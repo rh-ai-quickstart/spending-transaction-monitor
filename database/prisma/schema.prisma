@@ -1,0 +1,237 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User datastore
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  firstName         String
+  lastName          String
+  phoneNumber       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  isActive          Boolean  @default(true)
+  
+  // Address information
+  addressStreet     String?
+  addressCity       String?
+  addressState      String?
+  addressZipCode    String?
+  addressCountry    String?  @default("US")
+  
+  // Financial information
+  creditLimit       Decimal? @db.Decimal(12, 2)
+  currentBalance    Decimal? @db.Decimal(12, 2) @default(0.00)
+  
+  // Location tracking (with privacy consent)
+  locationConsentGiven      Boolean @default(false)
+  lastAppLocationLatitude   Float?
+  lastAppLocationLongitude  Float?
+  lastAppLocationTimestamp  DateTime?
+  lastAppLocationAccuracy   Float?   // Location accuracy in meters
+  
+  // Last transaction location
+  lastTransactionLatitude   Float?
+  lastTransactionLongitude  Float?
+  lastTransactionTimestamp  DateTime?
+  lastTransactionCity       String?
+  lastTransactionState      String?
+  lastTransactionCountry    String?
+  
+  // Relationships
+  creditCards       CreditCard[]
+  transactions      Transaction[]
+  alertRules        AlertRule[]
+  alertNotifications AlertNotification[]
+  
+  @@map("users")
+  @@index([addressCity, addressState])
+  @@index([locationConsentGiven])
+}
+
+// Credit card information
+model CreditCard {
+  id              String   @id @default(cuid())
+  userId          String
+  cardNumber      String   // Last 4 digits only for security
+  cardType        String   // Visa, MasterCard, etc.
+  bankName        String
+  cardHolderName  String
+  expiryMonth     Int
+  expiryYear      Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relationships
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  
+  @@map("credit_cards")
+}
+
+// Transaction datastore
+model Transaction {
+  id                String      @id @default(cuid())
+  userId            String
+  creditCardId      String
+  
+  // Transaction details
+  amount            Decimal     @db.Decimal(10, 2)
+  currency          String      @default("USD")
+  description       String
+  merchantName      String
+  merchantCategory  String      // MCC code or category
+  transactionDate   DateTime
+  transactionType   TransactionType @default(PURCHASE)
+  
+  // Location information
+  merchantLocation  String?
+  merchantCity      String?
+  merchantState     String?
+  merchantCountry   String?
+  
+  // Processing information
+  status            TransactionStatus @default(PENDING)
+  authorizationCode String?
+  referenceNumber   String?
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relationships
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditCard        CreditCard @relation(fields: [creditCardId], references: [id], onDelete: Cascade)
+  alertNotifications AlertNotification[]
+  
+  @@map("transactions")
+  @@index([userId, transactionDate])
+  @@index([merchantCategory])
+  @@index([amount])
+}
+
+// Alert rules datastore
+model AlertRule {
+  id                String      @id @default(cuid())
+  userId            String
+  
+  // Rule details
+  name              String
+  description       String?
+  isActive          Boolean     @default(true)
+  alertType         AlertType
+  
+  // Condition parameters
+  amountThreshold   Decimal?    @db.Decimal(10, 2)
+  merchantCategory  String?
+  merchantName      String?
+  location          String?
+  timeframe         String?     // e.g., "daily", "weekly", "monthly"
+  
+  // Natural language query for AI-driven alerts
+  naturalLanguageQuery String?
+  
+  // Notification preferences
+  notificationMethods NotificationMethod[] @default([EMAIL])
+  
+  // Metadata
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastTriggered     DateTime?
+  triggerCount      Int @default(0)
+  
+  // Relationships
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertNotifications AlertNotification[]
+  
+  @@map("alert_rules")
+  @@index([userId, isActive])
+}
+
+// Alert notifications log
+model AlertNotification {
+  id              String      @id @default(cuid())
+  userId          String
+  alertRuleId     String
+  transactionId   String?
+  
+  // Notification details
+  title           String
+  message         String
+  notificationMethod NotificationMethod
+  status          NotificationStatus @default(PENDING)
+  
+  // Delivery information
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relationships
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertRule       AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  transaction     Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  
+  @@map("alert_notifications")
+  @@index([userId, createdAt])
+}
+
+// Enums
+enum TransactionType {
+  PURCHASE
+  REFUND
+  CASHBACK
+  FEE
+  INTEREST
+  PAYMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  CANCELLED
+  SETTLED
+}
+
+enum AlertType {
+  AMOUNT_THRESHOLD      // Alert when transaction exceeds amount
+  MERCHANT_CATEGORY     // Alert for specific merchant categories
+  MERCHANT_NAME         // Alert for specific merchants
+  LOCATION_BASED        // Alert for transactions in specific locations
+  FREQUENCY_BASED       // Alert for unusual frequency of transactions
+  PATTERN_BASED         // AI-driven pattern recognition
+  CUSTOM_QUERY          // Natural language query-based alerts
+}
+
+enum NotificationMethod {
+  EMAIL
+  SMS
+  PUSH
+  WEBHOOK
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}

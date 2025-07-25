@@ -1,0 +1,42 @@
+{
+  "name": "spending-transaction-monitor",
+  "version": "1.0.0",
+  "description": "This document outlines a high-level architecture for an **AI-driven Spending Transaction Monitor** for credit card transactions, addressing the sophisticated natural language alerting requirements and user stories provided. It details the runtime data flow, the monorepo file structure, the specific technology stack for each component, and the comprehensive testing strategy.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node src/seed.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sauagarwa/spending-transaction-monitor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sauagarwa/spending-transaction-monitor/issues"
+  },
+  "homepage": "https://github.com/sauagarwa/spending-transaction-monitor#readme",
+  "dependencies": {
+    "@prisma/client": "^6.12.0",
+    "@types/pg": "^8.15.4",
+    "pg": "^8.16.3",
+    "prisma": "^6.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
