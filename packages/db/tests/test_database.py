@@ -12,5 +12,5 @@ from db.database import engine
 async def test_database_connection():
     """Test database connection"""
     async with engine.begin() as conn:
-        result = await conn.execute(text("SELECT 1"))
+        result = await conn.execute(text('SELECT 1'))
         assert result.scalar() == 1

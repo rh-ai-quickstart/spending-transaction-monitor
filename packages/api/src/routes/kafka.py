@@ -3,6 +3,7 @@ Test endpoints for Kafka consumer functionality
 """
 
 import json
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,9 @@ from pydantic import BaseModel
 
 from ..core.config import settings
 from ..services.kafka_consumer import transaction_consumer
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,7 +56,7 @@ def cleanup_kafka_producer():
             _kafka_producer = None
         except Exception as e:
             # Log the error but don't raise it during shutdown
-            print(f'Error closing Kafka producer: {e}')
+            logger.error(f'Error closing Kafka producer: {e}')
 
 
 @router.post('/send-test-transaction')

@@ -35,8 +35,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/example/spending-monitor"
-Repository = "https://github.com/example/spending-monitor.git"
+Homepage = "https://github.com/RHEcosystemAppEng/spending-transaction-monitor"
+Repository = "https://github.com/RHEcosystemAppEng/spending-transaction-monitor.git"
 
 [tool.hatch.version]
 path = "src/__init__.py"

@@ -1,6 +1,7 @@
 """Transaction endpoints"""
 
 import uuid
+from datetime import datetime
 
 from db import get_db
 from db.models import CreditCard, Transaction, User
@@ -57,8 +58,6 @@ async def get_transactions(
 
     if start_date:
         try:
-            from datetime import datetime
-
             start_datetime = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             query = query.where(Transaction.transaction_date >= start_datetime)
         except ValueError as e:
@@ -69,8 +68,6 @@ async def get_transactions(
 
     if end_date:
         try:
-            from datetime import datetime
-
             end_datetime = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
             query = query.where(Transaction.transaction_date <= end_datetime)
         except ValueError as e:

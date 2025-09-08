@@ -33,7 +33,6 @@ Columns:
 - merchant_zipcode: text
 - trans_num: text
 - authorization_code: text
-- trans_num: text
 
 Table: users
 Columns:
@@ -53,9 +52,9 @@ Columns:
 - last_transaction_latitude   float
 - last_merchant_longitude  float
 - last_transaction_timestamp  DateTime
-- last_merchant_city       String
-- last_merchant_state      String
-- last_merchant_country    String
+- last_merchant_city       text
+- last_merchant_state      text
+- last_merchant_country    text
 """
 
     prompt = f"""

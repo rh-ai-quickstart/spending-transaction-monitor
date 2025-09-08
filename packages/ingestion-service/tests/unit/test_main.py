@@ -28,9 +28,9 @@ class TestKafkaConnectionManager:
         """Test successful producer creation"""
         mock_producer_instance = MagicMock()
         mock_kafka_producer.return_value = mock_producer_instance
-        
+
         producer = kafka_manager.get_producer()
-        
+
         assert producer is mock_producer_instance
         assert kafka_manager.producer is mock_producer_instance
         mock_kafka_producer.assert_called_once()
@@ -38,10 +38,10 @@ class TestKafkaConnectionManager:
     @patch('src.main.KafkaProducer')
     def test_get_producer_failure(self, mock_kafka_producer):
         """Test producer creation failure"""
-        mock_kafka_producer.side_effect = Exception("Connection failed")
-        
+        mock_kafka_producer.side_effect = Exception('Connection failed')
+
         producer = kafka_manager.get_producer()
-        
+
         assert producer is None
         assert kafka_manager.producer is None
 
@@ -50,37 +50,37 @@ class TestKafkaConnectionManager:
         """Test health check when Kafka is healthy"""
         mock_producer_instance = MagicMock()
         mock_kafka_producer.return_value = mock_producer_instance
-        
+
         # First get a producer
         kafka_manager.get_producer()
-        
+
         health = kafka_manager.health_check()
-        
-        assert health["kafka_status"] == "healthy"
-        assert health["connection_pool_active"] is True
+
+        assert health['kafka_status'] == 'healthy'
+        assert health['connection_pool_active'] is True
 
     @patch('src.main.KafkaProducer')
     def test_health_check_unhealthy(self, mock_kafka_producer):
         """Test health check when Kafka is unhealthy"""
-        mock_kafka_producer.side_effect = Exception("Connection failed")
-        
+        mock_kafka_producer.side_effect = Exception('Connection failed')
+
         # Try to get a producer (will fail)
         kafka_manager.get_producer()
-        
+
         health = kafka_manager.health_check()
-        
-        assert health["kafka_status"] == "unhealthy"
-        assert health["connection_pool_active"] is False
+
+        assert health['kafka_status'] == 'unhealthy'
+        assert health['connection_pool_active'] is False
 
     @patch('src.main.KafkaProducer')
     def test_send_message_no_producer(self, mock_kafka_producer):
         """Test sending message when no producer is available"""
         # Mock KafkaProducer to raise exception to simulate connection failure
-        mock_kafka_producer.side_effect = Exception("Connection failed")
+        mock_kafka_producer.side_effect = Exception('Connection failed')
         kafka_manager.producer = None
-        
-        result = kafka_manager.send_message("test-topic", {"test": "data"})
-        
+
+        result = kafka_manager.send_message('test-topic', {'test': 'data'})
+
         assert result is False
 
     @patch('src.main.KafkaProducer')
@@ -89,33 +89,35 @@ class TestKafkaConnectionManager:
         mock_producer_instance = MagicMock()
         mock_future = MagicMock()
         mock_record_metadata = MagicMock()
-        mock_record_metadata.topic = "test-topic"
+        mock_record_metadata.topic = 'test-topic'
         mock_record_metadata.partition = 0
         mock_record_metadata.offset = 123
         mock_future.get.return_value = mock_record_metadata
         mock_producer_instance.send.return_value = mock_future
         mock_kafka_producer.return_value = mock_producer_instance
-        
+
         # Get producer first
         kafka_manager.get_producer()
-        
-        result = kafka_manager.send_message("test-topic", {"test": "data"})
-        
+
+        result = kafka_manager.send_message('test-topic', {'test': 'data'})
+
         assert result is True
-        mock_producer_instance.send.assert_called_once_with("test-topic", {"test": "data"})
+        mock_producer_instance.send.assert_called_once_with(
+            'test-topic', {'test': 'data'}
+        )
 
     @patch('src.main.KafkaProducer')
     def test_send_message_failure(self, mock_kafka_producer):
         """Test message sending failure"""
         mock_producer_instance = MagicMock()
-        mock_producer_instance.send.side_effect = Exception("Send failed")
+        mock_producer_instance.send.side_effect = Exception('Send failed')
         mock_kafka_producer.return_value = mock_producer_instance
-        
+
         # Get producer first
         kafka_manager.get_producer()
-        
-        result = kafka_manager.send_message("test-topic", {"test": "data"})
-        
+
+        result = kafka_manager.send_message('test-topic', {'test': 'data'})
+
         assert result is False
         # Producer should be reset after failure
         assert kafka_manager.producer is None
@@ -123,12 +125,12 @@ class TestKafkaConnectionManager:
 
 class TestTransactionTransformation:
     """Test transaction transformation logic"""
-    
+
     def test_transform_transaction_success(self):
         """Test successful transaction transformation"""
         from src.common.models import IncomingTransaction
         from src.main import transform_transaction
-        
+
         test_data = {
             'User': 1,
             'Card': 1,
@@ -144,12 +146,12 @@ class TestTransactionTransformation:
             'Zip': '10001',
             'MCC': 5411,
             'Errors?': '',
-            'Is Fraud?': 'No'
+            'Is Fraud?': 'No',
         }
-        
+
         incoming = IncomingTransaction(**test_data)
         result = transform_transaction(incoming)
-        
+
         assert result.user == 1
         assert result.amount == 10.0
         assert result.is_fraud is False
@@ -159,7 +161,7 @@ class TestTransactionTransformation:
         """Test transaction transformation with fraud=Yes"""
         from src.common.models import IncomingTransaction
         from src.main import transform_transaction
-        
+
         test_data = {
             'User': 1,
             'Card': 1,
@@ -175,10 +177,10 @@ class TestTransactionTransformation:
             'Zip': '10001',
             'MCC': 5411,
             'Errors?': '',
-            'Is Fraud?': 'Yes'
+            'Is Fraud?': 'Yes',
         }
-        
+
         incoming = IncomingTransaction(**test_data)
         result = transform_transaction(incoming)
-        
+
         assert result.is_fraud is True
