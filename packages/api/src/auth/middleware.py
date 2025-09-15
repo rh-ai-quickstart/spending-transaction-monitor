@@ -5,10 +5,10 @@ JWT Authentication middleware for Keycloak integration using python-jose
 from datetime import datetime, timedelta
 import logging
 
-import requests
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -300,7 +300,7 @@ async def get_current_user(
             test_user_email = request.headers.get('X-Test-User-Email')
             if test_user_email:
                 return await get_test_user(test_user_email, session)
-        
+
         # Fallback to current behavior (first user or mock)
         return await get_dev_fallback_user(session)
 
@@ -335,7 +335,7 @@ async def require_authentication(
             test_user_email = request.headers.get('X-Test-User-Email')
             if test_user_email:
                 return await get_test_user(test_user_email, session)
-        
+
         # Fallback to current behavior (first user or mock)
         return await get_dev_fallback_user(session)
 
@@ -357,8 +357,7 @@ def require_role(required_role: str):
     """Decorator to require specific role"""
 
     async def role_checker(
-        user: dict = Depends(require_authentication),
-        request: Request = None
+        user: dict = Depends(require_authentication), request: Request = None
     ) -> dict:
         user_roles = user.get('roles', [])
         if required_role not in user_roles:
@@ -375,8 +374,7 @@ def require_any_role(required_roles: list[str]):
     """Decorator to require any of the specified roles"""
 
     async def role_checker(
-        user: dict = Depends(require_authentication),
-        request: Request = None
+        user: dict = Depends(require_authentication), request: Request = None
     ) -> dict:
         user_roles = user.get('roles', [])
         if not any(role in user_roles for role in required_roles):
