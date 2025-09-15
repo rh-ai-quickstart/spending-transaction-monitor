@@ -12,6 +12,11 @@ import {
 import { authConfig } from '../config/auth';
 import type { User, AuthContextType } from '../types/auth';
 import { DEV_USER } from '../constants/auth';
+import {
+  useLocationOnMount,
+  storeLocation,
+  clearStoredLocation,
+} from '../hooks/useLocation';
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -20,6 +25,17 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
  */
 const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode }) => {
   const [user] = useState<User>(DEV_USER);
+  const { location } = useLocationOnMount(true); // Auto-request location in dev mode
+
+  // Store location when captured
+  useEffect(() => {
+    if (location) {
+      storeLocation(location);
+      if (import.meta.env.DEV) {
+        console.log('📍 Development mode - location captured for fraud detection');
+      }
+    }
+  }, [location]);
 
   const login = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -31,6 +47,7 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
     if (import.meta.env.DEV) {
       console.log('🔓 Dev mode: logout() called - staying authenticated');
     }
+    clearStoredLocation(); // Clear location data on logout
   }, []);
 
   const signinRedirect = useCallback(() => {
@@ -106,6 +123,8 @@ ProductionAuthProvider.displayName = 'ProductionAuthProvider';
 const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode }) => {
   const oidcAuth = useOIDCAuth();
   const [user, setUser] = useState<User | null>(null);
+  const [hasRequestedLocation, setHasRequestedLocation] = useState(false);
+  const { location, requestLocation } = useLocationOnMount(false); // Don't auto-request, we'll do it manually on login
 
   useEffect(() => {
     if (oidcAuth.user) {
@@ -120,6 +139,12 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       };
       setUser(newUser);
 
+      // Request location on successful login (only once per session)
+      if (!hasRequestedLocation) {
+        requestLocation();
+        setHasRequestedLocation(true);
+      }
+
       if (import.meta.env.DEV) {
         console.log('🔒 User authenticated via OIDC:', {
           id: oidcAuth.user.profile.sub,
@@ -128,8 +153,20 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       }
     } else {
       setUser(null);
+      setHasRequestedLocation(false);
+      clearStoredLocation(); // Clear location data on logout
     }
-  }, [oidcAuth.user]);
+  }, [oidcAuth.user, hasRequestedLocation, requestLocation]);
+
+  // Store location when captured
+  useEffect(() => {
+    if (location && user) {
+      storeLocation(location);
+      if (import.meta.env.DEV) {
+        console.log('📍 Production mode - location captured for fraud detection');
+      }
+    }
+  }, [location, user]);
 
   const login = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
   const logout = useCallback(() => oidcAuth.signoutRedirect(), [oidcAuth]);
