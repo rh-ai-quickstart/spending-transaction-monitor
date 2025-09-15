@@ -111,6 +111,59 @@ BYPASS_AUTH=true   # Force enable bypass
 BYPASS_AUTH=false  # Force disable bypass
 ```
 
+### 3.1. Enhanced Dev Mode - Dynamic User Selection ✅ IMPLEMENTED
+
+**Header-Based User Selection**:
+
+The development bypass now supports **dynamic user selection** via headers for better multi-user testing scenarios.
+
+```python
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    session: AsyncSession = Depends(get_db) if get_db else None,
+    request: Request = None,
+) -> dict | None:
+    if settings.BYPASS_AUTH:
+        # 🆕 NEW: Check for test user header (dynamic user selection)
+        if request is not None:
+            test_user_email = request.headers.get('X-Test-User-Email')
+            if test_user_email:
+                return await get_test_user(test_user_email, session)
+        
+        # Fallback to current behavior (first user or mock)
+        return await get_dev_fallback_user(session)
+```
+
+**🆕 Enhanced Testing Capabilities**:
+
+```bash
+# Test as specific user (must exist in database)
+curl -H "X-Test-User-Email: alice@example.com" http://localhost:8000/api/users/me
+
+# Test as admin user  
+curl -H "X-Test-User-Email: admin@company.com" http://localhost:8000/api/transactions
+
+# Test user with specific transaction history
+curl -H "X-Test-User-Email: user1@example.com" http://localhost:8000/api/users/me/transactions
+
+# No header = current behavior (first user or mock)
+curl http://localhost:8000/api/users/me
+```
+
+**Error Handling & Security**:
+
+- ✅ **User not found**: Returns `400` error with clear message
+- ✅ **Production safety**: Header completely ignored when `BYPASS_AUTH=false`
+- ✅ **Clear logging**: Test user selection logged with `🧪 DEV MODE` prefix
+- ✅ **Fail-secure**: Falls back to mock user if database unavailable
+
+**Use Cases**:
+
+- 🧪 **Multi-user testing**: Test different user roles and permissions
+- 📊 **Transaction history**: Test with users having different transaction patterns
+- 🔒 **Role testing**: Verify admin vs user access controls
+- ⚡ **Quick switching**: No need to modify database or restart services
+
 ### 4. Frontend Integration ✅ IMPLEMENTED
 
 **Auth Configuration** (`packages/ui/src/config/auth.ts`):
