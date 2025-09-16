@@ -16,7 +16,7 @@ export default defineConfig({
     port: parseInt(process.env.UI_PORT || process.env.PORT || '3000'),
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

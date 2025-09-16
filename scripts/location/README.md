@@ -1,50 +1,30 @@
 # Location-Based Scripts
 
-This directory contains scripts for testing and validating the location-based fraud detection system.
+This directory contains development tools for the location-based fraud detection system.
 
 ## Scripts
 
-### 🧪 `test-location-fraud-detection.py`
-**Purpose**: End-to-end testing of the location-based fraud detection system
+### 📊 `monitor-location-data.py`
+**Purpose**: Real-time monitoring of location data during development and testing
 
 **What it does**:
-- Tests API health and connectivity
-- Simulates user location capture via HTTP headers
-- Creates location-based alert rules
-- Creates test transactions with different geographic locations
-- Verifies alert notifications are triggered for suspicious distances
+- Monitors user location consent status in real-time
+- Tracks GPS coordinate updates in the database
+- Displays location accuracy and timestamps
+- Provides development feedback during frontend testing
 
 **Usage**:
 ```bash
 # From the project root
 cd packages/api
-uv run python ../../scripts/location/test-location-fraud-detection.py
+uv run python ../../scripts/location/monitor-location-data.py
 ```
 
-**Test Scenarios**:
-- **Nearby Transaction**: Brooklyn, NY (~13km from NYC user location) - should NOT trigger alert
-- **Distant Transaction**: Los Angeles, CA (~3944km from NYC user location) - should trigger alert
-
-### 🔍 `verify-database-functions.py`
-**Purpose**: Direct database validation of location calculation functions
-
-**What it does**:
-- Tests the `haversine_distance_km()` PostgreSQL function directly
-- Validates the `transaction_location_analysis` VIEW
-- Checks user location data persistence
-- Verifies distance calculations and risk level categorization
-
-**Usage**:
-```bash
-# From the project root
-cd packages/api
-uv run python ../../scripts/location/verify-database-functions.py
-```
-
-**Database Components Tested**:
-- Distance calculations (NYC to LA, NYC to Brooklyn)
-- Transaction location analysis with risk levels
-- User location data storage and consent management
+**Workflow**:
+1. Start the monitor script in one terminal
+2. Start the frontend and backend services (`pnpm dev`)
+3. Open browser to http://localhost:3000
+4. Test location consent flow - monitor shows real-time updates
 
 ## Prerequisites
 
@@ -60,18 +40,16 @@ uv run python ../../scripts/location/verify-database-functions.py
 
 ## Expected Results
 
-### Test Script Output
-- ✅ API health check
-- ✅ User location capture simulation
-- ✅ Transaction creation (both nearby and distant)
-- ⚠️ Alert rule creation (may need LLM configuration)
-- ✅ Alert notification checking
+### Monitor Output
+- ✅ Real-time location consent status updates
+- ✅ GPS coordinate tracking (latitude, longitude)
+- ✅ Location accuracy monitoring (±meters)
+- ✅ Timestamp tracking for location updates
+- ✅ Database persistence confirmation
 
-### Database Verification Output
-- ✅ Distance calculations with ~99.8% accuracy
-- ✅ Risk level categorization (NORMAL, LOW_RISK, HIGH_RISK, VERY_HIGH_RISK)
-- ✅ User location data persistence
-- ✅ Real-time transaction location analysis
+### Development Feedback
+- 🔄 `Consent: None | Location: No location` - Initial state
+- ✅ `Consent: true | Location: 45.459, -73.423` - After user grants permission
 
 ## Troubleshooting
 
@@ -79,7 +57,7 @@ uv run python ../../scripts/location/verify-database-functions.py
 If you get Python import errors, ensure you're running from the correct directory:
 ```bash
 cd packages/api
-uv run python ../../scripts/location/script-name.py
+uv run python ../../scripts/location/monitor-location-data.py
 ```
 
 ### API Connection Issues
