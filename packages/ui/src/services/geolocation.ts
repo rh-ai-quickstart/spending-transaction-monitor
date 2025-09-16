@@ -17,12 +17,12 @@ export interface UserLocation {
 export function getCurrentLocation(): Promise<UserLocation> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Geolocation is not supported by your browser."));
+      reject(new Error('Geolocation is not supported by your browser.'));
       return;
     }
 
     console.log('🌍 Requesting geolocation permission...');
-    
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         console.log('✅ Location permission granted and coordinates received');
@@ -41,7 +41,7 @@ export function getCurrentLocation(): Promise<UserLocation> {
         enableHighAccuracy: true,
         timeout: 15000,
         maximumAge: 0, // Always get fresh location
-      }
+      },
     );
   });
 }
@@ -51,10 +51,10 @@ export function getCurrentLocation(): Promise<UserLocation> {
  */
 export function watchLocation(
   onSuccess: (loc: UserLocation) => void,
-  onError?: (err: Error) => void
+  onError?: (err: Error) => void,
 ): number {
   if (!navigator.geolocation) {
-    onError?.(new Error("Geolocation is not supported by your browser."));
+    onError?.(new Error('Geolocation is not supported by your browser.'));
     return -1;
   }
 
@@ -74,7 +74,7 @@ export function watchLocation(
       enableHighAccuracy: true,
       timeout: 10000,
       maximumAge: 0,
-    }
+    },
   );
   return id;
 }
@@ -91,7 +91,9 @@ export function clearWatch(id: number) {
 /**
  * Check current permission state
  */
-export async function checkLocationPermission(): Promise<'granted' | 'denied' | 'prompt'> {
+export async function checkLocationPermission(): Promise<
+  'granted' | 'denied' | 'prompt'
+> {
   if ('permissions' in navigator) {
     const permission = await navigator.permissions.query({ name: 'geolocation' });
     return permission.state;
