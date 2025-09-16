@@ -56,9 +56,7 @@ export const Secondary: Story = {
 export const WithoutIcon: Story = {
   render: (args) => (
     <Alert {...args}>
-      <AlertDescription>
-        This is an alert without an icon.
-      </AlertDescription>
+      <AlertDescription>This is an alert without an icon.</AlertDescription>
     </Alert>
   ),
 };
