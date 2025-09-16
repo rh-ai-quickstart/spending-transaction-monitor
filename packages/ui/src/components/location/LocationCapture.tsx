@@ -38,11 +38,13 @@ export function LocationCapture({
   autoRequest = false,
   className,
 }: LocationCaptureProps) {
-  const { location, error, loading, requestLocation, clearLocation } =
-    useUserLocation(false, true); // Don't watch, do send to backend
+  const { location, error, loading, requestLocation, clearLocation } = useUserLocation(
+    false,
+    true,
+  ); // Don't watch, do send to backend
   const [showConsent, setShowConsent] = useState(showConsentDialog);
   const [hasUserDeclined, setHasUserDeclined] = useState(false);
-  
+
   const isSupported = 'geolocation' in navigator;
   const isLoading = loading;
 
@@ -267,7 +269,12 @@ export function LocationDebug({ location }: { location: UserLocation | null }) {
         <div>Lat: {location.latitude.toFixed(6)}</div>
         <div>Lng: {location.longitude.toFixed(6)}</div>
         <div>Accuracy: ±{Math.round(location.accuracy)}m</div>
-        <div>Captured: {location.timestamp ? new Date(location.timestamp).toLocaleTimeString() : 'N/A'}</div>
+        <div>
+          Captured:{' '}
+          {location.timestamp
+            ? new Date(location.timestamp).toLocaleTimeString()
+            : 'N/A'}
+        </div>
       </CardContent>
     </Card>
   );

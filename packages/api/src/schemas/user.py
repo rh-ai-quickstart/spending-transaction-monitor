@@ -12,7 +12,7 @@ class UserOut(BaseModel):
     updated_at: str | None = None
     credit_cards_count: int
     transactions_count: int
-    
+
     # Location fields
     location_consent_given: bool | None = None
     last_app_location_latitude: float | None = None

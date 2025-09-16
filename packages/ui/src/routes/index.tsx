@@ -258,7 +258,7 @@ function Index() {
       <StatsList stats={transactionStats} variant="default" columns={4} />
 
       {/* Location-Based Fraud Detection */}
-      <LocationCapture 
+      <LocationCapture
         onLocationCaptured={(location) => {
           console.log('Location captured for fraud detection:', location);
         }}
