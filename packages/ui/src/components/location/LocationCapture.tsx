@@ -15,16 +15,13 @@ import {
 import { Alert, AlertDescription } from '../atoms/alert/alert';
 import { Badge } from '../atoms/badge/badge';
 import { MapPin, Shield, AlertTriangle, CheckCircle2, X } from 'lucide-react';
-import {
-  useLocation,
-  type LocationData,
-  type LocationError,
-} from '../../hooks/useLocation';
+import { useUserLocation } from '../../hooks/useGeolocation';
+import type { UserLocation } from '../../services/geolocation';
 
 interface LocationCaptureProps {
-  onLocationCaptured?: (location: LocationData) => void;
+  onLocationCaptured?: (location: UserLocation) => void;
   onLocationDenied?: () => void;
-  onLocationError?: (error: LocationError) => void;
+  onLocationError?: (error: string) => void;
   showConsentDialog?: boolean;
   autoRequest?: boolean;
   className?: string;
@@ -41,10 +38,13 @@ export function LocationCapture({
   autoRequest = false,
   className,
 }: LocationCaptureProps) {
-  const { location, error, isLoading, isSupported, requestLocation, clearLocation } =
-    useLocation();
+  const { location, error, loading, requestLocation, clearLocation } =
+    useUserLocation(false, true); // Don't watch, do send to backend
   const [showConsent, setShowConsent] = useState(showConsentDialog);
   const [hasUserDeclined, setHasUserDeclined] = useState(false);
+  
+  const isSupported = 'geolocation' in navigator;
+  const isLoading = loading;
 
   // Handle location capture success
   useEffect(() => {
@@ -56,7 +56,7 @@ export function LocationCapture({
   // Handle location errors
   useEffect(() => {
     if (error) {
-      if (error.code === 1) {
+      if (error.includes('denied') || error.includes('permission')) {
         // PERMISSION_DENIED
         setHasUserDeclined(true);
         onLocationDenied?.();
@@ -87,10 +87,10 @@ export function LocationCapture({
     requestLocation,
   ]);
 
-  const handleGrantConsent = useCallback(() => {
+  const handleGrantConsent = useCallback(async () => {
     setShowConsent(false);
     setHasUserDeclined(false);
-    requestLocation();
+    await requestLocation();
   }, [requestLocation]);
 
   const handleDenyConsent = useCallback(() => {
@@ -99,10 +99,10 @@ export function LocationCapture({
     onLocationDenied?.();
   }, [onLocationDenied]);
 
-  const handleRetryLocation = useCallback(() => {
+  const handleRetryLocation = useCallback(async () => {
     clearLocation();
     setHasUserDeclined(false);
-    requestLocation();
+    await requestLocation();
   }, [clearLocation, requestLocation]);
 
   if (!isSupported) {
@@ -168,7 +168,7 @@ export function LocationCapture({
       <Alert variant="destructive" className={className}>
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between">
-          <span>{error.message}</span>
+          <span>{error}</span>
           {!hasUserDeclined && (
             <Button size="sm" variant="outline" onClick={handleRetryLocation}>
               Retry
@@ -218,8 +218,8 @@ export function LocationStatus({
   error,
   className,
 }: {
-  location: LocationData | null;
-  error: LocationError | null;
+  location: UserLocation | null;
+  error: string | null;
   className?: string;
 }) {
   if (location) {
@@ -231,7 +231,7 @@ export function LocationStatus({
     );
   }
 
-  if (error?.code === 1) {
+  if (error && error.includes('denied')) {
     return (
       <Badge variant="outline" className={className}>
         <X className="h-3 w-3 mr-1" />
@@ -255,7 +255,7 @@ export function LocationStatus({
 /**
  * Location debugging component (dev mode only)
  */
-export function LocationDebug({ location }: { location: LocationData | null }) {
+export function LocationDebug({ location }: { location: UserLocation | null }) {
   if (!import.meta.env.DEV || !location) return null;
 
   return (
@@ -267,7 +267,7 @@ export function LocationDebug({ location }: { location: LocationData | null }) {
         <div>Lat: {location.latitude.toFixed(6)}</div>
         <div>Lng: {location.longitude.toFixed(6)}</div>
         <div>Accuracy: ±{Math.round(location.accuracy)}m</div>
-        <div>Captured: {new Date(location.timestamp).toLocaleTimeString()}</div>
+        <div>Captured: {location.timestamp ? new Date(location.timestamp).toLocaleTimeString() : 'N/A'}</div>
       </CardContent>
     </Card>
   );

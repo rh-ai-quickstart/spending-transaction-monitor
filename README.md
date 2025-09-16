@@ -1,7 +1,7 @@
 <!-- omit from toc -->
 # Spending Transaction Monitor
 
-Alerting for credit card transactions with rule-based and future natural-language rules.
+Alerting for credit card transactions with rule-based fraud detection and location-based security monitoring.
 
 For contribution guidelines and repo conventions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 <!-- omit from toc -->
@@ -34,7 +34,8 @@ Packages
 ## How it works
 
 - Users create alert rules (amount, merchant, category, timeframe, location; notification methods: email/SMS/push/webhook).
-- Incoming transactions are stored and evaluated against active rules.
+- Location-based fraud detection captures user GPS coordinates for enhanced security monitoring.
+- Incoming transactions are stored and evaluated against active rules, including location-based risk assessment.
 - Triggered rules produce alert notifications which are delivered via configured channels.
 
 ```mermaid

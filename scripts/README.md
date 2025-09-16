@@ -22,13 +22,12 @@ Scripts for authentication setup, development workflows, and Keycloak integratio
 Scripts for testing and validating the location-based fraud detection system.
 
 **Scripts**:
-- `test-location-fraud-detection.py` - End-to-end system testing
-- `verify-database-functions.py` - Database function validation
+- `monitor-location-data.py` - Real-time location data monitoring for development
 
 **Use Cases**:
-- Testing location capture and processing
-- Validating distance calculations
-- Verifying fraud detection algorithms
+- Monitoring location capture during development
+- Real-time validation of location consent flow
+- Debugging location-based fraud detection system
 
 [📖 Detailed Documentation](location/README.md)
 
@@ -51,17 +50,16 @@ python scripts/auth/setup_keycloak.py
 pnpm dev:backend
 ```
 
-### For Location System Testing
+### For Location System Development
 ```bash
-# Start the backend system
-pnpm dev:backend
+# Start the backend and frontend systems
+pnpm dev
 
-# Run end-to-end location fraud detection test
+# Monitor location data in real-time (in separate terminal)
 cd packages/api
-uv run python ../../scripts/location/test-location-fraud-detection.py
+uv run python ../../scripts/location/monitor-location-data.py
 
-# Verify database location functions
-uv run python ../../scripts/location/verify-database-functions.py
+# Open browser to http://localhost:3000 and test location consent flow
 ```
 
 ### For System Health Check
@@ -83,55 +81,50 @@ pnpm dev  # Full stack with auth bypass
 pnpm dev:backend  # Backend only
 ```
 
-### 2. Feature Testing
+### 2. Feature Development
 ```bash
 # Test authentication features
 cd scripts/auth && ./auth-dev.sh
 
-# Test location features  
+# Monitor location features in development
 cd packages/api
-uv run python ../../scripts/location/test-location-fraud-detection.py
+uv run python ../../scripts/location/monitor-location-data.py
 
 # Check system health
 bash scripts/status-check.sh
 ```
 
-### 3. Database Validation
+### 3. Database Management
 ```bash
-# Verify location database functions
-cd packages/api
-uv run python ../../scripts/location/verify-database-functions.py
-
 # Check database migrations
 pnpm db:upgrade
 pnpm db:verify
+
+# Start/stop database services
+pnpm db:start
+pnpm db:stop
 ```
 
 ## 🎯 Script Categories
 
-### Testing Scripts
-- **Location Testing**: Comprehensive fraud detection system validation
-- **Authentication Testing**: Auth flow and security validation
-- **Database Testing**: Function and schema verification
-
 ### Development Scripts
+- **Location Monitoring**: Real-time location data development monitoring
 - **Auth Development**: Keycloak setup and development utilities
 - **System Utilities**: Health checks and status monitoring
 
-### Validation Scripts
-- **End-to-End Testing**: Full system integration testing
-- **Component Testing**: Individual feature validation
-- **Performance Testing**: Database function benchmarks
+### Monitoring Scripts
+- **Location System**: Real-time GPS coordinate and consent monitoring
+- **System Health**: Database and API server status checking
 
 ## 📊 Expected Results
 
-### Location System Tests
-- ✅ 99.8% accurate distance calculations
-- ✅ Real-time risk assessment
-- ✅ Transaction location analysis
-- ✅ User location persistence
+### Location System Monitoring
+- ✅ Real-time GPS coordinate capture
+- ✅ User location consent tracking
+- ✅ Location accuracy monitoring
+- ✅ Database location data persistence
 
-### Authentication Tests
+### Authentication System
 - ✅ Development auth bypass working
 - ✅ JWT token validation
 - ✅ User context management
@@ -151,7 +144,7 @@ pnpm db:verify
 ```bash
 # Ensure you're running from correct directory
 cd packages/api
-uv run python ../../scripts/location/script-name.py
+uv run python ../../scripts/location/monitor-location-data.py
 ```
 
 **Permission Errors**:
