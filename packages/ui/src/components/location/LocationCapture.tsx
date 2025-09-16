@@ -3,11 +3,11 @@
  * Handles user location consent and capture for fraud detection
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Alert, AlertDescription } from '../ui/alert';
-import { Badge } from '../ui/badge';
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from '../atoms/button/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../atoms/card/card';
+import { Alert, AlertDescription } from '../atoms/alert/alert';
+import { Badge } from '../atoms/badge/badge';
 import { MapPin, Shield, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import {
   useLocation,
