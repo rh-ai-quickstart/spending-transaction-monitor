@@ -59,7 +59,7 @@ class UserUpdate(BaseModel):
     last_app_location_timestamp: datetime | None = Field(
         None, description='Last app location timestamp'
     )
-    lastAppLocationAccuracy: float | None = Field(
+    last_app_location_accuracy: float | None = Field(
         None, description='Last app location accuracy'
     )
 
@@ -209,6 +209,22 @@ async def get_current_user(
         'updated_at': user.updated_at.isoformat() if user.updated_at else None,
         'credit_cards_count': credit_cards_count,
         'transactions_count': transactions_count,
+        # Location fields
+        'location_consent_given': user.location_consent_given,
+        'last_app_location_latitude': user.last_app_location_latitude,
+        'last_app_location_longitude': user.last_app_location_longitude,
+        'last_app_location_timestamp': user.last_app_location_timestamp.isoformat()
+        if user.last_app_location_timestamp
+        else None,
+        'last_app_location_accuracy': user.last_app_location_accuracy,
+        'last_transaction_latitude': user.last_transaction_latitude,
+        'last_transaction_longitude': user.last_transaction_longitude,
+        'last_transaction_timestamp': user.last_transaction_timestamp.isoformat()
+        if user.last_transaction_timestamp
+        else None,
+        'last_transaction_city': user.last_transaction_city,
+        'last_transaction_state': user.last_transaction_state,
+        'last_transaction_country': user.last_transaction_country,
     }
 
 
@@ -251,6 +267,22 @@ async def create_user(
             'updated_at': user.updated_at.isoformat() if user.updated_at else None,
             'credit_cards_count': 0,
             'transactions_count': 0,
+            # Location fields (null for new users)
+            'location_consent_given': user.location_consent_given,
+            'last_app_location_latitude': user.last_app_location_latitude,
+            'last_app_location_longitude': user.last_app_location_longitude,
+            'last_app_location_timestamp': user.last_app_location_timestamp.isoformat()
+            if user.last_app_location_timestamp
+            else None,
+            'last_app_location_accuracy': user.last_app_location_accuracy,
+            'last_transaction_latitude': user.last_transaction_latitude,
+            'last_transaction_longitude': user.last_transaction_longitude,
+            'last_transaction_timestamp': user.last_transaction_timestamp.isoformat()
+            if user.last_transaction_timestamp
+            else None,
+            'last_transaction_city': user.last_transaction_city,
+            'last_transaction_state': user.last_transaction_state,
+            'last_transaction_country': user.last_transaction_country,
         }
     except SQLAlchemyError as err:
         raise HTTPException(status_code=500, detail=str(err)) from err
@@ -302,8 +334,6 @@ async def update_user(
                 update_data[field] = value
 
         if update_data:
-            from datetime import datetime
-
             update_data['updated_at'] = datetime.now(UTC)
 
             # Update the user object
@@ -327,6 +357,22 @@ async def update_user(
             'updated_at': user.updated_at.isoformat() if user.updated_at else None,
             'credit_cards_count': credit_cards_count,
             'transactions_count': transactions_count,
+            # Location fields
+            'location_consent_given': user.location_consent_given,
+            'last_app_location_latitude': user.last_app_location_latitude,
+            'last_app_location_longitude': user.last_app_location_longitude,
+            'last_app_location_timestamp': user.last_app_location_timestamp.isoformat()
+            if user.last_app_location_timestamp
+            else None,
+            'last_app_location_accuracy': user.last_app_location_accuracy,
+            'last_transaction_latitude': user.last_transaction_latitude,
+            'last_transaction_longitude': user.last_transaction_longitude,
+            'last_transaction_timestamp': user.last_transaction_timestamp.isoformat()
+            if user.last_transaction_timestamp
+            else None,
+            'last_transaction_city': user.last_transaction_city,
+            'last_transaction_state': user.last_transaction_state,
+            'last_transaction_country': user.last_transaction_country,
         }
     except SQLAlchemyError as err:
         raise HTTPException(status_code=500, detail=str(err)) from err
@@ -501,8 +547,6 @@ async def deactivate_user(
             raise HTTPException(status_code=404, detail='User not found')
 
         user.is_active = False
-        from datetime import datetime
-
         user.updated_at = datetime.now(UTC)
 
         await session.commit()
@@ -528,8 +572,6 @@ async def activate_user(
             raise HTTPException(status_code=404, detail='User not found')
 
         user.is_active = True
-        from datetime import datetime
-
         user.updated_at = datetime.now(UTC)
 
         await session.commit()
@@ -551,8 +593,6 @@ async def update_user_location(
         user_id = current_user['id']
 
         # Update user location in database
-        from datetime import datetime
-
         current_time = datetime.now(UTC)
 
         # Get the user first
