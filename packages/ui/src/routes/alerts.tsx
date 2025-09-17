@@ -4,6 +4,10 @@ import { Card } from '../components/atoms/card/card';
 import { Button } from '../components/atoms/button/button';
 import { Badge } from '../components/atoms/badge/badge';
 import { AlertRuleForm } from '../components/alert-rule-form/alert-rule-form';
+import {
+  AlertRuleValidation,
+  type ValidationResult,
+} from '../components/alert-rule-validation/alert-rule-validation';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import {
   Dialog,
@@ -13,12 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/atoms/dialog/dialog';
-import { Bell, Pause, Play, Trash2 } from 'lucide-react';
+import { Bell, Pause, Play, Trash2, AlertTriangle, X } from 'lucide-react';
 import {
   useAlertRules,
-  useCreateAlertRule,
+  useCreateAlertRuleFromValidation,
   useToggleAlertRule,
   useDeleteAlertRule,
+  useValidateAlertRule,
 } from '../hooks/transactions';
 import { cn } from '../lib/utils';
 import { statusColors } from '../lib/colors';
@@ -34,21 +39,68 @@ export const Route = createFileRoute('/alerts')({
 
 function AlertsPage() {
   const { data: rules, isLoading } = useAlertRules();
-  const createRule = useCreateAlertRule();
+  const createRuleFromValidation = useCreateAlertRuleFromValidation();
+  const validateRule = useValidateAlertRule();
   const toggleRule = useToggleAlertRule();
   const deleteRule = useDeleteAlertRule();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<{ id: string; name: string } | null>(
     null,
   );
+  const [createError, setCreateError] = useState<{
+    rule: string;
+    message: string;
+  } | null>(null);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(
+    null,
+  );
+  const [pendingRule, setPendingRule] = useState<string | null>(null);
 
-  const handleCreateRule = async (data: CreateAlertRuleInput) => {
+  const handleValidateRule = async (data: CreateAlertRuleInput) => {
     try {
-      await createRule.mutateAsync(data.rule);
+      setCreateError(null);
+      setValidationResult(null);
+      setPendingRule(data.rule);
+
+      const result = await validateRule.mutateAsync(data.rule);
+      setValidationResult(result);
+    } catch (error) {
+      console.error('Failed to validate rule:', error);
+      setCreateError({
+        rule: data.rule,
+        message: 'Failed to validate the alert rule. Please try again.',
+      });
+    }
+  };
+
+  const handleConfirmCreateRule = async () => {
+    if (!pendingRule || !validationResult) return;
+
+    try {
+      setCreateError(null);
+      await createRuleFromValidation.mutateAsync({
+        alert_rule: validationResult.alert_rule,
+        sql_query: validationResult.sql_query,
+        natural_language_query: pendingRule,
+      });
+      setValidationResult(null);
+      setPendingRule(null);
     } catch (error) {
       console.error('Failed to create rule:', error);
-      // TODO: Show error toast notification
+      setCreateError({
+        rule: pendingRule,
+        message: 'Failed to create the alert rule. Please try again.',
+      });
     }
+  };
+
+  const handleDismissValidation = () => {
+    setValidationResult(null);
+    setPendingRule(null);
+  };
+
+  const dismissError = () => {
+    setCreateError(null);
   };
 
   const handleToggleRule = (ruleId: string) => {
@@ -87,10 +139,75 @@ function AlertsPage() {
       {/* Alert Rule Form */}
       <div className="mb-8">
         <AlertRuleForm
-          onSubmit={handleCreateRule}
-          isSubmitting={createRule.isPending}
+          onSubmit={handleValidateRule}
+          isSubmitting={validateRule.isPending}
         />
       </div>
+
+      {/* Validation Result Display */}
+      {validationResult && (
+        <AlertRuleValidation
+          validationResult={validationResult}
+          onConfirm={handleConfirmCreateRule}
+          onDismiss={handleDismissValidation}
+          isCreating={createRuleFromValidation.isPending}
+        />
+      )}
+
+      {/* Error Display */}
+      {createError && (
+        <div className="mb-8">
+          <Card
+            className={cn('border-l-4 p-4', statusColors.error.card, 'border-red-500')}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="flex-shrink-0">
+                  <AlertTriangle
+                    className={cn('h-5 w-5 mt-0.5', statusColors.error.icon)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="font-medium text-red-900 dark:text-red-100">
+                      Alert Rule Failed
+                    </p>
+                  </div>
+
+                  {/* Display the failed rule */}
+                  <div className="mb-3 p-3 bg-red-100/50 dark:bg-red-950/30 rounded-md border border-red-200/50 dark:border-red-800/30">
+                    <p className="text-sm font-mono text-red-800 dark:text-red-200 italic">
+                      "{createError.rule}"
+                    </p>
+                  </div>
+
+                  {/* User-friendly error message */}
+                  <p className="text-sm text-red-700 dark:text-red-300 leading-relaxed">
+                    {createError.message}
+                  </p>
+
+                  <div className="mt-3">
+                    <Badge
+                      variant="secondary"
+                      className={cn('capitalize', statusColors.error.badge)}
+                    >
+                      Invalid Rule
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={dismissError}
+                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-950/50"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Active Rules */}
       <div className="space-y-4">

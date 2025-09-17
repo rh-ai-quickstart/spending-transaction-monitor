@@ -126,12 +126,16 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch.object(AlertRuleService, 'parse_nl_rule_with_llm') as mock_parse,
+            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
         ):
-            mock_parse.return_value = {
-                'valid_sql': True,
-                'alert_text': rule_text,
+            mock_graph.invoke.return_value = {
+                'validation_status': 'valid',
+                'validation_message': 'Alert rule validated successfully and ready to create.',
+                'alert_rule': {'name': 'Test Rule', 'amount_threshold': 100},
                 'sql_query': 'SELECT * FROM transactions WHERE amount > 100',
+                'sql_description': 'Query description',
+                'similarity_result': {'is_similar': False},
+                'valid_sql': True,
             }
 
             # Act
@@ -141,12 +145,17 @@ class TestAlertRuleService:
 
             # Assert
             assert result['status'] == 'valid'
-            assert result['message'] == 'Alert rule validated successfully'
+            assert (
+                result['message']
+                == 'Alert rule validated successfully and ready to create.'
+            )
             assert result['user_id'] == user_id
             assert 'validation_timestamp' in result
-            assert result['alert_text'] == rule_text
             assert 'sql_query' in result
-            assert result['transaction_used'] == sample_transaction_obj.__dict__
+            # Check that transaction_used is properly serialized dictionary (not __dict__)
+            assert 'transaction_used' in result
+            assert isinstance(result['transaction_used'], dict)
+            assert result['transaction_used']['id'] == sample_transaction_obj.id
 
     @pytest.mark.asyncio
     async def test_validate_alert_rule_success_with_dummy_transaction(
@@ -171,12 +180,18 @@ class TestAlertRuleService:
                     'get_dummy_transaction',
                     return_value=dummy_transaction,
                 ),
-                patch.object(AlertRuleService, 'parse_nl_rule_with_llm') as mock_parse,
+                patch(
+                    'src.services.alert_rule_service.validate_rule_graph'
+                ) as mock_graph,
             ):
-                mock_parse.return_value = {
-                    'valid_sql': True,
-                    'alert_text': rule_text,
+                mock_graph.invoke.return_value = {
+                    'validation_status': 'valid',
+                    'validation_message': 'Alert rule validated successfully and ready to create.',
+                    'alert_rule': {'name': 'Test Rule', 'amount_threshold': 100},
                     'sql_query': 'SELECT * FROM transactions WHERE amount > 100',
+                    'sql_description': 'Query description',
+                    'similarity_result': {'is_similar': False},
+                    'valid_sql': True,
                 }
 
                 # Act
@@ -204,9 +219,17 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch.object(AlertRuleService, 'parse_nl_rule_with_llm') as mock_parse,
+            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
         ):
-            mock_parse.return_value = {'valid_sql': False, 'alert_text': rule_text}
+            mock_graph.invoke.return_value = {
+                'validation_status': 'invalid',
+                'validation_message': f'Invalid Alert Rule: "{rule_text}" — Only Financial Transaction Alerts Are Supported.',
+                'alert_rule': None,
+                'sql_query': None,
+                'sql_description': None,
+                'similarity_result': None,
+                'valid_sql': False,
+            }
 
             # Act
             result = await alert_rule_service.validate_alert_rule(
@@ -215,8 +238,10 @@ class TestAlertRuleService:
 
             # Assert
             assert result['status'] == 'invalid'
-            assert result['message'] == 'Rule could not be parsed or validated'
-            assert result['error'] == 'LLM could not parse rule structure'
+            assert (
+                result['message']
+                == f'Invalid Alert Rule: "{rule_text}" — Only Financial Transaction Alerts Are Supported.'
+            )
             assert result['user_id'] == user_id
 
     @pytest.mark.asyncio
@@ -235,9 +260,9 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch.object(AlertRuleService, 'parse_nl_rule_with_llm') as mock_parse,
+            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
         ):
-            mock_parse.side_effect = Exception('LLM service unavailable')
+            mock_graph.invoke.side_effect = Exception('LLM service unavailable')
 
             # Act
             result = await alert_rule_service.validate_alert_rule(
@@ -458,9 +483,17 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch.object(AlertRuleService, 'parse_nl_rule_with_llm') as mock_parse,
+            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
         ):
-            mock_parse.return_value = None
+            mock_graph.invoke.return_value = {
+                'validation_status': 'invalid',
+                'validation_message': f'Invalid Alert Rule: "{rule_text}" — Only Financial Transaction Alerts Are Supported.',
+                'alert_rule': None,
+                'sql_query': None,
+                'sql_description': None,
+                'similarity_result': None,
+                'valid_sql': False,
+            }
 
             # Act
             result = await alert_rule_service.validate_alert_rule(
@@ -469,7 +502,7 @@ class TestAlertRuleService:
 
             # Assert
             assert result['status'] == 'invalid'
-            assert result['message'] == 'Rule could not be parsed or validated'
+            assert f'Invalid Alert Rule: "{rule_text}"' in result['message']
 
     @pytest.mark.asyncio
     async def test_trigger_alert_rule_none_result_from_llm(

@@ -16,9 +16,7 @@ from db.models import (
 )
 from src.services.notification_service import NotificationService
 
-# Import LangGraph components inside methods to avoid event loop binding issues
-# from .alerts.generate_alert_graph import app as generate_alert_graph
-# from .alerts.parse_alert_graph import app as parse_alert_graph
+from .alerts.validate_rule_graph import app as validate_rule_graph
 from .transaction_service import TransactionService
 from .user_service import UserService
 
@@ -30,6 +28,71 @@ class AlertRuleService:
         self.transaction_service = TransactionService()
         self.user_service = UserService()
         self.notification_service = NotificationService()
+
+    @staticmethod
+    def _transaction_to_dict(transaction: Transaction) -> dict[str, Any]:
+        """Convert SQLAlchemy Transaction model to a clean dictionary"""
+
+        # Handle datetime conversion safely
+        def safe_datetime_convert(dt_obj):
+            if dt_obj is None:
+                return None
+            if hasattr(dt_obj, 'isoformat'):
+                return dt_obj.isoformat()
+            return str(dt_obj)
+
+        # Handle enum conversion safely
+        def safe_enum_convert(enum_obj):
+            if enum_obj is None:
+                return None
+            if hasattr(enum_obj, 'value'):
+                return enum_obj.value
+            return str(enum_obj)
+
+        # Handle numeric conversion safely
+        def safe_float_convert(num_obj):
+            if num_obj is None:
+                return None
+            try:
+                return float(num_obj)
+            except (ValueError, TypeError):
+                return None
+
+        return {
+            'id': getattr(transaction, 'id', None),
+            'user_id': getattr(transaction, 'user_id', None),
+            'credit_card_num': getattr(transaction, 'credit_card_num', None),
+            'amount': safe_float_convert(getattr(transaction, 'amount', None)),
+            'currency': getattr(transaction, 'currency', 'USD'),
+            'description': getattr(transaction, 'description', None),
+            'merchant_name': getattr(transaction, 'merchant_name', None),
+            'merchant_category': getattr(transaction, 'merchant_category', None),
+            'transaction_date': safe_datetime_convert(
+                getattr(transaction, 'transaction_date', None)
+            ),
+            'transaction_type': safe_enum_convert(
+                getattr(transaction, 'transaction_type', None)
+            ),
+            'merchant_latitude': safe_float_convert(
+                getattr(transaction, 'merchant_latitude', None)
+            ),
+            'merchant_longitude': safe_float_convert(
+                getattr(transaction, 'merchant_longitude', None)
+            ),
+            'merchant_zipcode': getattr(transaction, 'merchant_zipcode', None),
+            'merchant_city': getattr(transaction, 'merchant_city', None),
+            'merchant_state': getattr(transaction, 'merchant_state', None),
+            'merchant_country': getattr(transaction, 'merchant_country', None),
+            'status': safe_enum_convert(getattr(transaction, 'status', None)),
+            'authorization_code': getattr(transaction, 'authorization_code', None),
+            'trans_num': getattr(transaction, 'trans_num', None),
+            'created_at': safe_datetime_convert(
+                getattr(transaction, 'created_at', None)
+            ),
+            'updated_at': safe_datetime_convert(
+                getattr(transaction, 'updated_at', None)
+            ),
+        }
 
     @staticmethod
     def parse_nl_rule_with_llm(
@@ -80,50 +143,80 @@ class AlertRuleService:
         self, rule: str, user_id: str, session: AsyncSession
     ) -> dict[str, Any]:
         """
-        Validate an alert rule using the latest transaction for a user.
-        Returns the parsed rule structure and validation results.
+        Validate an alert rule with similarity checking against existing rules.
+        Returns detailed validation results including similarity analysis and SQL description.
         """
         print('Validating rule:', rule)
+
+        # Get latest transaction for validation
         transaction = await self.transaction_service.get_latest_transaction(
             user_id, session
         )
         transaction_dict = (
-            transaction.__dict__
+            self._transaction_to_dict(transaction)
             if transaction is not None
             else self.transaction_service.get_dummy_transaction(user_id)
         )
 
-        try:
-            parsed_rule = self.parse_nl_rule_with_llm(rule, transaction_dict)
+        # Get existing rules for similarity checking
+        from sqlalchemy import select
 
-            if parsed_rule and parsed_rule.get('valid_sql'):
-                return {
-                    'status': 'valid',
-                    'message': 'Alert rule validated successfully',
-                    'transaction_used': transaction_dict,
-                    'user_id': user_id,
-                    'validation_timestamp': datetime.now().isoformat(),
-                    'alert_text': parsed_rule.get('alert_text'),
-                    'sql_query': parsed_rule.get('sql_query'),
-                    'alert_rule': parsed_rule.get('alert_rule'),
+        try:
+            result = await session.execute(
+                select(AlertRule).where(AlertRule.user_id == user_id)
+            )
+            existing_rules = result.scalars().all()
+            existing_rules_dict = [
+                {
+                    'id': rule.id,
+                    'natural_language_query': rule.natural_language_query,
+                    'name': rule.name,
+                    'description': rule.description,
                 }
-            else:
-                return {
-                    'status': 'invalid',
-                    'transaction_used': transaction_dict,
-                    'user_id': user_id,
-                    'message': 'Rule could not be parsed or validated',
-                    'error': 'LLM could not parse rule structure',
-                    'alert_text': parsed_rule.get('alert_text')
-                    if parsed_rule
-                    else None,
-                    'validation_timestamp': datetime.now().isoformat(),
-                }
+                for rule in existing_rules
+            ]
         except Exception as e:
+            print(f'Error fetching existing rules: {e}')
+            # Fallback to empty list if fetching existing rules fails
+            existing_rules_dict = []
+
+        try:
+            # Run the validation graph
+            validation_result = validate_rule_graph.invoke(
+                {
+                    'transaction': transaction_dict,
+                    'alert_text': rule,
+                    'user_id': user_id,
+                    'existing_rules': existing_rules_dict,
+                }
+            )
+
+            result = {
+                'status': validation_result.get('validation_status', 'error'),
+                'message': validation_result.get(
+                    'validation_message', 'Validation completed'
+                ),
+                'alert_rule': validation_result.get('alert_rule'),
+                'sql_query': validation_result.get('sql_query'),
+                'sql_description': validation_result.get('sql_description'),
+                'similarity_result': validation_result.get('similarity_result'),
+                'valid_sql': validation_result.get('valid_sql', False),
+                'transaction_used': transaction_dict,
+                'user_id': user_id,
+                'validation_timestamp': datetime.now().isoformat(),
+            }
+            print(f'Alert rule service returning validation result: {result}')
+            return result
+
+        except Exception as e:
+            print(f'Error in rule validation: {e}')
             return {
                 'status': 'error',
                 'message': f'Validation failed: {str(e)}',
                 'error': str(e),
+                'transaction_used': transaction_dict,
+                'user_id': user_id,
+                'validation_timestamp': datetime.now().isoformat(),
             }
 
     async def create_notification(

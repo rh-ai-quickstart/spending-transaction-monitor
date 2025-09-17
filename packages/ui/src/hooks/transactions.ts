@@ -6,6 +6,17 @@ import {
 } from '../services/api-transaction';
 import type { TransactionStats } from '../schemas/transaction';
 
+interface AlertRule {
+  name?: string;
+  description?: string;
+  alert_type?: string;
+  amount_threshold?: number;
+  merchant_category?: string;
+  merchant_name?: string;
+  location?: string;
+  timeframe?: string;
+}
+
 // Transaction hooks
 export const useRecentTransactions = (page = 1, limit = 10) => {
   return useQuery({
@@ -55,6 +66,27 @@ export const useAlertRules = () => {
   return useQuery({
     queryKey: ['alertRules'],
     queryFn: () => alertService.getAlertRules(),
+  });
+};
+
+export const useValidateAlertRule = () => {
+  return useMutation({
+    mutationFn: (rule: string) => alertService.validateAlertRule(rule),
+  });
+};
+
+export const useCreateAlertRuleFromValidation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (validationResult: {
+      alert_rule: AlertRule;
+      sql_query: string;
+      natural_language_query: string;
+    }) => alertService.createAlertRuleFromValidation(validationResult),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alertRules'] });
+    },
   });
 };
 
