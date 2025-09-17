@@ -1,10 +1,6 @@
 # Standard library
-import uuid
 from datetime import UTC, datetime
-
-# Local
-from db import get_db
-from db.models import AlertRule, User
+import uuid
 
 # Third-party
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +9,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+# Local
+from db import get_db
+from db.models import AlertRule, User
 
 from ..auth.middleware import require_admin, require_authentication
 from ..schemas.user import UserOut

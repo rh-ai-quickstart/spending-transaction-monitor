@@ -3,8 +3,8 @@ Location middleware for capturing user location during authentication
 Updates user location profile when location headers are present
 """
 
-import logging
 from datetime import UTC, datetime
+import logging
 
 from fastapi import Request
 from sqlalchemy import select, update
