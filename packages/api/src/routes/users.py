@@ -99,6 +99,48 @@ async def get_users(
         raise HTTPException(status_code=500, detail=str(err)) from err
 
 
+@router.get('/profile', response_model=UserOut)
+async def get_current_user_profile(
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_authentication),
+):
+    """Get the current logged-in user profile."""
+    try:
+        # Use the authenticated user's ID instead of arbitrary first user
+        result = await session.execute(
+            select(User)
+            .options(
+                selectinload(User.creditCards),
+                selectinload(User.transactions),
+            )
+            .where(User.id == current_user['id'])
+        )
+        user: User | None = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail='User profile not found')
+
+    except SQLAlchemyError as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+
+    # Simple aggregation: counts
+    credit_cards_count = len(user.creditCards)
+    transactions_count = len(user.transactions)
+
+    return {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'phone_number': user.phone_number,
+        'is_active': user.is_active,
+        'created_at': user.created_at.isoformat() if user.created_at else None,
+        'updated_at': user.updated_at.isoformat() if user.updated_at else None,
+        'credit_cards_count': credit_cards_count,
+        'transactions_count': transactions_count,
+    }
+
+
 @router.get('/{user_id}', response_model=UserOut)
 async def get_user(
     user_id: str,
@@ -130,48 +172,6 @@ async def get_user(
         raise HTTPException(status_code=500, detail=str(err)) from err
 
     # simple aggregation: counts
-    credit_cards_count = len(user.creditCards)
-    transactions_count = len(user.transactions)
-
-    return {
-        'id': user.id,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'phone_number': user.phone_number,
-        'is_active': user.is_active,
-        'created_at': user.created_at.isoformat() if user.created_at else None,
-        'updated_at': user.updated_at.isoformat() if user.updated_at else None,
-        'credit_cards_count': credit_cards_count,
-        'transactions_count': transactions_count,
-    }
-
-
-@router.get('/me', response_model=UserOut)
-async def get_current_user(
-    session: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_authentication),
-):
-    """Get the current logged-in user profile."""
-    try:
-        # Use the authenticated user's ID instead of arbitrary first user
-        result = await session.execute(
-            select(User)
-            .options(
-                selectinload(User.creditCards),
-                selectinload(User.transactions),
-            )
-            .where(User.id == current_user['id'])
-        )
-        user: User | None = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(status_code=404, detail='User profile not found')
-
-    except SQLAlchemyError as err:
-        raise HTTPException(status_code=500, detail=str(err)) from err
-
-    # Simple aggregation: counts
     credit_cards_count = len(user.creditCards)
     transactions_count = len(user.transactions)
 
