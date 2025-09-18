@@ -16,6 +16,7 @@ from db.models import (
 
 from .alerts.generate_alert_graph import app as generate_alert_graph
 from .alerts.parse_alert_graph import app as parse_alert_graph
+from .notifications import Context, SmtpStrategy
 from .transaction_service import TransactionService
 from .user_service import UserService
 
@@ -152,11 +153,22 @@ class AlertRuleService:
                     title=f'Alert: {rule.name}',
                     message=alert_result.get('alert_message', 'Alert triggered'),
                     notification_method=NotificationMethod.EMAIL,
-                    status=NotificationStatus.SENT,
+                    status=NotificationStatus.PENDING,
                 )
 
-                # Add notification to session
-                session.add(notification)
+                # Send email notification
+                try:
+                    strategy = SmtpStrategy()
+                    ctx = Context(strategy)
+                    sent_notification = await ctx.send_notification(
+                        notification, session
+                    )
+                    session.add(sent_notification)
+                except Exception as e:
+                    print(f'Failed to send email notification: {e}')
+                    # Still add the notification to session with failed status
+                    notification.status = NotificationStatus.FAILED
+                    session.add(notification)
 
                 # Update trigger count and last triggered time
                 await session.execute(
