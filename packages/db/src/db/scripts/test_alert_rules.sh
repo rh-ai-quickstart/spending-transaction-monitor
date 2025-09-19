@@ -197,75 +197,32 @@ test_alert_rule() {
         return
     fi
     
-    # Step 2: Create alert rule via API
-    echo -e "${YELLOW}🚨 Creating alert rule via API...${NC}"
+    # Step 2a: Validate alert rule via API
+    echo -e "${YELLOW}🔍 Validating alert rule via API...${NC}"
     
-    local create_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules" \
+    local validate_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/validate" \
         -H "Content-Type: application/json" \
         -d "{\"natural_language_query\": \"$alert_text\"}")
     
-    local http_status=$(echo "$create_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-    local response_body=$(echo "$create_response" | sed -e 's/HTTPSTATUS:.*//g')
+    local validate_http_status=$(echo "$validate_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    local validate_response_body=$(echo "$validate_response" | sed -e 's/HTTPSTATUS:.*//g')
     
-    if [[ "$http_status" == "200" ]]; then
-        echo -e "${GREEN}✅ Alert rule created successfully (HTTP 200)${NC}"
+    if [[ "$validate_http_status" == "200" ]]; then
+        echo -e "${GREEN}✅ Alert rule validation successful (HTTP 200)${NC}"
         
-        # Extract rule ID from response
-        local rule_id=""
+        # Extract validation status and details
+        local validation_status=""
+        local validation_message=""
+        local alert_rule_json=""
+        local sql_query=""
+        
         if command -v jq >/dev/null 2>&1; then
-            rule_id=$(echo "$response_body" | jq -r '.id // empty')
+            validation_status=$(echo "$validate_response_body" | jq -r '.status // ""')
+            validation_message=$(echo "$validate_response_body" | jq -r '.message // ""')
+            alert_rule_json=$(echo "$validate_response_body" | jq -c '.alert_rule // null')
+            sql_query=$(echo "$validate_response_body" | jq -r '.sql_query // ""')
         else
-            rule_id=$(echo "$response_body" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    print(data.get('id', ''))
-except:
-    pass
-")
-        fi
-        
-        if [[ -z "$rule_id" ]]; then
-            echo -e "${RED}❌ Could not extract rule ID from response${NC}"
-            echo -e "${YELLOW}📄 Response: ${response_body}${NC}"
-            FAILED_TESTS=$((FAILED_TESTS + 1))
-            echo ""
-            return
-        fi
-        
-        echo -e "${GREEN}🆔 Rule ID: ${rule_id}${NC}"
-        
-        # Step 3: Trigger the alert rule
-        echo -e "${YELLOW}🔔 Triggering alert rule...${NC}"
-        
-        local trigger_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/${rule_id}/trigger" \
-            -H "Content-Type: application/json")
-        
-        local trigger_http_status=$(echo "$trigger_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
-        local trigger_response_body=$(echo "$trigger_response" | sed -e 's/HTTPSTATUS:.*//g')
-        
-        if [[ "$trigger_http_status" == "200" ]]; then
-            echo -e "${GREEN}✅ Alert trigger API call successful (HTTP 200)${NC}"
-            
-            # Check if alert was actually triggered
-            local alert_triggered=""
-            local status=""
-            local alert_message=""
-            
-            if command -v jq >/dev/null 2>&1; then
-                alert_triggered=$(echo "$trigger_response_body" | jq -r '.rule_evaluation.alert_triggered // false')
-                status=$(echo "$trigger_response_body" | jq -r '.status // ""')
-                alert_message=$(echo "$trigger_response_body" | jq -r '.rule_evaluation.alert_message // ""')
-            else
-                alert_triggered=$(echo "$trigger_response_body" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    print(data.get('rule_evaluation', {}).get('alert_triggered', False))
-except:
-    print('false')
-")
-                status=$(echo "$trigger_response_body" | python3 -c "
+            validation_status=$(echo "$validate_response_body" | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -273,7 +230,150 @@ try:
 except:
     pass
 ")
-                alert_message=$(echo "$trigger_response_body" | python3 -c "
+            validation_message=$(echo "$validate_response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('message', ''))
+except:
+    pass
+")
+            alert_rule_json=$(echo "$validate_response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    alert_rule = data.get('alert_rule')
+    if alert_rule:
+        print(json.dumps(alert_rule))
+    else:
+        print('null')
+except:
+    print('null')
+")
+            sql_query=$(echo "$validate_response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('sql_query', ''))
+except:
+    pass
+")
+        fi
+        
+        echo -e "${BLUE}📋 Validation Status: ${validation_status}${NC}"
+        echo -e "${BLUE}📝 Validation Message: ${validation_message}${NC}"
+        
+        # Check if validation was successful (valid or warning)
+        if [[ "$validation_status" == "valid" || "$validation_status" == "warning" ]]; then
+            if [[ "$validation_status" == "warning" ]]; then
+                echo -e "${YELLOW}⚠️  Warning detected but proceeding with rule creation${NC}"
+            fi
+            
+            # Step 2b: Create alert rule using validation result
+            echo -e "${YELLOW}🚨 Creating alert rule via API...${NC}"
+            
+            # Create payload using proper JSON construction to avoid escaping issues
+            local create_payload
+            if command -v jq >/dev/null 2>&1; then
+                create_payload=$(jq -n \
+                    --argjson alert_rule "$alert_rule_json" \
+                    --arg sql_query "$sql_query" \
+                    --arg natural_language_query "$alert_text" \
+                    '{alert_rule: $alert_rule, sql_query: $sql_query, natural_language_query: $natural_language_query}')
+            else
+                # Use temporary file approach to avoid shell escaping issues
+                echo "$validate_response_body" > /tmp/validation_result.json
+                echo "$alert_text" > /tmp/alert_text.txt
+                create_payload=$(python3 -c "
+import json
+with open('/tmp/validation_result.json', 'r') as f:
+    validation_data = json.load(f)
+with open('/tmp/alert_text.txt', 'r') as f:
+    alert_text = f.read().strip()
+payload = {
+    'alert_rule': validation_data['alert_rule'],
+    'sql_query': validation_data['sql_query'],
+    'natural_language_query': alert_text
+}
+print(json.dumps(payload))
+")
+                rm -f /tmp/validation_result.json /tmp/alert_text.txt
+            fi
+            
+            local create_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules" \
+                -H "Content-Type: application/json" \
+                -d "$create_payload")
+            
+            local http_status=$(echo "$create_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+            local response_body=$(echo "$create_response" | sed -e 's/HTTPSTATUS:.*//g')
+            
+                if [[ "$http_status" == "200" ]]; then
+                    echo -e "${GREEN}✅ Alert rule created successfully (HTTP 200)${NC}"
+                    
+                    # Extract rule ID from response
+                    local rule_id=""
+                    if command -v jq >/dev/null 2>&1; then
+                        rule_id=$(echo "$response_body" | jq -r '.id // empty')
+                    else
+                        rule_id=$(echo "$response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('id', ''))
+except:
+    pass
+")
+                    fi
+                    
+                    if [[ -z "$rule_id" ]]; then
+                        echo -e "${RED}❌ Could not extract rule ID from response${NC}"
+                        echo -e "${YELLOW}📄 Response: ${response_body}${NC}"
+                        FAILED_TESTS=$((FAILED_TESTS + 1))
+                        echo ""
+                        return
+                    fi
+                    
+                    echo -e "${GREEN}🆔 Rule ID: ${rule_id}${NC}"
+                    
+                    # Step 3: Trigger the alert rule
+                    echo -e "${YELLOW}🔔 Triggering alert rule...${NC}"
+                    
+                    local trigger_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/${rule_id}/trigger" \
+                        -H "Content-Type: application/json")
+                    
+                    local trigger_http_status=$(echo "$trigger_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+                    local trigger_response_body=$(echo "$trigger_response" | sed -e 's/HTTPSTATUS:.*//g')
+                    
+                    if [[ "$trigger_http_status" == "200" ]]; then
+                        echo -e "${GREEN}✅ Alert trigger API call successful (HTTP 200)${NC}"
+                        
+                        # Check if alert was actually triggered
+                        local alert_triggered=""
+                        local status=""
+                        local alert_message=""
+                        
+                        if command -v jq >/dev/null 2>&1; then
+                            alert_triggered=$(echo "$trigger_response_body" | jq -r '.rule_evaluation.alert_triggered // false')
+                            status=$(echo "$trigger_response_body" | jq -r '.status // ""')
+                            alert_message=$(echo "$trigger_response_body" | jq -r '.rule_evaluation.alert_message // ""')
+                        else
+                            alert_triggered=$(echo "$trigger_response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('rule_evaluation', {}).get('alert_triggered', False))
+except:
+    print('false')
+")
+                            status=$(echo "$trigger_response_body" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('status', ''))
+except:
+    pass
+")
+                            alert_message=$(echo "$trigger_response_body" | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -281,30 +381,40 @@ try:
 except:
     pass
 ")
-            fi
-            
-            if [[ "$alert_triggered" == "true" && "$status" == "triggered" ]]; then
-                echo -e "${GREEN}🎉 ALERT TRIGGERED SUCCESSFULLY!${NC}"
-                echo -e "${GREEN}📨 Alert Message: ${alert_message}${NC}"
-                PASSED_TESTS=$((PASSED_TESTS + 1))
+                        fi
+                        
+                        if [[ "$alert_triggered" == "true" && "$status" == "triggered" ]]; then
+                            echo -e "${GREEN}🎉 ALERT TRIGGERED SUCCESSFULLY!${NC}"
+                            echo -e "${GREEN}📨 Alert Message: ${alert_message}${NC}"
+                            PASSED_TESTS=$((PASSED_TESTS + 1))
+                        else
+                            echo -e "${RED}❌ Alert was not triggered${NC}"
+                            echo -e "${YELLOW}🔍 Alert Triggered: ${alert_triggered}${NC}"
+                            echo -e "${YELLOW}🔍 Status: ${status}${NC}"
+                            echo -e "${YELLOW}📄 Full Response: ${trigger_response_body}${NC}"
+                            FAILED_TESTS=$((FAILED_TESTS + 1))
+                        fi
+                    else
+                        echo -e "${RED}❌ Failed to trigger alert (HTTP ${trigger_http_status})${NC}"
+                        echo -e "${YELLOW}📄 Response: ${trigger_response_body}${NC}"
+                        FAILED_TESTS=$((FAILED_TESTS + 1))
+                    fi
+                else
+                    echo -e "${RED}❌ Failed to create alert rule (HTTP ${http_status})${NC}"
+                    echo -e "${YELLOW}📄 Response: ${response_body}${NC}"
+                    FAILED_TESTS=$((FAILED_TESTS + 1))
+                fi
             else
-                echo -e "${RED}❌ Alert was not triggered${NC}"
-                echo -e "${YELLOW}🔍 Alert Triggered: ${alert_triggered}${NC}"
-                echo -e "${YELLOW}🔍 Status: ${status}${NC}"
-                echo -e "${YELLOW}📄 Full Response: ${trigger_response_body}${NC}"
+                echo -e "${RED}❌ Validation failed - cannot create rule${NC}"
+                echo -e "${YELLOW}📋 Validation Status: ${validation_status}${NC}"
+                echo -e "${YELLOW}📝 Validation Message: ${validation_message}${NC}"
                 FAILED_TESTS=$((FAILED_TESTS + 1))
             fi
         else
-            echo -e "${RED}❌ Failed to trigger alert (HTTP ${trigger_http_status})${NC}"
-            echo -e "${YELLOW}📄 Response: ${trigger_response_body}${NC}"
+            echo -e "${RED}❌ Failed to validate alert rule (HTTP ${validate_http_status})${NC}"
+            echo -e "${YELLOW}📄 Response: ${validate_response_body}${NC}"
             FAILED_TESTS=$((FAILED_TESTS + 1))
         fi
-        
-    else
-        echo -e "${RED}❌ Failed to create alert rule (HTTP ${http_status})${NC}"
-        echo -e "${YELLOW}📄 Response: ${response_body}${NC}"
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-    fi
     
     echo ""
 }
