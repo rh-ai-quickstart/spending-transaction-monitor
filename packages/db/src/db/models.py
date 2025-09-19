@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from .database import Base
 
@@ -304,3 +305,19 @@ class AlertNotification(Base):
     transaction: Mapped[Transaction | None] = relationship(
         back_populates='alertNotifications'
     )
+
+
+class MerchantCategorySynonym(Base):
+    __tablename__ = 'merchant_category_synonyms'
+
+    synonym: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical_category: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MerchantCategoryEmbedding(Base):
+    __tablename__ = 'merchant_category_embeddings'
+
+    category: Mapped[str] = mapped_column(String, primary_key=True)
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))  # 1536 for OpenAI text-embedding-3-small
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

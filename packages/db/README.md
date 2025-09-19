@@ -4,7 +4,8 @@ PostgreSQL database setup with Docker Compose and Alembic migrations.
 
 ## Features
 
-- **PostgreSQL 15** - Modern relational database with advanced features
+- **PostgreSQL 16 with pgvector** - Modern relational database with vector similarity search
+- **pgvector Extension** - Vector embeddings and similarity search capabilities
 - **Docker Compose** - Easy database setup and management
 - **Alembic** - Database migrations with SQLAlchemy
 - **Async SQLAlchemy** - Modern async database operations
@@ -158,6 +159,64 @@ class User(Base):
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+```
+
+## Vector Search with pgvector
+
+The database includes the pgvector extension for similarity search and AI/ML workloads.
+
+### Vector Data Types
+
+```python
+from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy.dialects.postgresql import ARRAY
+from pgvector.sqlalchemy import Vector
+
+class Document(Base):
+    __tablename__ = "document"
+    
+    id = Column(Integer, primary_key=True)
+    content = Column(String, nullable=False)
+    embedding = Column(Vector(1536))  # OpenAI embedding dimension
+    created_at = Column(DateTime, server_default=func.now())
+```
+
+### Similarity Search Examples
+
+```python
+# L2 distance (Euclidean)
+results = await session.execute(
+    select(Document)
+    .order_by(Document.embedding.l2_distance([0.1, 0.2, 0.3]))
+    .limit(5)
+)
+
+# Cosine distance
+results = await session.execute(
+    select(Document)
+    .order_by(Document.embedding.cosine_distance([0.1, 0.2, 0.3]))
+    .limit(5)
+)
+
+# Inner product
+results = await session.execute(
+    select(Document)
+    .order_by(Document.embedding.max_inner_product([0.1, 0.2, 0.3]))
+    .limit(5)
+)
+```
+
+### Performance Optimization
+
+For large datasets, create appropriate indexes:
+
+```sql
+-- IVFFlat index (good for L2 and inner product)
+CREATE INDEX ON document USING ivfflat (embedding vector_l2_ops);
+
+-- HNSW index (good for L2, inner product, and cosine distance)
+CREATE INDEX ON document USING hnsw (embedding vector_l2_ops);
+CREATE INDEX ON document USING hnsw (embedding vector_cosine_ops);
 ```
 
 ## Development Workflow
