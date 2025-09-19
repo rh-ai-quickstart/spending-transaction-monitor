@@ -20,6 +20,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
  */
 const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode }) => {
   const [user] = useState<User>(DEV_USER);
+  // Note: Location is now handled by LocationCapture component on user interaction
 
   const login = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -31,6 +32,7 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
     if (import.meta.env.DEV) {
       console.log('🔓 Dev mode: logout() called - staying authenticated');
     }
+    // Note: Location clearing now handled by backend on logout
   }, []);
 
   const signinRedirect = useCallback(() => {
@@ -106,6 +108,7 @@ ProductionAuthProvider.displayName = 'ProductionAuthProvider';
 const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode }) => {
   const oidcAuth = useOIDCAuth();
   const [user, setUser] = useState<User | null>(null);
+  // Note: Location is now handled by LocationCapture component on user interaction
 
   useEffect(() => {
     if (oidcAuth.user) {
@@ -128,8 +131,11 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       }
     } else {
       setUser(null);
+      // Note: Location clearing now handled by backend on logout
     }
   }, [oidcAuth.user]);
+
+  // Location is now handled by LocationCapture component
 
   const login = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
   const logout = useCallback(() => oidcAuth.signoutRedirect(), [oidcAuth]);
