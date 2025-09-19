@@ -36,10 +36,10 @@ def execute_sql(sql: str) -> str:
                     if 'NO_ALERT' in str_formatted_rows:
                         return '[]'
                     if 'NOT_APPLICABLE' in str_formatted_rows:
-                        return 'SQL Error: Invalid alert rule'
+                        return 'SQL Error: Alert rule is invalid'
                     return str(formatted_rows)
                 else:
-                    print('No rows returned *****')
+                    print('No rows returned')
                     return '[]'
             else:
                 # For non-SELECT queries (INSERT, UPDATE, DELETE)

@@ -28,7 +28,26 @@ router = APIRouter()
 
 
 class AlertRuleCreateRequest(BaseModel):
+    alert_rule: dict
+    sql_query: str
     natural_language_query: str
+
+
+class AlertRuleValidationRequest(BaseModel):
+    natural_language_query: str
+
+
+class AlertRuleValidationResponse(BaseModel):
+    status: str  # 'valid', 'warning', 'invalid', 'error'
+    message: str
+    alert_rule: dict | None = None
+    sql_query: str | None = None
+    sql_description: str | None = None
+    similarity_result: dict | None = None
+    valid_sql: bool = False
+    transaction_used: dict | None = None
+    user_id: str | None = None
+    validation_timestamp: str | None = None
 
 
 # Initialize alert rule service instance
@@ -38,6 +57,26 @@ transaction_service = transaction_service.TransactionService()
 
 
 # Alert Rules endpoints
+@router.post('/rules/validate', response_model=AlertRuleValidationResponse)
+async def validate_alert_rule(
+    payload: AlertRuleValidationRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_authentication),
+):
+    """Validate an alert rule with similarity checking and detailed analysis"""
+    print('DEBUG: Current user:', current_user)
+    print('Validating alert rule for user:', current_user['id'], 'payload:', payload)
+
+    validation_result = await alert_rule_service.validate_alert_rule(
+        payload.natural_language_query, current_user['id'], session
+    )
+    try:
+        return AlertRuleValidationResponse(**validation_result)
+    except Exception as e:
+        print('DEBUG: Error validating alert rule:', e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get('/rules', response_model=list[AlertRuleOut])
 async def get_alert_rules(
     user_id: str | None = Query(None, description='Filter by user ID'),
@@ -133,30 +172,33 @@ async def create_alert_rule(
     session: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_authentication),
 ):
-    """Create a new alert rule"""
-    print('Creating alert rule for user:', current_user['id'], 'payload:', payload)
-
-    # Validate alert rule
-    validate_result = await alert_rule_service.validate_alert_rule(
-        payload.natural_language_query, current_user['id'], session
+    """Create a new alert rule from pre-validated data"""
+    print(
+        'Creating alert rule from validation for user:',
+        current_user['id'],
+        'payload:',
+        payload,
     )
-    if validate_result.get('status') != 'valid':
-        raise HTTPException(status_code=400, detail='Invalid alert rule')
+
+    # Extract alert rule data from payload
+    alert_rule_data = payload.alert_rule
+    if not alert_rule_data:
+        raise HTTPException(status_code=400, detail='Alert rule data not provided')
 
     rule = AlertRule(
         id=str(uuid.uuid4()),
         user_id=current_user['id'],
-        name=validate_result.get('alert_rule').get('name'),
-        description=validate_result.get('alert_rule').get('description'),
+        name=alert_rule_data.get('name'),
+        description=alert_rule_data.get('description'),
         is_active=True,
-        alert_type=validate_result.get('alert_rule').get('alert_type'),
-        amount_threshold=validate_result.get('alert_rule').get('amount_threshold'),
-        merchant_category=validate_result.get('alert_rule').get('merchant_category'),
-        merchant_name=validate_result.get('alert_rule').get('merchant_name'),
-        location=validate_result.get('alert_rule').get('location'),
-        timeframe=validate_result.get('alert_rule').get('timeframe'),
+        alert_type=alert_rule_data.get('alert_type'),
+        amount_threshold=alert_rule_data.get('amount_threshold'),
+        merchant_category=alert_rule_data.get('merchant_category'),
+        merchant_name=alert_rule_data.get('merchant_name'),
+        location=alert_rule_data.get('location'),
+        timeframe=alert_rule_data.get('timeframe'),
         natural_language_query=payload.natural_language_query,
-        sql_query=validate_result.get('sql_query'),
+        sql_query=payload.sql_query,
         notification_methods=None,
     )
 

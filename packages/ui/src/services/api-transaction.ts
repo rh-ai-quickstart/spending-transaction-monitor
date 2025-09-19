@@ -19,6 +19,24 @@ interface ApiNotificationResponse {
   read_at?: string | null;
 }
 
+interface AlertRuleData {
+  name?: string;
+  description?: string;
+  alert_type?: string;
+  amount_threshold?: number;
+  merchant_category?: string;
+  merchant_name?: string;
+  location?: string;
+  timeframe?: string;
+}
+
+interface SimilarityResult {
+  is_similar: boolean;
+  similarity_score: number;
+  similar_rule?: string;
+  reason: string;
+}
+
 // Real API-based transaction service
 export const apiTransactionService = {
   // Get recent transactions with pagination
@@ -255,7 +273,92 @@ export const realAlertService = {
     }));
   },
 
-  // Create new alert rule
+  // Validate alert rule with similarity checking
+  async validateAlertRule(rule: string): Promise<{
+    status: 'valid' | 'warning' | 'invalid' | 'error';
+    message: string;
+    alert_rule?: AlertRuleData;
+    sql_query?: string;
+    sql_description?: string;
+    similarity_result?: SimilarityResult;
+    valid_sql?: boolean;
+  }> {
+    try {
+      console.log('Validating alert rule:', rule);
+
+      const response = await fetch('/api/alerts/rules/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          natural_language_query: rule,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to validate alert rule: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const validationResult = await response.json();
+      console.log('Alert rule validation result:', validationResult);
+      return validationResult;
+    } catch (error) {
+      console.error('Error validating alert rule:', error);
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to validate alert rule',
+      );
+    }
+  },
+
+  // Create new alert rule from validation result
+  async createAlertRuleFromValidation(validationResult: {
+    alert_rule: AlertRuleData;
+    sql_query: string;
+    natural_language_query: string;
+  }): Promise<AlertRule> {
+    try {
+      const response = await fetch('/api/alerts/rules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(validationResult),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to create alert rule: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const apiRule = await response.json();
+
+      // Transform API response to match UI schema
+      const newRule: AlertRule = {
+        id: apiRule.id,
+        rule:
+          apiRule.natural_language_query ||
+          apiRule.name ||
+          validationResult.natural_language_query,
+        status: apiRule.is_active ? 'active' : 'inactive',
+        triggered: apiRule.trigger_count || 0,
+        last_triggered: apiRule.last_triggered || 'Never',
+        created_at: apiRule.created_at,
+      };
+
+      return newRule;
+    } catch (error) {
+      console.error('Error creating alert rule:', error);
+      throw new Error(
+        error instanceof Error ? error.message : 'Failed to create alert rule',
+      );
+    }
+  },
+
+  // Create new alert rule (legacy method)
   async createAlertRule(rule: string, userId?: string): Promise<AlertRule> {
     try {
       // Note: userId parameter is now unused as the API automatically determines the current user
@@ -331,7 +434,6 @@ export const realAlertService = {
       }
 
       const updatedApiRule = await response.json();
-
       // Transform API response to match UI schema
       const updatedRule: AlertRule = {
         id: updatedApiRule.id,

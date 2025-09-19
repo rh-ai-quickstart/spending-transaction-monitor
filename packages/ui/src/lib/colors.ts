@@ -38,6 +38,13 @@ export const statusColors = {
     icon: 'text-warning',
     badge: 'bg-warning-muted text-warning-muted-foreground',
   },
+  error: {
+    text: 'text-red-600 dark:text-red-400',
+    icon: 'text-red-600 dark:text-red-400',
+    badge:
+      'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900',
+    card: 'border-l-red-500 bg-red-50/50 dark:bg-red-950/50',
+  },
 } as const;
 
 export const severityColors = {
