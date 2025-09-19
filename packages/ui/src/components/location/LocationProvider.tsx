@@ -42,4 +42,3 @@ export function LocationProvider({ children }: LocationProviderProps) {
     </LocationContext.Provider>
   );
 }
-

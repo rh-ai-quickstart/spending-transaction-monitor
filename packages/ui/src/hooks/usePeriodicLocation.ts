@@ -78,12 +78,12 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
     try {
       console.log('🗺️ Performing periodic location update...');
       const location = await getCurrentLocation();
-      
+
       await sendLocationToBackend(location);
-      
+
       // Reset retry attempts on success
       retryAttemptsRef.current = 0;
-      
+
       setState((prev) => ({
         ...prev,
         lastUpdate: new Date(),
@@ -97,12 +97,14 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
         accuracy: location.accuracy ? `±${Math.round(location.accuracy)}m` : 'unknown',
         updateCount: state.updateCount + 1,
       });
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       retryAttemptsRef.current += 1;
 
-      console.error(`❌ Periodic location update failed (attempt ${retryAttemptsRef.current}):`, errorMessage);
+      console.error(
+        `❌ Periodic location update failed (attempt ${retryAttemptsRef.current}):`,
+        errorMessage,
+      );
 
       setState((prev) => ({
         ...prev,
@@ -111,10 +113,14 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
 
       // Retry logic
       if (retryAttemptsRef.current < locationConfig.maxRetryAttempts) {
-        console.log(`🔄 Retrying location update in ${locationConfig.retryDelayMs / 1000}s...`);
+        console.log(
+          `🔄 Retrying location update in ${locationConfig.retryDelayMs / 1000}s...`,
+        );
         setTimeout(updateLocation, locationConfig.retryDelayMs);
       } else {
-        console.error(`💥 Max retry attempts (${locationConfig.maxRetryAttempts}) exceeded for location update`);
+        console.error(
+          `💥 Max retry attempts (${locationConfig.maxRetryAttempts}) exceeded for location update`,
+        );
         retryAttemptsRef.current = 0; // Reset for next interval
       }
     }
@@ -123,11 +129,16 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
   // Update countdown timer
   const updateCountdown = useCallback(() => {
     if (!state.lastUpdate) return;
-    
-    const nextUpdateTime = new Date(state.lastUpdate.getTime() + locationConfig.updateIntervalMs);
+
+    const nextUpdateTime = new Date(
+      state.lastUpdate.getTime() + locationConfig.updateIntervalMs,
+    );
     const now = new Date();
-    const secondsRemaining = Math.max(0, Math.floor((nextUpdateTime.getTime() - now.getTime()) / 1000));
-    
+    const secondsRemaining = Math.max(
+      0,
+      Math.floor((nextUpdateTime.getTime() - now.getTime()) / 1000),
+    );
+
     setState((prev) => ({
       ...prev,
       nextUpdateIn: secondsRemaining,
@@ -146,7 +157,9 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
       return;
     }
 
-    console.log(`🕐 Starting periodic location updates (every ${Math.round(locationConfig.updateIntervalMs / (60 * 1000))} minutes)`);
+    console.log(
+      `🕐 Starting periodic location updates (every ${Math.round(locationConfig.updateIntervalMs / (60 * 1000))} minutes)`,
+    );
 
     manuallyStopped.current = false; // Clear manual stop flag when starting
     setState((prev) => ({ ...prev, isActive: true }));
@@ -190,7 +203,12 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
 
   // Auto-start when authenticated and auto-stop when not
   useEffect(() => {
-    if (isAuthenticated && locationConfig.enablePeriodicUpdates && !state.isActive && !manuallyStopped.current) {
+    if (
+      isAuthenticated &&
+      locationConfig.enablePeriodicUpdates &&
+      !state.isActive &&
+      !manuallyStopped.current
+    ) {
       start();
     } else if (!isAuthenticated && state.isActive) {
       manuallyStopped.current = false; // Reset flag when user logs out

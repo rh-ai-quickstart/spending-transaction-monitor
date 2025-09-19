@@ -64,7 +64,7 @@ describe('usePeriodicLocation', () => {
   it('should initialize with default state when not authenticated', () => {
     // Mock unauthenticated state
     vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as AuthContextType);
-    
+
     const { result } = renderHook(() => usePeriodicLocation());
 
     expect(result.current.isActive).toBe(false);
@@ -179,7 +179,7 @@ describe('usePeriodicLocation', () => {
 
     // Mock user becoming unauthenticated
     vi.mocked(useAuth).mockReturnValue({ isAuthenticated: false } as AuthContextType);
-    
+
     // Rerender to trigger useEffect
     rerender();
 

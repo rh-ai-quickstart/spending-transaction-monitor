@@ -39,9 +39,7 @@ The `LocationProvider` is already integrated into the main app. No additional se
 ```tsx
 // Already configured in main.tsx
 <AuthProvider>
-  <LocationProvider>
-    {/* Your app */}
-  </LocationProvider>
+  <LocationProvider>{/* Your app */}</LocationProvider>
 </AuthProvider>
 ```
 
@@ -53,14 +51,8 @@ Access location service status in your components:
 import { useLocationContext } from '@/components/location/LocationProvider';
 
 function MyComponent() {
-  const {
-    isActive,
-    lastUpdate,
-    updateCount,
-    lastError,
-    nextUpdateIn,
-    forceUpdate,
-  } = useLocationContext();
+  const { isActive, lastUpdate, updateCount, lastError, nextUpdateIn, forceUpdate } =
+    useLocationContext();
 
   return (
     <div>
@@ -81,7 +73,7 @@ In development mode, a status component shows location service information:
 import { LocationStatus } from '@/components/location/LocationProvider';
 
 // Shows location service status in development
-<LocationStatus />
+<LocationStatus />;
 ```
 
 ## API Integration

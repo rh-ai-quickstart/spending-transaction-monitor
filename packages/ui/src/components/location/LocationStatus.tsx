@@ -6,21 +6,15 @@
 import { useLocationContext } from './LocationProvider';
 
 export function LocationStatus() {
-  const {
-    isActive,
-    lastUpdate,
-    updateCount,
-    lastError,
-    nextUpdateIn,
-    forceUpdate,
-  } = useLocationContext();
+  const { isActive, lastUpdate, updateCount, lastError, nextUpdateIn, forceUpdate } =
+    useLocationContext();
 
   const formatCountdown = (seconds: number): string => {
     if (seconds <= 0) return 'Now';
-    
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    
+
     if (minutes > 0) {
       return `${minutes}m ${remainingSeconds}s`;
     }
@@ -37,20 +31,16 @@ export function LocationStatus() {
       <div className="font-semibold mb-2 text-gray-900 dark:text-gray-100">
         📍 Location Service
       </div>
-      
+
       <div className="space-y-1 text-gray-600 dark:text-gray-400">
         <div>Status: {isActive ? '🟢 Active' : '🔴 Inactive'}</div>
-        {lastUpdate && (
-          <div>Last: {lastUpdate.toLocaleTimeString()}</div>
-        )}
+        {lastUpdate && <div>Last: {lastUpdate.toLocaleTimeString()}</div>}
         <div>Updates: {updateCount}</div>
         {isActive && nextUpdateIn > 0 && (
           <div>Next: {formatCountdown(nextUpdateIn)}</div>
         )}
         {lastError && (
-          <div className="text-red-500 dark:text-red-400">
-            Error: {lastError}
-          </div>
+          <div className="text-red-500 dark:text-red-400">Error: {lastError}</div>
         )}
       </div>
 
