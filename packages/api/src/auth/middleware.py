@@ -346,7 +346,7 @@ async def require_authentication(
             headers={'WWW-Authenticate': 'Bearer'},
         )
 
-    user = await get_current_user(request, credentials, session)
+    user = await get_current_user(credentials, session, request)
     if not user:
         raise HTTPException(status_code=401, detail='Invalid authentication')
 
