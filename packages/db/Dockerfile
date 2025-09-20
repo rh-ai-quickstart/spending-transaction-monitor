@@ -11,8 +11,8 @@ RUN apk add --no-cache python3 py3-pip
 # Create a directory for the workspace
 RUN mkdir -p /app
 
-# Copy the entire workspace db package
-COPY packages/db/ /app/packages/db/
+# Copy the db package
+COPY . /app/packages/db/
 
 WORKDIR /app/packages/db
 
@@ -23,7 +23,7 @@ ENV PATH="/app/venv/bin:$PATH"
 RUN uv pip install -e .
 
 # Copy initialization scripts
-COPY packages/db/src/db/scripts/ /docker-entrypoint-initdb.d/
+COPY src/db/scripts/ /docker-entrypoint-initdb.d/
 
 # Add a script to run migrations after postgres starts
 RUN echo '#!/bin/bash' > /docker-entrypoint-initdb.d/99-run-migrations.sh && \

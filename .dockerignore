@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+**/node_modules/
+
+# Exclude non-essential packages to avoid symlink issues
+packages/auth/
+packages/evaluation/
+packages/ingestion-service/
+
+# Python virtual environments
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/coverage/
+
+# Development files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Documentation (not needed for builds)
+docs/
+*.md
+README*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Package manager lock files (keep pnpm-lock.yaml as it's needed)
+package-lock.json
+yarn.lock
+
+# Misc
+.turbo/
+*.tsbuildinfo

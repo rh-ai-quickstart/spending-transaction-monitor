@@ -3,8 +3,8 @@ services:
   postgres:
     image: quay.io/rh-ai-quickstart/spending-monitor-db:latest
     build:
-      context: .
-      dockerfile: packages/db/Dockerfile
+      context: packages/db
+      dockerfile: Dockerfile
     container_name: spending-monitor-db
     environment:
       POSTGRES_DB: spending-monitor

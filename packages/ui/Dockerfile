@@ -1,4 +1,4 @@
-# Multi-stage build for React application using pnpm workspace
+# Multi-stage build for React application
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -6,17 +6,21 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
-# Copy workspace configuration files
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+# Copy root package files for workspace setup (context is root)
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 
-# Copy all packages for workspace resolution
-COPY packages/ ./packages/
+# Copy workspace packages
+COPY packages/ui/ ./packages/ui/
+COPY packages/configs/ ./packages/configs/
 
-# Install dependencies using pnpm workspace
-RUN pnpm install --frozen-lockfile
+# Set working directory to UI package
+WORKDIR /app/packages/ui
 
-# Build the UI using workspace filter (skip TypeScript compilation for Docker)
-RUN pnpm --filter @spending-monitor/ui exec vite build
+# Install dependencies using workspace
+RUN pnpm install --no-frozen-lockfile
+
+# Build the application
+RUN pnpm run build:vite
 
 # Production stage - use Node.js to serve static files
 FROM node:20-alpine
@@ -26,7 +30,7 @@ WORKDIR /app
 # Install serve package globally to serve static files
 RUN npm install -g serve
 
-# Copy built assets
+# Copy built assets from builder stage
 COPY --from=builder /app/packages/ui/dist ./dist
 
 # Create non-root user for OpenShift compatibility
