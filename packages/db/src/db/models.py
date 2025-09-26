@@ -138,6 +138,9 @@ class User(Base):
     alertNotifications: Mapped[list[AlertNotification]] = relationship(
         back_populates='user', cascade='all, delete-orphan'
     )
+    cachedRecommendations: Mapped[list[CachedRecommendation]] = relationship(
+        back_populates='user', cascade='all, delete-orphan'
+    )
 
     __table_args__ = (
         Index('ix_users_city_state', 'address_city', 'address_state'),
@@ -305,3 +308,26 @@ class AlertNotification(Base):
     transaction: Mapped[Transaction | None] = relationship(
         back_populates='alertNotifications'
     )
+
+
+class CachedRecommendation(Base):
+    """Pre-generated alert recommendations for users"""
+
+    __tablename__ = 'cached_recommendations'
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey('users.id'), nullable=False)
+    recommendation_type: Mapped[str] = mapped_column(String, nullable=False)  # 'new_user' or 'transaction_based'
+    recommendations_json: Mapped[str] = mapped_column(String, nullable=False)  # JSON serialized recommendations
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Index for efficient querying by user and expiration
+    __table_args__ = (
+        Index('idx_cached_recommendations_user_expires', 'user_id', 'expires_at'),
+        Index('idx_cached_recommendations_expires', 'expires_at'),
+    )
+
+    user: Mapped[User] = relationship(back_populates='cachedRecommendations')

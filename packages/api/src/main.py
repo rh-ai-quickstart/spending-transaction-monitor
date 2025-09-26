@@ -14,6 +14,8 @@ from .routes import health
 from .routes import transactions as transactions_routes
 from .routes import users as users_routes
 from .services.alert_job_queue import alert_job_queue
+from .services.recommendation_job_queue import recommendation_job_queue
+from .services.recommendation_scheduler import recommendation_scheduler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -29,10 +31,24 @@ async def lifespan(app: FastAPI):
     await alert_job_queue.start()
     logger.info('Alert monitoring service started')
 
+    # Start the recommendation job queue
+    await recommendation_job_queue.start()
+    logger.info('Recommendation service started')
+
+    # Start the recommendation scheduler
+    await recommendation_scheduler.start()
+    logger.info('Recommendation scheduler started')
+
     yield
 
     await alert_job_queue.stop()
     logger.info('Alert monitoring service stopped')
+
+    await recommendation_job_queue.stop()
+    logger.info('Recommendation service stopped')
+
+    await recommendation_scheduler.stop()
+    logger.info('Recommendation scheduler stopped')
     logger.info('Shutting down application...')
 
 

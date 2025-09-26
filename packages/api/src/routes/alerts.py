@@ -1,6 +1,7 @@
 """Alert endpoints for managing alert rules and notifications"""
 
 from datetime import UTC, datetime
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from db.models import AlertNotification, AlertRule, NotificationMethod, User
 from src.services import transaction_service
+from src.services.alert_recommendation_service import AlertRecommendationService
+from src.services.background_recommendation_service import (
+    background_recommendation_service,
+)
+from src.services.recommendation_job_queue import recommendation_job_queue
 from src.services.user_service import UserService
 
 from ..auth.middleware import require_authentication
@@ -25,6 +31,7 @@ from ..services.alert_rule_service import AlertRuleService
 from ..services.notifications import Context, NoopStrategy, SmtpStrategy
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class AlertRuleCreateRequest(BaseModel):
@@ -50,10 +57,11 @@ class AlertRuleValidationResponse(BaseModel):
     validation_timestamp: str | None = None
 
 
-# Initialize alert rule service instance
+# Initialize service instances
 alert_rule_service = AlertRuleService()
 user_service = UserService()
 transaction_service = transaction_service.TransactionService()
+recommendation_service = AlertRecommendationService()
 
 
 # Alert Rules endpoints
@@ -616,3 +624,267 @@ async def trigger_alert_rule(
             'message': f'Alert trigger failed: {str(e)}',
             'error': str(e),
         }
+
+
+class AlertRecommendationResponse(BaseModel):
+    user_id: str
+    recommendation_type: str
+    recommendations: list[dict]
+    generated_at: str
+
+
+class RecommendationCategoriesResponse(BaseModel):
+    categories: dict[str, list[str]]
+
+
+# Alert Recommendations endpoints
+@router.get('/recommendations', response_model=AlertRecommendationResponse)
+async def get_alert_recommendations(
+    force_refresh: bool = Query(
+        False, description='Force regeneration of recommendations'
+    ),
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_authentication),
+):
+    """Get personalized alert recommendations for the current user"""
+    try:
+        user_id = current_user['id']
+
+        # First, try to get cached recommendations unless force refresh is requested
+        if not force_refresh:
+            cached_recommendations = (
+                await background_recommendation_service.get_cached_recommendations(
+                    user_id, session
+                )
+            )
+            if cached_recommendations:
+                return AlertRecommendationResponse(**cached_recommendations)
+
+        # If no cached recommendations or force refresh, check if we should generate in background
+        if force_refresh:
+            # For force refresh, generate immediately
+            recommendations = await recommendation_service.get_recommendations(
+                user_id, session
+            )
+
+            if 'error' in recommendations:
+                raise HTTPException(status_code=404, detail=recommendations['error'])
+
+            # Cache the new recommendations in background
+            await background_recommendation_service._cache_recommendations(
+                user_id, recommendations, session
+            )
+
+            return AlertRecommendationResponse(**recommendations)
+        else:
+            # No cached recommendations found, enqueue background job and return message
+            await recommendation_job_queue.enqueue_single_user_job(user_id)
+
+            # For now, generate synchronously as fallback
+            # In production, you might want to return a different response indicating processing
+            recommendations = await recommendation_service.get_recommendations(
+                user_id, session
+            )
+
+            if 'error' in recommendations:
+                raise HTTPException(status_code=404, detail=recommendations['error'])
+
+            return AlertRecommendationResponse(**recommendations)
+
+    except Exception as e:
+        print(f'Error getting recommendations: {e}')
+        raise HTTPException(
+            status_code=500, detail=f'Failed to get recommendations: {str(e)}'
+        ) from e
+
+
+@router.get(
+    '/recommendations/categories', response_model=RecommendationCategoriesResponse
+)
+async def get_recommendation_categories():
+    """Get available recommendation categories for UI purposes"""
+    try:
+        categories = await recommendation_service.get_recommendation_categories()
+        return RecommendationCategoriesResponse(categories=categories)
+    except Exception as e:
+        print(f'Error getting recommendation categories: {e}')
+        raise HTTPException(
+            status_code=500, detail=f'Failed to get recommendation categories: {str(e)}'
+        ) from e
+
+
+class RecommendationCreateRequest(BaseModel):
+    title: str
+    description: str
+    natural_language_query: str
+    category: str
+    priority: str
+    reasoning: str
+
+
+@router.post('/recommendations/create-rule')
+async def create_rule_from_recommendation(
+    recommendation: RecommendationCreateRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_authentication),
+):
+    """Create an alert rule from a specific recommendation"""
+    try:
+        natural_language_query = recommendation.natural_language_query
+
+        if not natural_language_query:
+            raise HTTPException(
+                status_code=400, detail='Recommendation does not contain a valid query'
+            )
+
+        # First validate the rule
+        validation_result = await alert_rule_service.validate_alert_rule(
+            natural_language_query, current_user['id'], session
+        )
+
+        if validation_result.get('status') not in ['valid', 'warning']:
+            raise HTTPException(
+                status_code=400,
+                detail=f'Rule validation failed: {validation_result.get("message")}',
+            )
+
+        # Create the alert rule using the validated data
+        alert_rule_data = validation_result.get('alert_rule', {})
+        sql_query = validation_result.get('sql_query', '')
+
+        # Create AlertRule object - use the recommendation title as the name
+        rule = AlertRule(
+            id=str(uuid.uuid4()),
+            user_id=current_user['id'],
+            name=recommendation.title,  # Always use recommendation title
+            description=recommendation.description
+            or alert_rule_data.get('description'),
+            is_active=True,
+            alert_type=alert_rule_data.get('alert_type'),
+            amount_threshold=alert_rule_data.get('amount_threshold'),
+            merchant_category=alert_rule_data.get('merchant_category'),
+            merchant_name=alert_rule_data.get('merchant_name'),
+            location=alert_rule_data.get('location'),
+            timeframe=alert_rule_data.get('timeframe'),
+            natural_language_query=natural_language_query,
+            sql_query=sql_query,
+            notification_methods=None,
+        )
+
+        session.add(rule)
+        await session.commit()
+        await session.refresh(rule)
+
+        return {
+            'message': 'Alert rule created successfully from recommendation',
+            'rule_id': rule.id,
+            'rule_name': rule.name,
+            'recommendation_used': {
+                'title': recommendation.title,
+                'description': recommendation.description,
+                'natural_language_query': recommendation.natural_language_query,
+                'category': recommendation.category,
+                'priority': recommendation.priority,
+                'reasoning': recommendation.reasoning,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f'Error creating rule from recommendation: {e}')
+        raise HTTPException(
+            status_code=500,
+            detail=f'Failed to create rule from recommendation: {str(e)}',
+        ) from e
+
+
+# Background Recommendation Management endpoints
+class BackgroundJobResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str
+
+
+class BulkRecommendationResponse(BaseModel):
+    status: str
+    total_users: int | None = None
+    success_count: int | None = None
+    error_count: int | None = None
+    message: str
+
+
+@router.post('/recommendations/generate-all', response_model=BulkRecommendationResponse)
+async def generate_recommendations_for_all_users(
+    current_user: dict = Depends(require_authentication),
+):
+    """Generate recommendations for all users in background (Admin only)"""
+
+    # Check if user is admin
+    if 'admin' not in current_user.get('roles', []):
+        raise HTTPException(status_code=403, detail='Admin access required')
+
+    try:
+        job_id = await recommendation_job_queue.enqueue_all_users_job()
+
+        return BulkRecommendationResponse(
+            status='enqueued',
+            message=f'Bulk recommendation generation job {job_id} has been enqueued',
+        )
+
+    except Exception as e:
+        logger.error(f'Error enqueueing bulk recommendation job: {e}')
+        raise HTTPException(
+            status_code=500,
+            detail=f'Failed to enqueue bulk recommendation job: {str(e)}',
+        ) from e
+
+
+@router.post('/recommendations/cleanup', response_model=BackgroundJobResponse)
+async def cleanup_expired_recommendations(
+    current_user: dict = Depends(require_authentication),
+):
+    """Cleanup expired cached recommendations (Admin only)"""
+
+    # Check if user is admin
+    if 'admin' not in current_user.get('roles', []):
+        raise HTTPException(status_code=403, detail='Admin access required')
+
+    try:
+        job_id = await recommendation_job_queue.enqueue_cleanup_job()
+
+        return BackgroundJobResponse(
+            job_id=job_id, status='enqueued', message='Cleanup job has been enqueued'
+        )
+
+    except Exception as e:
+        logger.error(f'Error enqueueing cleanup job: {e}')
+        raise HTTPException(
+            status_code=500, detail=f'Failed to enqueue cleanup job: {str(e)}'
+        ) from e
+
+
+@router.get('/recommendations/jobs/{job_id}')
+async def get_recommendation_job_status(
+    job_id: str,
+    current_user: dict = Depends(require_authentication),
+):
+    """Get the status of a recommendation job (Admin only)"""
+
+    # Check if user is admin
+    if 'admin' not in current_user.get('roles', []):
+        raise HTTPException(status_code=403, detail='Admin access required')
+
+    job = recommendation_job_queue.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail='Job not found')
+
+    return {
+        'job_id': job.job_id,
+        'job_type': job.job_type.value,
+        'user_id': job.user_id,
+        'status': job.status.value,
+        'result': job.result,
+        'error': job.error,
+        'created_at': job.created_at,
+    }
