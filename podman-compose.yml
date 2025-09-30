@@ -78,6 +78,7 @@ services:
       - BASE_URL=${BASE_URL:-https://api.openai.com/v1}
       - API_KEY=${API_KEY:-your-openai-api-key-here}
       - MODEL=${MODEL:-gpt-3.5-turbo}
+      - LLAMASTACK_BASE_URL=${LLAMASTACK_BASE_URL:-http://llamastack:8321}
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - NODE_ENV=${NODE_ENV:-development}
       - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
@@ -124,6 +125,21 @@ services:
       - spending-monitor
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+  llamastack:
+    image: llamastack/distribution-starter:latest
+    platform: linux/amd64
+    container_name: spending-monitor-llamastack
+    env_file:
+      - .env.development
+    ports:
+      - "8321:8321"
+    networks:
+      - spending-monitor
+    volumes:
+      - ./run-config.yaml:/run-config.yaml
+    entrypoint: python
+    command: ["-m", "llama_stack.core.server.server", "/run-config.yaml"]
 
   # Optional: pgAdmin for database management
   pgadmin:
