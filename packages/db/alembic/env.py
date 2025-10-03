@@ -60,17 +60,22 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    # Get database URL from environment variable first, then fall back to config
-    database_url = os.environ.get('DATABASE_URL') or config.get_main_option('sqlalchemy.url')
+    # Get database URL from environment variable first, then fall back to config, then use default
+    database_url = (
+        os.environ.get('DATABASE_URL') or 
+        config.get_main_option('sqlalchemy.url') or
+        'postgresql+psycopg2://user:password@localhost:5432/spending-monitor'  # Default fallback
+    )
+    
     # Convert asyncpg URLs to psycopg2 for Alembic compatibility
     if database_url and 'postgresql+asyncpg://' in database_url:
         database_url = database_url.replace('postgresql+asyncpg://', 'postgresql+psycopg2://')
     
     print(f'database_url in env.py: {database_url}')
-    # Create a copy of the config section and update the URL
+    
+    # Create a copy of the config section and ensure URL is set
     configuration = config.get_section(config.config_ini_section, {})
-    if database_url:
-        configuration['sqlalchemy.url'] = database_url
+    configuration['sqlalchemy.url'] = database_url
     
     connectable = engine_from_config(
         configuration,

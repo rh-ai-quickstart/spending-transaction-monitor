@@ -5,8 +5,11 @@ USER root
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for PostgreSQL
-RUN dnf install -y gcc gcc-c++ postgresql-devel && dnf clean all
+# Install system dependencies for PostgreSQL and curl
+RUN dnf install -y gcc gcc-c++ postgresql-devel curl --allowerasing && dnf clean all
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && mv ~/.local/bin/uv /usr/local/bin/uv
 
 # Create packages directory structure
 RUN mkdir -p /app/packages/api /app/packages/db
@@ -17,13 +20,15 @@ COPY packages/api/ ./packages/api/
 # Copy the db package (context is root)
 COPY packages/db/ ./packages/db/
 
-# Install Python dependencies
-# Install DB package first (dependency)
-RUN pip install --no-cache-dir -e ./packages/db
+# Install Python dependencies using uv with explicit Python binary
+# Install DB package first (dependency)  
+RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/db
 # Then install API package with dev dependencies
-RUN pip install --no-cache-dir -e ./packages/api[dev]
+RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/api[dev]  
 # Install psycopg2 for PostgreSQL sync operations (migrations)
-RUN pip install --no-cache-dir psycopg2
+RUN uv pip install --python $(which python3) --system --no-cache psycopg2
+# Install requests for Keycloak setup script
+RUN uv pip install --python $(which python3) --system --no-cache requests
 
 # Set environment variables
 ENV PYTHONPATH=/app/packages/api/src

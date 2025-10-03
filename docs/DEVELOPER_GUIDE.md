@@ -150,8 +150,8 @@ cd spending-transaction-monitor
 pnpm setup
 
 # 2. Create environment file
-cp env.example .env
-# Edit .env with your configuration (see Environment Configuration section)
+cp env.example .env.development
+# Edit .env.development with your configuration
 
 # 3. Start all services with containers (DB + API + UI + nginx + SMTP)
 make run-local

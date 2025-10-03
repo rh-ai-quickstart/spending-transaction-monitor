@@ -109,6 +109,10 @@ services:
       - spending-monitor
     environment:
       - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
+      - VITE_BYPASS_AUTH=${VITE_BYPASS_AUTH:-${BYPASS_AUTH:-false}}
+      - VITE_ENVIRONMENT=${ENVIRONMENT:-development}
+      - VITE_KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}/realms/spending-monitor
+      - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-spending-monitor}
 
   # Nginx reverse proxy to serve UI and proxy API
   nginx:
@@ -125,7 +129,31 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
 
-  # Optional: pgAdmin for database management
+  # Keycloak Identity Provider
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    platform: linux/amd64
+    container_name: spending-monitor-keycloak
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - spending-monitor
+    command: ["start-dev", "--import-realm"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  # Optional: pgAdmin for database management  
   pgadmin:
     image: dpage/pgadmin4:latest
     platform: linux/amd64
@@ -137,7 +165,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "8080:80"
+      - "8081:80"  # Changed from 8080 to avoid conflict with Keycloak
     depends_on:
       - postgres
     networks:

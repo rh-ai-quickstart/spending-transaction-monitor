@@ -86,12 +86,8 @@ class Settings(BaseSettings):
 
     def model_post_init(self, __context):
         """Set derived values based on environment"""
-        # Auto-enable auth bypass in development if not explicitly set
-        if (
-            self.ENVIRONMENT == 'development'
-            and not hasattr(self, '_bypass_auth_explicitly_set')
-            and 'BYPASS_AUTH' not in os.environ
-        ):
+        # Auto-enable auth bypass in development ONLY if not explicitly set in environment
+        if self.ENVIRONMENT == 'development' and 'BYPASS_AUTH' not in os.environ:
             self.BYPASS_AUTH = True
 
         # Set DEBUG based on environment if not explicitly set

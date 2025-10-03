@@ -82,7 +82,7 @@ setup_keycloak() {
     log_header "Setting up Keycloak configuration"
     log_info "Running automated setup script..."
     
-    if python scripts/setup_keycloak.py; then
+    if cd packages/auth && pnpm setup-keycloak-with-users; then
         log_success "Keycloak setup completed!"
         echo ""
         echo "📋 Created:"
