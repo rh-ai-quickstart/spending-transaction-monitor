@@ -1,6 +1,7 @@
 """Transaction endpoints"""
 
 from datetime import UTC
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -23,9 +24,11 @@ from ..schemas.transaction import (
 from ..services.alert_job_queue import alert_job_queue
 from ..services.alert_rule_service import AlertRuleService
 from ..services.background_alert_service import background_alert_service
+from ..services.category_normalizer import CategoryNormalizer
 
 router = APIRouter()
 alert_rule_service = AlertRuleService()
+logger = logging.getLogger(__name__)
 
 
 @router.get('/', response_model=list[TransactionOut])
@@ -209,6 +212,24 @@ async def create_transaction(
             status_code=400,
             detail="Invalid transaction date format. Use ISO format (e.g., '2024-01-16T14:45:00Z')",
         ) from e
+
+    # Normalize merchant category using CategoryNormalizer
+    normalized_category = payload.merchant_category
+    if payload.merchant_category:
+        try:
+            normalized_category = await CategoryNormalizer.normalize(
+                session, payload.merchant_category
+            )
+            logger.info(
+                f"Category normalized: '{payload.merchant_category}' -> '{normalized_category}'"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Category normalization failed for '{payload.merchant_category}': {e}"
+            )
+            # Continue with original category if normalization fails
+            normalized_category = payload.merchant_category
+
     # Generate a transaction id
     transaction_id = str(uuid.uuid4())
     tx = Transaction(
@@ -219,7 +240,7 @@ async def create_transaction(
         currency=payload.currency,
         description=payload.description,
         merchant_name=payload.merchant_name,
-        merchant_category=payload.merchant_category,
+        merchant_category=normalized_category,
         transaction_date=transaction_date,
         transaction_type=payload.transaction_type,
         merchant_longitude=payload.merchant_longitude,

@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from .database import Base
 
@@ -331,3 +332,27 @@ class CachedRecommendation(Base):
     )
 
     user: Mapped[User] = relationship(back_populates='cachedRecommendations')
+
+
+class MerchantCategorySynonym(Base):
+    __tablename__ = 'merchant_category_synonyms'
+
+    synonym: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical_category: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class MerchantCategoryEmbedding(Base):
+    __tablename__ = 'merchant_category_embeddings'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[str] = mapped_column(String, nullable=False, index=True)  # Canonical category
+    synonym: Mapped[str] = mapped_column(String, nullable=False, index=True)   # Which synonym this embedding represents
+    embedding: Mapped[list[float]] = mapped_column(Vector(384))  # 384 for all-MiniLM via Ollama
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    
+    # Ensure each synonym only has one embedding
+    __table_args__ = (
+        Index('idx_category_synonym_unique', 'synonym', unique=True),
+        Index('idx_category_lookup', 'category'),
+    )

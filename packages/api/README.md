@@ -6,6 +6,7 @@ FastAPI backend application with AI-powered transaction monitoring and alerting.
 
 - **FastAPI** - Modern, fast web framework for building APIs
 - **AI-Powered Alerts** - Natural language alert rule creation with LLM integration
+- **Category Normalization** - Automatic merchant category normalization using semantic search and synonym mapping
 - **Transaction Management** - Comprehensive transaction CRUD operations with filtering
 - **User Management** - User and credit card management endpoints
 - **Background Processing** - Async alert monitoring and notification system
@@ -13,7 +14,7 @@ FastAPI backend application with AI-powered transaction monitoring and alerting.
 - **Async/Await** - Fully asynchronous request handling
 - **Pydantic** - Data validation using Python type annotations
 - **CORS** - Cross-Origin Resource Sharing support
-- **Database** - PostgreSQL with async SQLAlchemy
+- **Database** - PostgreSQL with async SQLAlchemy and pgvector
 - **Migrations** - Database migrations with Alembic
 - **Testing** - Comprehensive test suite with pytest
 - **Code Quality** - Linting with ruff, type checking with mypy
@@ -86,7 +87,22 @@ uv run python src/db/scripts/seed.py
 cd ../api
 ```
 
-6. **Start the API server**:
+6. **Setup Category Normalization (Optional)**:
+```bash
+cd ../db
+# Seed category synonyms and mappings
+uv run python src/db/scripts/seed_category_data.py
+
+# Generate embeddings (requires OPENAI_API_KEY)
+export OPENAI_API_KEY="your-openai-api-key"
+uv run python src/db/scripts/populate_embeddings.py
+
+# Or use Ollama for local embeddings
+uv run python src/db/scripts/populate_embeddings_ollama.py
+cd ../api
+```
+
+7. **Start the API server**:
 ```bash
 # With auth bypass (development)
 ENVIRONMENT=development BYPASS_AUTH=true API_PORT=8000 uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
@@ -167,6 +183,8 @@ src/
 │   ├── alert_job_queue.py       # Background alert processing queue
 │   ├── alert_rule_service.py    # Alert rule creation and management
 │   ├── background_alert_service.py # Alert monitoring service
+│   ├── category_normalizer.py  # Merchant category normalization service
+│   ├── embedding_service.py    # Embedding generation service
 │   ├── notification_service.py  # Notification delivery service
 │   ├── transaction_service.py   # Transaction business logic
 │   ├── user_service.py         # User management service
@@ -312,6 +330,24 @@ uv run pytest tests/ -k "integration" # Run integration tests
 ```
 
 ## AI Alert System Details
+
+### Category Normalization
+The system includes automatic merchant category normalization using a two-tier approach:
+
+1. **Synonym Lookup** - Fast exact matching against 200+ predefined synonyms
+2. **Semantic Search** - Vector similarity search using OpenAI embeddings for unknown terms
+3. **Fallback** - Returns original term if no matches found
+
+**Examples:**
+- `"restaurant"` → `"dining"`
+- `"5812"` (MCC code) → `"dining"`
+- `"coffee shop"` → `"dining"` (via semantic search)
+- `"walmart"` → `"grocery"` (via synonym lookup)
+
+**Integration Points:**
+- Transaction creation automatically normalizes categories
+- Alert rule creation normalizes extracted categories
+- Alert rule validation normalizes LLM-extracted categories
 
 ### Alert Rule Creation Flow
 1. **Natural Language Input**: Users provide alert rules in plain English

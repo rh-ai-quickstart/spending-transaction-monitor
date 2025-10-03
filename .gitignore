@@ -228,3 +228,7 @@ packages/api/test_output.txt
 packages/api/test_start.txt
 
 PR_DESCRIPTION.md
+
+# Data files (too large for GitHub)
+data/credit_card_transactions.csv
+data/cc_chunk_*

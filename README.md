@@ -20,8 +20,9 @@ This project demonstrates how to combine **OpenShift AI, and modern ML framework
 The solution is deployed on **OpenShift** and integrates multiple components:
 
 - **Transaction Ingestion Service**: Securely receives credit card transaction data in real-time and stores that in the database.  
-- **Transaction Data Store**: Stores both historical and streaming data (PostgreSQL).  
+- **Transaction Data Store**: Stores both historical and streaming data (PostgreSQL with pgvector for semantic search).  
 - **Customer UI**: React frontend for defining and managing alerts with location-based fraud detection.  
+- **AI-Powered Category Normalization**: Two-tier system using synonym mapping and semantic search to normalize merchant categories.  
 - **NLP Module (LlamaStack + LangGraph Agent)**: Parses natural language into machine-readable rules.  
 - **Rules Engine / Alerting Service**: Evaluates transactions against user rules, behavioral patterns, and location-based risk assessment.  
 - **AI/ML Behavioral Analysis**: Detects anomalies, spending spikes, recurring patterns, and location-based fraud indicators.  
@@ -30,10 +31,11 @@ The solution is deployed on **OpenShift** and integrates multiple components:
 
 ## Key Features
 
-- Users create alert rules (amount, merchant, category, timeframe, location; notification methods: email/SMS/push/webhook).
-- Location-based fraud detection captures user GPS coordinates for enhanced security monitoring.
-- Incoming transactions are stored and evaluated against active rules, including location-based risk assessment.
-- Triggered rules produce alert notifications which are delivered via configured channels.
+- **AI-Powered Category Normalization** - Automatically normalizes merchant categories using semantic search and synonym mapping (e.g., "restaurant" → "dining", "5812" → "dining").
+- **Natural Language Alert Rules** - Users create alert rules in plain English (amount, merchant, category, timeframe, location; notification methods: email/SMS/push/webhook).
+- **Location-based Fraud Detection** - Captures user GPS coordinates for enhanced security monitoring.
+- **Real-time Transaction Processing** - Incoming transactions are stored and evaluated against active rules, including location-based risk assessment.
+- **Intelligent Notifications** - Triggered rules produce alert notifications which are delivered via configured channels.
 
 ```mermaid
 graph TD
@@ -129,8 +131,9 @@ graph TD
 
 - **Frontend**: React  
 - **Backend**: FastAPI, Python
-- **Databases**: PostgreSQL (transactions, rules, users)  
-- **AI/ML**: LlamaStack, LangGraph, TensorFlow/PyTorch, RHOAI  
+- **Databases**: PostgreSQL with pgvector (transactions, rules, users, semantic embeddings)  
+- **AI/ML**: LlamaStack, LangGraph, OpenAI Embeddings, TensorFlow/PyTorch, RHOAI  
+- **Category Normalization**: Two-tier system (synonym mapping + semantic search)
 - **Deployment**: OpenShift, Kubernetes-native microservices  
 - **Notifications**: Email, SMS
 

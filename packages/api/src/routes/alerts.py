@@ -28,6 +28,7 @@ from ..schemas.alert import (
     AlertRuleUpdate,
 )
 from ..services.alert_rule_service import AlertRuleService
+from ..services.category_normalizer import CategoryNormalizer
 from ..services.notifications import Context, NoopStrategy, SmtpStrategy
 
 router = APIRouter()
@@ -72,8 +73,10 @@ async def validate_alert_rule(
     current_user: dict = Depends(require_authentication),
 ):
     """Validate an alert rule with similarity checking and detailed analysis"""
-    print('DEBUG: Current user:', current_user)
-    print('Validating alert rule for user:', current_user['id'], 'payload:', payload)
+    logger.debug('Current user: %s', current_user)
+    logger.debug(
+        'Validating alert rule for user: %s, payload: %s', current_user['id'], payload
+    )
 
     validation_result = await alert_rule_service.validate_alert_rule(
         payload.natural_language_query, current_user['id'], session
@@ -81,7 +84,7 @@ async def validate_alert_rule(
     try:
         return AlertRuleValidationResponse(**validation_result)
     except Exception as e:
-        print('DEBUG: Error validating alert rule:', e)
+        logger.error('Error validating alert rule: %s', e)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -181,10 +184,9 @@ async def create_alert_rule(
     current_user: dict = Depends(require_authentication),
 ):
     """Create a new alert rule from pre-validated data"""
-    print(
-        'Creating alert rule from validation for user:',
+    logger.debug(
+        'Creating alert rule from validation for user: %s, payload: %s',
         current_user['id'],
-        'payload:',
         payload,
     )
 
@@ -192,6 +194,23 @@ async def create_alert_rule(
     alert_rule_data = payload.alert_rule
     if not alert_rule_data:
         raise HTTPException(status_code=400, detail='Alert rule data not provided')
+
+    # Normalize merchant category if present
+    normalized_merchant_category = alert_rule_data.get('merchant_category')
+    if normalized_merchant_category:
+        try:
+            normalized_merchant_category = await CategoryNormalizer.normalize(
+                session, normalized_merchant_category
+            )
+            logger.info(
+                f"Alert rule category normalized: '{alert_rule_data.get('merchant_category')}' -> '{normalized_merchant_category}'"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Alert rule category normalization failed for '{alert_rule_data.get('merchant_category')}': {e}"
+            )
+            # Continue with original category if normalization fails
+            normalized_merchant_category = alert_rule_data.get('merchant_category')
 
     rule = AlertRule(
         id=str(uuid.uuid4()),
@@ -201,7 +220,7 @@ async def create_alert_rule(
         is_active=True,
         alert_type=alert_rule_data.get('alert_type'),
         amount_threshold=alert_rule_data.get('amount_threshold'),
-        merchant_category=alert_rule_data.get('merchant_category'),
+        merchant_category=normalized_merchant_category,
         merchant_name=alert_rule_data.get('merchant_name'),
         location=alert_rule_data.get('location'),
         timeframe=alert_rule_data.get('timeframe'),
@@ -578,36 +597,36 @@ async def trigger_alert_rule(
     current_user: dict = Depends(require_authentication),
 ):
     """Manually trigger an alert rule (for testing purposes)"""
-    print(f'DEBUG: Starting trigger_alert_rule endpoint for rule_id: {rule_id}')
+    logger.debug('Starting trigger_alert_rule endpoint for rule_id: %s', rule_id)
 
     result = await session.execute(select(AlertRule).where(AlertRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail='Alert rule not found')
 
-    print(f'DEBUG: Found rule: {rule.id}, user_id: {rule.user_id}')
+    logger.debug('Found rule: %s, user_id: %s', rule.id, rule.user_id)
 
-    print('DEBUG: About to get latest transaction')
+    logger.debug('About to get latest transaction')
     transaction = await transaction_service.get_latest_transaction(
         rule.user_id, session
     )
-    print(f'DEBUG: Got transaction: {transaction}')
+    logger.debug('Got transaction: %s', transaction)
     if transaction is None:
         raise ValueError('No transaction found for user')
 
-    print('DEBUG: About to get user')
+    logger.debug('About to get user')
     user = await user_service.get_user(rule.user_id, session)
-    print(f'DEBUG: Got user: {user}')
+    logger.debug('Got user: %s', user)
     if user is None:
         # Fallback to dummy user data for testing
         raise ValueError('User data not found')
 
     try:
-        print('DEBUG: About to call trigger_alert_rule')
+        logger.debug('About to call trigger_alert_rule')
         trigger_result = await alert_rule_service.trigger_alert_rule(
             rule, transaction, user, session
         )
-        print(f'DEBUG: trigger_alert_rule completed: {trigger_result}')
+        logger.debug('trigger_alert_rule completed: %s', trigger_result)
         return trigger_result
     except ValueError as e:
         # Handle business logic errors (inactive rule, no transaction)

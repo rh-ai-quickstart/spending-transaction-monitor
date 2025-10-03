@@ -1,6 +1,7 @@
 # validate_rule_graph.py
 from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .agents.alert_parser import parse_alert_to_sql_with_context
 from .agents.create_alert_rule import create_alert_rule
@@ -24,16 +25,19 @@ class ValidationState(dict):
     sql_description: str
     validation_status: str  # 'valid', 'warning', 'invalid'
     validation_message: str
+    session: AsyncSession
 
 
 graph = StateGraph(ValidationState)
 
 
-def create_alert_rule_node(state):
+async def create_alert_rule_node(state):
     """Create alert rule object from natural language text"""
     return {
         **state,
-        'alert_rule': create_alert_rule(state['alert_text'], state['user_id']),
+        'alert_rule': await create_alert_rule(
+            state['alert_text'], state['user_id'], state['session']
+        ),
     }
 
 
@@ -153,7 +157,7 @@ def determine_validation_status(state):
 
 
 # Add nodes to graph
-graph.add_node('create_alert_rule', RunnableLambda(create_alert_rule_node))
+graph.add_node('create_alert_rule', create_alert_rule_node)
 graph.add_node('parse_alert', RunnableLambda(parse_alert_node))
 graph.add_node('execute_sql', RunnableLambda(execute_sql_node))
 graph.add_node('validate_sql', RunnableLambda(validate_sql_node))

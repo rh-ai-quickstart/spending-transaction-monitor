@@ -29,6 +29,8 @@ importers:
 
   packages/api: {}
 
+  packages/auth: {}
+
   packages/configs/eslint:
     dependencies:
       '@eslint/js':

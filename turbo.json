@@ -18,7 +18,11 @@
     "lint:fix": {},
     "format": {},
     "format:check": {},
-    "test": {},
+    "test": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
     "type-check": {},
     "storybook": {
       "cache": false,

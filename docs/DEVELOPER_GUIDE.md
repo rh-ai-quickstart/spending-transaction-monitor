@@ -203,6 +203,10 @@ pnpm db:upgrade
 # Seed test data
 pnpm db:seed
 
+# Setup Category Normalization (Optional)
+pnpm seed:categories
+pnpm populate:embeddings
+
 # Verify setup
 pnpm db:verify
 ```
@@ -318,6 +322,7 @@ pnpm test
 - User management & authentication
 - Transaction CRUD operations
 - AI-powered alert rule validation
+- Category normalization with semantic search
 - Natural language processing for rules
 - Similarity checking for duplicate rules
 - Real-time rule evaluation
@@ -372,6 +377,7 @@ pnpm test
 
 - Users, Transactions, Alert Rules
 - Alert Notifications, Credit Cards
+- Merchant Category Synonyms & Embeddings
 - Vector embeddings for rule similarity
 
 ---
@@ -636,6 +642,8 @@ api:
 pnpm db:start              # Start PostgreSQL container
 pnpm db:upgrade            # Apply migrations  
 pnpm db:seed               # Add sample data
+pnpm seed:categories       # Setup category normalization
+pnpm populate:embeddings   # Generate embeddings
 pnpm db:verify             # Verify setup
 pnpm db:revision           # Create new migration
 pnpm db:stop               # Stop database

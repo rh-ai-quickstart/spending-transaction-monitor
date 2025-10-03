@@ -1,22 +1,31 @@
+import logging
 import uuid
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AlertType
 
+from ...category_normalizer import CategoryNormalizer
 from .utils import clean_and_parse_json_response, get_llm_client
 
+logger = logging.getLogger(__name__)
 
-def create_alert_rule(alert_text: str, user_id: str) -> dict:
+
+async def create_alert_rule(
+    alert_text: str, user_id: str, session: AsyncSession
+) -> dict:
     """
     Creates an AlertRule by classifying the alert text and generating a complete AlertRule object.
 
     Args:
         alert_text: Natural language description of the alert
         user_id: ID of the user this alert rule belongs to
+        session: Database session for category normalization
 
     Returns:
         dict: A dictionary representation of the AlertRule with classified type and metadata
     """
-    print('**** in create alert rule ***')
+    logger.debug('Creating alert rule from text: %s', alert_text)
     prompt = f"""
 You are an assistant that parses natural language alert text into a structured dictionary.
 
@@ -72,6 +81,23 @@ Return the parsed dictionary as JSON.
 
     alert_type = classification_map.get(classification, AlertType.PATTERN_BASED)
 
+    # Normalize merchant category if present
+    merchant_category = content_json.get('merchant_category')
+    if merchant_category:
+        try:
+            merchant_category = await CategoryNormalizer.normalize(
+                session, merchant_category
+            )
+            logger.info(
+                f"Alert rule validation category normalized: '{content_json.get('merchant_category')}' -> '{merchant_category}'"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Alert rule validation category normalization failed for '{content_json.get('merchant_category')}': {e}"
+            )
+            # Continue with original category if normalization fails
+            merchant_category = content_json.get('merchant_category')
+
     alert_rule_dict = {
         'id': str(uuid.uuid4()),
         'user_id': user_id,
@@ -82,7 +108,7 @@ Return the parsed dictionary as JSON.
         'natural_language_query': alert_text,
         'trigger_count': 0,
         'amount_threshold': content_json.get('amount_threshold'),
-        'merchant_category': content_json.get('merchant_category'),
+        'merchant_category': merchant_category,
         'merchant_name': content_json.get('merchant_name'),
         'location': content_json.get('location'),
         'timeframe': content_json.get('timeframe'),

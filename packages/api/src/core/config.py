@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     LLAMASTACK_BASE_URL: str = 'http://localhost:8321'
     LLAMASTACK_MODEL: str = 'meta-llama/Llama-3.2-3B-Instruct'
 
+    # Embedding settings (for category normalization)
+    EMBEDDING_PROVIDER: str = 'ollama'  # ollama, openai, llamastack
+    EMBEDDING_MODEL: str = 'all-minilm:l6-v2'  # or text-embedding-3-small for openai
+    EMBEDDING_DIMENSIONS: int = 384  # 384 for ollama/all-minilm, 1536 for openai
+    OLLAMA_BASE_URL: str = 'http://localhost:11434'
+
     # Keycloak settings
     KEYCLOAK_URL: str = 'http://localhost:8080'
     KEYCLOAK_REALM: str = 'spending-monitor'

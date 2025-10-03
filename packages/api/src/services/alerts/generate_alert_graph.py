@@ -1,6 +1,7 @@
 # app.py
 from langchain_core.runnables import RunnableLambda
 from langgraph.graph import StateGraph
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .agents.alert_parser import parse_alert_to_sql_with_context
 from .agents.create_alert_rule import create_alert_rule
@@ -18,6 +19,7 @@ class AppState(dict):
     alert_triggered: bool
     alert_message: str
     alert_rule: dict  # Will store the AlertRule object
+    session: AsyncSession
 
 
 graph = StateGraph(AppState)
@@ -65,17 +67,18 @@ graph.add_node(
 # Step 2: Create Alert
 graph.add_node('create_alert', RunnableLambda(generate_alert))
 
-graph.add_node(
-    'create_alert_rule',
-    RunnableLambda(
-        lambda state: {
-            **state,
-            'alert_rule': create_alert_rule(
-                state['alert_text'], state['transaction']['user_id']
-            ),
-        }
-    ),
-)
+
+async def create_alert_rule_node(state):
+    """Create alert rule object from natural language text"""
+    return {
+        **state,
+        'alert_rule': await create_alert_rule(
+            state['alert_text'], state['transaction']['user_id'], state['session']
+        ),
+    }
+
+
+graph.add_node('create_alert_rule', create_alert_rule_node)
 
 graph.add_node(
     'generate_alert_message',
