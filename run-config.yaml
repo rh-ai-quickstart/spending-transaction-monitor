@@ -1,0 +1,21 @@
+version: '2'
+image_name: remote-vllm
+apis:
+  - inference
+providers:
+  inference:
+    - provider_id: ${env.MODEL:=meta-llama/Llama-3.1-8B-Instruct}
+      provider_type: remote::vllm
+      config:
+        url: ${env.BASE_URL:=http://localhost:8080/v1}
+        api_token: ${env.API_KEY:=fake}
+        max_tokens: 4096
+        tls_verify: false
+metadata_store:
+  type: sqlite
+  db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/starter}/registry.db
+models:
+  - metadata: {}
+    model_id: ${env.MODEL:=meta-llama/Llama-3.1-8B-Instruct}
+    provider_id: ${env.MODEL:=meta-llama/Llama-3.1-8B-Instruct}
+    model_type: llm

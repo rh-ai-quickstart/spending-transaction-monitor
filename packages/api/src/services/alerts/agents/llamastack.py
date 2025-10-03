@@ -26,7 +26,7 @@ class LlamastackClient:
         try:
             response = self.client.chat.completions.create(
                 messages=[{'role': 'user', 'content': prompt}],
-                model=settings.LLAMASTACK_MODEL,
+                model=settings.MODEL,
             )
             return response.choices[0].message.content
 
