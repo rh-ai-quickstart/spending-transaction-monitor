@@ -217,8 +217,10 @@ help:
 	@echo "    push-ingestion     Push ingestion service image to registry"
 	@echo ""
 	@echo "  Deploying:"
-	@echo "    deploy             Deploy application using Helm"
-	@echo "    deploy-dev         Deploy in development mode"
+	@echo "    deploy             Deploy application using Helm (production with env vars)"
+	@echo "    deploy-noauth      🔓 Deploy with AUTH BYPASS (dev/testing only)"
+	@echo "    deploy-keycloak    🔐 Deploy with KEYCLOAK AUTH (production)"
+	@echo "    deploy-dev         Deploy in development mode (reduced resources)"
 	@echo "    deploy-all         Build, push and deploy all components"
 	@echo "    full-deploy        Complete pipeline: login, build, push, deploy"
 	@echo ""
@@ -362,6 +364,43 @@ deploy: create-project check-env-prod
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
 		$(HELM_SECRET_PARAMS)
+
+# Deploy in development mode with auth bypass (no authentication required)
+.PHONY: deploy-noauth
+deploy-noauth: create-project
+	@echo "🔓 Deploying in DEVELOPMENT mode with AUTH BYPASS..."
+	@echo "⚠️  WARNING: Authentication is DISABLED - use only for development/testing"
+	@echo ""
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-dev-noauth.yaml \
+		--set global.imageRegistry=$(REGISTRY_URL) \
+		--set global.imageRepository=$(REPOSITORY) \
+		--set global.imageTag=$(IMAGE_TAG)
+	@echo ""
+	@echo "✅ Deployment complete!"
+	@echo "🔓 Auth bypass is ENABLED - no login required"
+	@echo "📍 Get your route: oc get route $(PROJECT_NAME)-nginx-route -n $(NAMESPACE)"
+
+# Deploy in production mode with Keycloak authentication
+.PHONY: deploy-keycloak
+deploy-keycloak: create-project check-env-prod
+	@echo "🔐 Deploying in PRODUCTION mode with KEYCLOAK AUTH..."
+	@echo "Using production environment file: $(ENV_FILE_PROD)"
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL; \
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-prod-keycloak.yaml \
+		--set global.imageRegistry=$(REGISTRY_URL) \
+		--set global.imageRepository=$(REPOSITORY) \
+		--set global.imageTag=$(IMAGE_TAG) \
+		$(HELM_SECRET_PARAMS)
+	@echo ""
+	@echo "✅ Deployment complete!"
+	@echo "🔐 Keycloak authentication is ENABLED"
+	@echo "⚠️  Make sure Keycloak is deployed and configured"
+	@echo "📍 Get your route: oc get route $(PROJECT_NAME)-nginx-route -n $(NAMESPACE)"
 
 .PHONY: deploy-dev
 deploy-dev: create-project check-env-prod
