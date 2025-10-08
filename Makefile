@@ -11,11 +11,13 @@ IMAGE_TAG ?= latest
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
 API_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:$(IMAGE_TAG)
 DB_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:$(IMAGE_TAG)
+INGESTION_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ingestion:$(IMAGE_TAG)
 
 # Local development image names (tagged as 'local')
 UI_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:local
 API_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:local
 DB_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:local
+INGESTION_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ingestion:local
 
 # Environment file paths
 ENV_FILE_DEV = .env.development
@@ -205,12 +207,14 @@ help:
 	@echo "    build-ui           Build UI image"
 	@echo "    build-api          Build API image"
 	@echo "    build-db           Build database migration image (includes CSV data loading)"
+	@echo "    build-ingestion    Build ingestion service image"
 	@echo ""
 	@echo "  Pushing:"
 	@echo "    push-all           Push all images to registry"
 	@echo "    push-ui            Push UI image to registry"
 	@echo "    push-api           Push API image to registry"
 	@echo "    push-db            Push database migration image to registry"
+	@echo "    push-ingestion     Push ingestion service image to registry"
 	@echo ""
 	@echo "  Deploying:"
 	@echo "    deploy             Deploy application using Helm"
@@ -311,8 +315,13 @@ build-db:
 	@echo "Building database image..."
 	podman build --platform=linux/amd64 -t $(DB_IMAGE) -f ./packages/db/Containerfile .
 
+.PHONY: build-ingestion
+build-ingestion:
+	@echo "Building ingestion service image..."
+	podman build --platform=linux/amd64 -t $(INGESTION_IMAGE) -f ./packages/ingestion-service/Containerfile .
+
 .PHONY: build-all
-build-all: build-ui build-api build-db
+build-all: build-ui build-api build-db build-ingestion
 	@echo "All images built successfully"
 
 # Push targets
@@ -331,8 +340,13 @@ push-db: build-db
 	@echo "Pushing database image..."
 	podman push $(DB_IMAGE)
 
+.PHONY: push-ingestion
+push-ingestion: build-ingestion
+	@echo "Pushing ingestion service image..."
+	podman push $(INGESTION_IMAGE)
+
 .PHONY: push-all
-push-all: push-ui push-api push-db
+push-all: push-ui push-api push-db push-ingestion
 	@echo "All images pushed successfully"
 
 # Deploy targets
@@ -438,12 +452,12 @@ helm-debug: check-env-prod
 .PHONY: clean-images
 clean-images:
 	@echo "Cleaning up local images..."
-	@podman rmi $(UI_IMAGE) $(API_IMAGE) $(DB_IMAGE) || true
+	@podman rmi $(UI_IMAGE) $(API_IMAGE) $(DB_IMAGE) $(INGESTION_IMAGE) || true
 
 .PHONY: clean-local-images
 clean-local-images:
 	@echo "Cleaning up local development images..."
-	@podman rmi $(UI_IMAGE_LOCAL) $(API_IMAGE_LOCAL) $(DB_IMAGE_LOCAL) || true
+	@podman rmi $(UI_IMAGE_LOCAL) $(API_IMAGE_LOCAL) $(DB_IMAGE_LOCAL) $(INGESTION_IMAGE_LOCAL) || true
 
 .PHONY: clean-all
 clean-all: undeploy-all clean-images clean-local-images
@@ -528,6 +542,7 @@ build-local:
 	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
 	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
 	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
 	@echo "✅ Local images built and tagged successfully"
 
 .PHONY: pull-local
@@ -558,32 +573,121 @@ reset-local: setup-dev-env
 	@echo ""
 	@echo "✅ Local environment has been reset and database is ready!"
 
+# Clean UI images to ensure fresh build with correct environment variables
+.PHONY: clean-ui-images
+clean-ui-images:
+	@echo "🗑️  Removing old UI images to ensure clean build..."
+	@podman rmi -f spending-monitor-ui:local localhost/spending-transaction-monitor_ui:latest 2>/dev/null || true
+	@echo "✅ UI images removed"
+
+# Build and run locally with Keycloak authentication (default/production mode)
 .PHONY: build-run-local
-build-run-local: setup-dev-env build-local
-	@echo "Starting all services locally with freshly built images (tagged as 'local')..."
-	@echo "This will start: PostgreSQL, API, UI, nginx proxy, and SMTP server"
+build-run-local: setup-dev-env clean-ui-images
+	@echo "🔨 Building images (environment-agnostic)..."
+	podman-compose -f podman-compose.yml -f podman-compose.build.yml build --no-cache migrations api ui
+	@echo "Tagging built images as 'local'..."
+	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
+	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
+	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
+	@echo ""
+	@echo "✅ Starting with Keycloak authentication (runtime config)..."
+	@echo "   - Login required (user1@example.com / password123)"
+	@echo "   - Keycloak authentication enabled"
+	@echo "   - Frontend: http://localhost:3000"
+	@echo "   - API (proxied): http://localhost:3000/api/*"
+	@echo "   - API (direct): http://localhost:8000"
+	@echo "   - Keycloak: http://localhost:8080"
+	@echo ""
+	IMAGE_TAG=local BYPASS_AUTH=false VITE_BYPASS_AUTH=false VITE_ENVIRONMENT=staging \
+		podman-compose -f podman-compose.yml up -d --no-build
+
+# Build and run locally with auth bypass (no authentication)
+.PHONY: build-run-local-noauth
+build-run-local-noauth: setup-dev-env clean-ui-images
+	@echo "🔨 Building images (environment-agnostic)..."
+	podman-compose -f podman-compose.yml -f podman-compose.build.yml build --no-cache migrations api ui
+	@echo "Tagging built images as 'local'..."
+	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
+	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
+	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
+	@echo ""
+	@echo "✅ Starting with auth bypass (runtime config)..."
+	@echo "   - No login required"
+	@echo "   - Yellow dev banner will be visible"
+	@echo "   - Frontend: http://localhost:3000"
+	@echo "   - API (proxied): http://localhost:3000/api/*"
+	@echo "   - API (direct): http://localhost:8000"
+	@echo ""
+	IMAGE_TAG=local BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development \
+		podman-compose -f podman-compose.yml up -d --no-build
+	@echo ""
+	@echo "Waiting for services to be ready..."
+	@sleep 30
+	@echo "Running database migrations..."
+	@pnpm db:upgrade || (echo "❌ Database upgrade failed. Check if database is running." && exit 1)
+	@echo "Seeding database with test data..."
+	@pnpm db:seed || (echo "❌ Database seeding failed. Check migration status." && exit 1)
+	@echo ""
+	@echo "✅ All services started including Keycloak and database is ready!"
+	@echo ""
+	@echo "To also start pgAdmin for database management, run:"
+	@echo "  IMAGE_TAG=local podman-compose -f podman-compose.yml --profile tools up -d pgadmin"
+	@echo "  Then access pgAdmin at: http://localhost:8081"
+	@echo ""
+	@echo "To setup Keycloak with database users:"
+	@echo "  make setup-keycloak"
+	@echo "  or directly: pnpm auth:setup-keycloak-with-users"
+	@echo ""
+	@echo "💡 Auth Bypass (Development Mode):"
+	@echo "  To disable authentication in development, set:"
+	@echo "    export BYPASS_AUTH=true"
+	@echo "  This affects both backend API and frontend UI"
+	@echo "  Default: BYPASS_AUTH=false (authentication required)"
+	@echo ""
+	@echo "To view logs: make logs-local"
+	@echo "To stop services: make stop-local"
+
+# New target for running with Keycloak enabled
+.PHONY: run-local-with-auth
+run-local-with-auth: setup-dev-env
+	@echo "Starting all services including Keycloak locally with Podman Compose using development environment..."
+	@echo "Using development environment file: $(ENV_FILE_DEV)"
+	@echo "This will start: PostgreSQL, API, UI, nginx proxy, SMTP server, and Keycloak"
 	@echo "Services will be available at:"
 	@echo "  - Frontend: http://localhost:3000"
 	@echo "  - API (proxied): http://localhost:3000/api/*"
 	@echo "  - API (direct): http://localhost:8000"
 	@echo "  - API Docs: http://localhost:8000/docs"
 	@echo "  - SMTP Web UI: http://localhost:3002"
+	@echo "  - Keycloak: http://localhost:8080"
 	@echo "  - Database: localhost:5432"
 	@echo ""
-	IMAGE_TAG=local podman-compose -f podman-compose.yml up -d
+	@echo "Pulling latest images from quay.io registry..."
+	IMAGE_TAG=latest podman-compose -f podman-compose.yml pull
+	IMAGE_TAG=latest podman-compose -f podman-compose.yml up -d
 	@echo ""
-	@echo "Waiting for database to be ready..."
-	@sleep 15
-	@echo "Database migrations and seeding are handled automatically by the migrations container..."
+	@echo "Waiting for services to be ready..."
+	@sleep 30
 	@echo ""
-	@echo "✅ All services started and database is ready!"
-	@echo ""
-	@echo "To also start pgAdmin for database management, run:"
-	@echo "  IMAGE_TAG=local podman-compose -f podman-compose.yml --profile tools up -d pgadmin"
-	@echo "  Then access pgAdmin at: http://localhost:8080"
-	@echo ""
-	@echo "To view logs: make logs-local"
-	@echo "To stop services: make stop-local"
+	@echo "✅ All services started including Keycloak!"
+	@echo "Use 'make setup-keycloak' to configure Keycloak with database users"
+
+# Setup Keycloak with database users using pnpm
+.PHONY: setup-keycloak
+setup-keycloak: setup-dev-env
+	@echo "Setting up Keycloak with database users using pnpm..."
+	@echo "Waiting for Keycloak to be ready..."
+	@timeout 60 bash -c 'until curl -sf http://localhost:8080/health/ready >/dev/null 2>&1; do sleep 2; done' || (echo "❌ Keycloak not ready after 60s" && exit 1)
+	@echo "Keycloak is ready, running setup..."
+	pnpm auth:setup-keycloak-with-users
+	@echo "✅ Keycloak setup completed!"
+
+# Setup Keycloak with database users (alias for consistency)
+.PHONY: setup-keycloak-local
+setup-keycloak-local: setup-keycloak
+	@echo "ℹ️  Note: setup-keycloak-local is now an alias for setup-keycloak (both use pnpm)"
 
 .PHONY: setup-local
 setup-local: check-env-dev pull-local run-local

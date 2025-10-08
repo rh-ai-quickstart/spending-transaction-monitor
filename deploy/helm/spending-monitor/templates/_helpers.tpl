@@ -159,3 +159,19 @@ Migration selector labels
 {{ include "spending-monitor.selectorLabels" . }}
 app.kubernetes.io/component: migration
 {{- end }}
+
+{{/*
+Ingestion labels
+*/}}
+{{- define "spending-monitor.ingestion.labels" -}}
+{{ include "spending-monitor.labels" . }}
+app.kubernetes.io/component: ingestion
+{{- end }}
+
+{{/*
+Ingestion selector labels
+*/}}
+{{- define "spending-monitor.ingestion.selectorLabels" -}}
+{{ include "spending-monitor.selectorLabels" . }}
+app.kubernetes.io/component: ingestion
+{{- end }}

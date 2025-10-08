@@ -1,0 +1,40 @@
+FROM registry.access.redhat.com/ubi9/python-312:latest
+
+USER root
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for PostgreSQL and curl
+RUN dnf install -y gcc gcc-c++ postgresql-devel curl --allowerasing && dnf clean all
+
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && mv ~/.local/bin/uv /usr/local/bin/uv
+
+# Create packages directory structure
+RUN mkdir -p /app/packages/ingestion-service /app/packages/db
+
+# Copy the ingestion service package (context is root)
+COPY packages/ingestion-service/ ./packages/ingestion-service/
+
+# Copy the db package (context is root)
+COPY packages/db/ ./packages/db/
+
+# Install Python dependencies using uv with explicit Python binary
+# Install DB package first (dependency)  
+RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/db
+# Then install ingestion service package with dev dependencies
+RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/ingestion-service[dev]
+
+# Set environment variables
+ENV PYTHONPATH=/app/packages/ingestion-service/src
+
+USER 1001
+
+# Expose FastAPI port
+EXPOSE 8001
+
+# Start FastAPI server
+WORKDIR /app/packages/ingestion-service
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
