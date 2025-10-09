@@ -12,13 +12,11 @@ GIT_BRANCH ?= main
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
 API_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:$(IMAGE_TAG)
 DB_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:$(IMAGE_TAG)
-INGESTION_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ingestion:$(IMAGE_TAG)
 
 # Local development image names (tagged as 'local')
 UI_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:local
 API_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:local
 DB_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:local
-INGESTION_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ingestion:local
 
 # Environment file paths
 ENV_FILE_DEV = .env.development
@@ -208,14 +206,12 @@ help:
 	@echo "    build-ui           Build UI image"
 	@echo "    build-api          Build API image"
 	@echo "    build-db           Build database migration image (includes CSV data loading)"
-	@echo "    build-ingestion    Build ingestion service image"
 	@echo ""
 	@echo "  Pushing:"
 	@echo "    push-all           Push all images to registry"
 	@echo "    push-ui            Push UI image to registry"
 	@echo "    push-api           Push API image to registry"
 	@echo "    push-db            Push database migration image to registry"
-	@echo "    push-ingestion     Push ingestion service image to registry"
 	@echo ""
 	@echo "  Deploying:"
 	@echo "    deploy             Deploy application using Helm (production with env vars)"
@@ -231,7 +227,6 @@ help:
 	@echo "    openshift-build-api          Build API image only"
 	@echo "    openshift-build-ui           Build UI image only"
 	@echo "    openshift-build-db           Build DB image only"
-	@echo "    openshift-build-ingestion    Build Ingestion image only"
 	@echo "    openshift-deploy-noauth      Build in OpenShift and deploy (no auth)"
 	@echo "    openshift-deploy-keycloak    Build in OpenShift and deploy (Keycloak)"
 	@echo ""
@@ -328,13 +323,8 @@ build-db:
 	@echo "Building database image..."
 	podman build --platform=linux/amd64 -t $(DB_IMAGE) -f ./packages/db/Containerfile .
 
-.PHONY: build-ingestion
-build-ingestion:
-	@echo "Building ingestion service image..."
-	podman build --platform=linux/amd64 -t $(INGESTION_IMAGE) -f ./packages/ingestion-service/Containerfile .
-
 .PHONY: build-all
-build-all: build-ui build-api build-db build-ingestion
+build-all: build-ui build-api build-db
 	@echo "All images built successfully"
 
 # Push targets
@@ -353,13 +343,8 @@ push-db: build-db
 	@echo "Pushing database image..."
 	podman push $(DB_IMAGE)
 
-.PHONY: push-ingestion
-push-ingestion: build-ingestion
-	@echo "Pushing ingestion service image..."
-	podman push $(INGESTION_IMAGE)
-
 .PHONY: push-all
-push-all: push-ui push-api push-db push-ingestion
+push-all: push-ui push-api push-db
 	@echo "All images pushed successfully"
 
 # Deploy targets
@@ -454,7 +439,6 @@ openshift-build-all:
 	@oc start-build spending-monitor-db -n $(NAMESPACE) --follow &
 	@oc start-build spending-monitor-api -n $(NAMESPACE) --follow &
 	@oc start-build spending-monitor-ui -n $(NAMESPACE) --follow &
-	@oc start-build spending-monitor-ingestion -n $(NAMESPACE) --follow &
 	@wait
 	@echo "✅ All builds completed!"
 
@@ -472,11 +456,6 @@ openshift-build-ui:
 openshift-build-db:
 	@echo "Building DB in OpenShift..."
 	oc start-build spending-monitor-db -n $(NAMESPACE) --follow
-
-.PHONY: openshift-build-ingestion
-openshift-build-ingestion:
-	@echo "Building Ingestion service in OpenShift..."
-	oc start-build spending-monitor-ingestion -n $(NAMESPACE) --follow
 
 .PHONY: openshift-deploy-noauth
 openshift-deploy-noauth: openshift-create-builds openshift-build-all
@@ -570,12 +549,12 @@ helm-debug: check-env-prod
 .PHONY: clean-images
 clean-images:
 	@echo "Cleaning up local images..."
-	@podman rmi $(UI_IMAGE) $(API_IMAGE) $(DB_IMAGE) $(INGESTION_IMAGE) || true
+	@podman rmi $(UI_IMAGE) $(API_IMAGE) $(DB_IMAGE) || true
 
 .PHONY: clean-local-images
 clean-local-images:
 	@echo "Cleaning up local development images..."
-	@podman rmi $(UI_IMAGE_LOCAL) $(API_IMAGE_LOCAL) $(DB_IMAGE_LOCAL) $(INGESTION_IMAGE_LOCAL) || true
+	@podman rmi $(UI_IMAGE_LOCAL) $(API_IMAGE_LOCAL) $(DB_IMAGE_LOCAL) || true
 
 .PHONY: clean-all
 clean-all: undeploy-all clean-images clean-local-images
@@ -660,7 +639,6 @@ build-local:
 	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
 	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
 	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
-	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
 	@echo "✅ Local images built and tagged successfully"
 
 .PHONY: pull-local
@@ -729,7 +707,6 @@ build-run-local-noauth: setup-dev-env clean-ui-images
 	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
 	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
 	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
-	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
 	@echo ""
 	@echo "✅ Starting with auth bypass (runtime config)..."
 	@echo "   - No login required"

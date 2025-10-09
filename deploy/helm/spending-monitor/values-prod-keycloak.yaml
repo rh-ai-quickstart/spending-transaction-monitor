@@ -60,17 +60,6 @@ ui:
       memory: "256Mi"
       cpu: "500m"
 
-ingestion:
-  enabled: true
-  replicas: 1
-  resources:
-    requests:
-      memory: "256Mi"
-      cpu: "100m"
-    limits:
-      memory: "512Mi"
-      cpu: "500m"
-
 # Persistent storage for production
 database:
   persistence:

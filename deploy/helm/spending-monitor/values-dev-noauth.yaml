@@ -59,10 +59,6 @@ ui:
       memory: "256Mi"
       cpu: "200m"
 
-# Disable ingestion service by default in dev
-ingestion:
-  enabled: false
-
 # No persistence in dev
 database:
   persistence:

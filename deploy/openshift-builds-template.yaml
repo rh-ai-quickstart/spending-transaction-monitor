@@ -144,47 +144,4 @@ spec:
       memory: 1Gi
       cpu: 500m
 
----
-# =============================================================================
-# Ingestion Service
-# =============================================================================
-
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: spending-monitor-ingestion
-  labels:
-    app: spending-monitor
-    component: ingestion
-
----
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
-metadata:
-  name: spending-monitor-ingestion
-  labels:
-    app: spending-monitor
-    component: ingestion
-spec:
-  output:
-    to:
-      kind: ImageStreamTag
-      name: spending-monitor-ingestion:latest
-  source:
-    type: Git
-    git:
-      uri: ${GIT_URI}
-      ref: ${GIT_REF}
-    contextDir: .
-  strategy:
-    type: Docker
-    dockerStrategy:
-      dockerfilePath: packages/ingestion-service/Containerfile
-  resources:
-    limits:
-      memory: 4Gi
-      cpu: "2"
-    requests:
-      memory: 2Gi
-      cpu: "1"
 
