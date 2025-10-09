@@ -20,7 +20,7 @@ COPY data/ /app/data/
 
 # Install uv + deps
 RUN pip install --no-cache-dir uv
-RUN uv venv /app/venv
+RUN uv venv /app/venv --python python3.11
 ENV PATH="/app/venv/bin:$PATH"
 RUN uv pip install -e ./packages/db
 
