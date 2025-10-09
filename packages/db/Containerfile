@@ -4,12 +4,12 @@ FROM registry.access.redhat.com/ubi9/python-312:latest
 USER 0
 
 # Install system dependencies
-RUN microdnf install -y \
+RUN dnf install -y \
     gcc \
     gcc-c++ \
     libpq-devel \
     postgresql \
-    && microdnf clean all
+    && dnf clean all
 
 # Copy db package
 WORKDIR /app
