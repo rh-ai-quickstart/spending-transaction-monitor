@@ -279,6 +279,10 @@ test_alert_rule() {
             seed_command="seed:more-than-20-same-merchant" ;;
         "alert_outside_home_state_sample.json")
             seed_command="seed:outside-home-state" ;;
+        "alert_outside_home_city_sample.json")
+            seed_command="seed:outside-home-city" ;;
+        "alert_outside_home_country_sample.json")
+            seed_command="seed:outside-home-country" ;;
         "alert_over_500_transaction.json")
             seed_command="seed:over-500-transaction" ;;
         *)

@@ -1,0 +1,49 @@
+{
+    "alert_text": "Alert me if a transaction happens outside my home city.",
+    "user": {
+      "id": "u-outcity-001",
+      "email": "james.wilson@example.com",
+      "first_name": "James",
+      "last_name": "Wilson",
+      "address_city": "Austin",
+      "address_state": "TX",
+      "address_country": "US"
+    },
+    "transactions": [
+      {
+        "id": "txn-oc-1001",
+        "user_id": "u-outcity-001",
+        "credit_card_num": "4111111111111111",
+        "amount": 45.75,
+        "currency": "USD",
+        "description": "Coffee at Local Brew",
+        "merchant_name": "Local Brew Coffee",
+        "merchant_category": "dining",
+        "merchant_city": "Austin",
+        "merchant_state": "TX",
+        "merchant_country": "US",
+        "transaction_date": "2025-08-20T08:30:00Z",
+        "transaction_type": "PURCHASE",
+        "status": "SETTLED",
+        "trans_num": "OC1001"
+      },
+      {
+        "id": "txn-oc-1002",
+        "user_id": "u-outcity-001",
+        "credit_card_num": "4111111111111111",
+        "amount": 92.00,
+        "currency": "USD",
+        "description": "Lunch in Dallas",
+        "merchant_name": "Dallas Steakhouse",
+        "merchant_category": "dining",
+        "merchant_city": "Dallas",
+        "merchant_state": "TX",
+        "merchant_country": "US",
+        "transaction_date": "2025-08-22T12:30:00Z",
+        "transaction_type": "PURCHASE",
+        "status": "SETTLED",
+        "trans_num": "OC1002"
+      }
+    ]
+  }
+

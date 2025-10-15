@@ -14,6 +14,23 @@ from db.database import SessionLocal
 from db.models import AlertNotification, AlertRule, CreditCard, Transaction, User
 from sqlalchemy import func, select, text
 
+# Import Keycloak sync functionality (optional)
+try:
+    import importlib.util
+    auth_script = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'auth', 'scripts', 'sync_db_users_to_keycloak.py')
+    spec = importlib.util.spec_from_file_location("sync_db_users_to_keycloak", auth_script)
+    if spec and spec.loader:
+        sync_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sync_module)
+        DatabaseUserSyncer = sync_module.DatabaseUserSyncer
+        KEYCLOAK_SYNCER_AVAILABLE = True
+    else:
+        raise ImportError("Could not load Keycloak sync module")
+except (ImportError, FileNotFoundError, AttributeError):
+    DatabaseUserSyncer = None  # type: ignore
+    KEYCLOAK_SYNCER_AVAILABLE = False
+    print('ℹ️  Keycloak sync unavailable (auth package not found), tests will run without authentication')
+
 
 def get_user_confirmation() -> bool:
     """Get user confirmation to proceed with data deletion"""
@@ -44,7 +61,15 @@ def get_user_confirmation() -> bool:
 
 
 async def reset_database(session) -> None:
-    """Delete all data from database tables"""
+    """Delete all data from database tables
+    
+    TODO: Implement non-destructive seeding mode
+    - Add --append flag to skip database reset
+    - Add --upsert flag to merge with existing data
+    - Add conflict resolution for duplicate IDs
+    - Preserve existing data while adding test data
+    This would allow incremental test data additions without full resets.
+    """
     print('\n🗑️  Clearing existing database data...')
 
     try:
@@ -113,8 +138,88 @@ def convert_timestamps(obj_data: dict[str, Any], fields: list[str]) -> dict[str,
     return obj_copy
 
 
-async def seed_from_json(json_file_path: str) -> None:
-    """Seed database with data from JSON file"""
+def sync_users_to_keycloak(users: list[dict[str, Any]], quiet: bool = False) -> bool:
+    """
+    Sync seeded users to Keycloak for authentication using the existing DatabaseUserSyncer
+    
+    Args:
+        users: List of user dictionaries to sync
+        quiet: If True, suppress output messages
+        
+    Returns:
+        True if sync succeeded or was skipped gracefully, False on critical error
+    """
+    if not KEYCLOAK_SYNCER_AVAILABLE:
+        if not quiet:
+            print('\nℹ️  Keycloak sync skipped (auth package not available)')
+            print('   Tests will run without authentication')
+        return True
+    
+    if not users:
+        if not quiet:
+            print('\n⚠️  No users to sync to Keycloak')
+        return True
+    
+    if not quiet:
+        print('\n' + '=' * 60)
+        print('🔐 Syncing users to Keycloak')
+        print('=' * 60)
+    
+    try:
+        # Use the existing DatabaseUserSyncer but pass in user data directly
+        syncer = DatabaseUserSyncer()
+        
+        # Get admin token
+        if not syncer.get_admin_token():
+            if not quiet:
+                print('⚠️  Keycloak not available, tests will run without authentication')
+            return True
+        
+        # Sync each user
+        success_count = 0
+        for user_data in users:
+            # Transform to the format expected by create_keycloak_user
+            user_sync_data = {
+                'id': user_data.get('id'),
+                'email': user_data['email'],
+                'first_name': user_data.get('first_name', ''),
+                'last_name': user_data.get('last_name', ''),
+                'username': user_data['email'].split('@')[0],
+                'password': syncer.default_password
+            }
+            
+            if syncer.create_keycloak_user(user_sync_data):
+                success_count += 1
+                if not quiet:
+                    print(f'  ✅ User {user_sync_data["username"]} synced')
+            else:
+                if not quiet:
+                    print(f'  ⚠️  Failed to sync user {user_sync_data["username"]}')
+        
+        if not quiet:
+            print('=' * 60)
+            print(f'🎉 Keycloak sync completed: {success_count}/{len(users)} users synced')
+            print(f'🔗 Users can login with:')
+            print(f'   • Username/Email: their email address')
+            print(f'   • Password: {syncer.default_password}')
+            print('=' * 60)
+        
+        return True
+        
+    except Exception as e:
+        if not quiet:
+            print(f'\n⚠️  Keycloak sync failed: {e}')
+            print('   This is not critical - tests can run without Keycloak.')
+        return True  # Not a critical error
+
+
+async def seed_from_json(json_file_path: str, sync_keycloak: bool = True) -> None:
+    """Seed database with data from JSON file
+    
+    Args:
+        json_file_path: Path to JSON file with test data
+        sync_keycloak: If True, sync users to Keycloak after seeding (default: True)
+    """
 
     # Validate file exists
     if not os.path.exists(json_file_path):
@@ -316,6 +421,10 @@ async def seed_from_json(json_file_path: str) -> None:
             print(f'   • Alert Rules: {alert_rule_count}')
             print(f'   • Alert Notifications: {alert_notif_count}')
             print('\n🎉 Seeding completed successfully!')
+            
+            # Sync users to Keycloak if enabled
+            if sync_keycloak and fixture['users']:
+                sync_users_to_keycloak(fixture['users'])
 
         except Exception as e:
             print(f'\n❌ Error during seeding: {e}')
@@ -350,6 +459,12 @@ Available JSON files in json/ directory:
         action='store_true',
         help='Skip confirmation prompt and proceed directly',
     )
+    
+    parser.add_argument(
+        '--no-keycloak',
+        action='store_true',
+        help='Skip Keycloak user synchronization',
+    )
 
     args = parser.parse_args()
 
@@ -369,7 +484,7 @@ Available JSON files in json/ directory:
 
     # Execute seeding
     try:
-        asyncio.run(seed_from_json(json_file_path))
+        asyncio.run(seed_from_json(json_file_path, sync_keycloak=not args.no_keycloak))
     except KeyboardInterrupt:
         print('\n⚠️  Interrupted by user. Exiting...')
     except Exception as e:

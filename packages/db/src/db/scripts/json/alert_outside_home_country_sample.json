@@ -1,0 +1,49 @@
+{
+    "alert_text": "Alert me if a transaction occurs outside my country.",
+    "user": {
+      "id": "u-outcountry-001",
+      "email": "sarah.martinez@example.com",
+      "first_name": "Sarah",
+      "last_name": "Martinez",
+      "address_city": "New York",
+      "address_state": "NY",
+      "address_country": "US"
+    },
+    "transactions": [
+      {
+        "id": "txn-ocy-1001",
+        "user_id": "u-outcountry-001",
+        "credit_card_num": "4111111111111111",
+        "amount": 125.50,
+        "currency": "USD",
+        "description": "Shopping at Macy's",
+        "merchant_name": "Macy's",
+        "merchant_category": "shopping",
+        "merchant_city": "New York",
+        "merchant_state": "NY",
+        "merchant_country": "US",
+        "transaction_date": "2025-08-18T14:20:00Z",
+        "transaction_type": "PURCHASE",
+        "status": "SETTLED",
+        "trans_num": "OCY1001"
+      },
+      {
+        "id": "txn-ocy-1002",
+        "user_id": "u-outcountry-001",
+        "credit_card_num": "4111111111111111",
+        "amount": 245.00,
+        "currency": "EUR",
+        "description": "Hotel in Paris",
+        "merchant_name": "Hotel de Paris",
+        "merchant_category": "lodging",
+        "merchant_city": "Paris",
+        "merchant_state": "IDF",
+        "merchant_country": "FR",
+        "transaction_date": "2025-08-22T09:00:00Z",
+        "transaction_type": "PURCHASE",
+        "status": "SETTLED",
+        "trans_num": "OCY1002"
+      }
+    ]
+  }
+

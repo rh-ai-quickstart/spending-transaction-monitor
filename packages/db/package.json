@@ -33,6 +33,8 @@
     "seed:charged-more-same-merchant": "uv run python -m db.scripts.seed_alert_rules json/alert_charged_significantly_more_same_merchant.json",
     "seed:more-than-20-same-merchant": "uv run python -m db.scripts.seed_alert_rules json/alert_more_than_20_dollars_same_merchant.json",
     "seed:outside-home-state": "uv run python -m db.scripts.seed_alert_rules json/alert_outside_home_state_sample.json",
+    "seed:outside-home-city": "uv run python -m db.scripts.seed_alert_rules json/alert_outside_home_city_sample.json",
+    "seed:outside-home-country": "uv run python -m db.scripts.seed_alert_rules json/alert_outside_home_country_sample.json",
     "seed:over-500-transaction": "uv run python -m db.scripts.seed_alert_rules json/alert_over_500_transaction.json",
     "seed:custom": "echo 'Usage: pnpm run seed:custom <json-file>' && echo 'Example: pnpm run seed:custom json/my_test_data.json'",
     "verify": "uv run python -m db.scripts.verify_user",
