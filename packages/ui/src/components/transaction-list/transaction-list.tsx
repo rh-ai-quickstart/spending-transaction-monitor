@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Badge } from '../atoms/badge/badge';
 import { Button } from '../atoms/button/button';
 import { cn } from '../../lib/utils';
-import { statusColors } from '../../lib/colors';
 import { useRecentTransactions, useTransactionSearch } from '../../hooks/transactions';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { TransactionCard } from '../transaction-card/transaction-card';
 import type { Transaction } from '../../schemas/transaction';
 
 export interface TransactionListProps {
@@ -65,13 +64,15 @@ export function TransactionList({
 
             switch (sortBy) {
               case 'date':
-                comparison = new Date(a.time).getTime() - new Date(b.time).getTime();
+                comparison =
+                  new Date(a.transaction_date).getTime() -
+                  new Date(b.transaction_date).getTime();
                 break;
               case 'amount':
                 comparison = a.amount - b.amount;
                 break;
               case 'merchant':
-                comparison = a.merchant.localeCompare(b.merchant);
+                comparison = a.merchant_name.localeCompare(b.merchant_name);
                 break;
             }
 
@@ -92,65 +93,6 @@ export function TransactionList({
       setCurrentPage(1);
     }
   }, [isSearching, statusFilter]);
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatTime = (time: string) => {
-    const date = new Date(time);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-
-    return date.toLocaleDateString();
-  };
-
-  const getStatusColor = (status: Transaction['status']) => {
-    return statusColors[status]?.badge || '';
-  };
-
-  const getCategoryIcon = (category?: string) => {
-    if (!category) return '💰';
-
-    const lowerCategory = category.toLowerCase();
-
-    if (lowerCategory.includes('cloud') || lowerCategory.includes('software'))
-      return '☁️';
-    if (lowerCategory.includes('food') || lowerCategory.includes('dining')) return '🍽️';
-    if (
-      lowerCategory.includes('transport') ||
-      lowerCategory.includes('uber') ||
-      lowerCategory.includes('taxi')
-    )
-      return '🚗';
-    if (lowerCategory.includes('business') || lowerCategory.includes('office'))
-      return '🏢';
-    if (lowerCategory.includes('transfer') || lowerCategory.includes('bank'))
-      return '🏦';
-    if (lowerCategory.includes('shopping') || lowerCategory.includes('retail'))
-      return '🛒';
-    if (lowerCategory.includes('entertainment') || lowerCategory.includes('streaming'))
-      return '🎬';
-    if (lowerCategory.includes('health') || lowerCategory.includes('medical'))
-      return '🏥';
-    if (lowerCategory.includes('education') || lowerCategory.includes('learning'))
-      return '📚';
-    if (lowerCategory.includes('travel') || lowerCategory.includes('hotel'))
-      return '✈️';
-
-    return '💰'; // Default fallback
-  };
 
   if (isLoading) {
     return (
@@ -193,57 +135,12 @@ export function TransactionList({
           </div>
         ) : (
           data.transactions.map((transaction) => (
-            <div
+            <TransactionCard
               key={transaction.id}
-              className={cn(
-                'flex items-center justify-between p-4 rounded-lg border transition-colors',
-                onTransactionClick
-                  ? 'cursor-pointer hover:bg-muted/50'
-                  : 'cursor-default',
-                'group',
-                selectedTransactionId === transaction.id
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                  : 'border-border',
-              )}
-              onClick={() => onTransactionClick?.(transaction)}
-            >
-              <div className="flex items-center gap-4">
-                <div className="text-2xl">{getCategoryIcon(transaction.category)}</div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-foreground">
-                      {transaction.merchant}
-                    </p>
-                    {transaction.category && (
-                      <span className="text-xs text-muted-foreground">
-                        • {transaction.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm text-muted-foreground">
-                      {transaction.id}
-                    </span>
-                    <span className="text-sm text-muted-foreground">•</span>
-                    <span className="text-sm text-muted-foreground">
-                      {formatTime(transaction.time)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Badge
-                  variant="secondary"
-                  className={cn('capitalize', getStatusColor(transaction.status))}
-                >
-                  {transaction.status}
-                </Badge>
-                <span className="font-semibold text-foreground min-w-[100px] text-right">
-                  {formatAmount(transaction.amount)}
-                </span>
-              </div>
-            </div>
+              transaction={transaction}
+              onClick={onTransactionClick}
+              isSelected={selectedTransactionId === transaction.id}
+            />
           ))
         )}
       </div>

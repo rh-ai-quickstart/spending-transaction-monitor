@@ -1,34 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  apiTransactionService as transactionService,
-  realAlertService as alertService,
-  userService,
-} from '../services/api-transaction';
-import type { TransactionStats } from '../schemas/transaction';
-
-interface AlertRule {
-  name: string;
-  description: string;
-  alert_type: string;
-  amount_threshold?: number;
-  merchant_category?: string;
-  merchant_name?: string;
-  location?: string;
-  timeframe?: string;
-}
+import { TransactionService } from '../services/transaction';
+import { userService } from '../services/user';
+import type { TransactionStats, CreateTransaction } from '../schemas/transaction';
+import { useAuth } from './useAuth';
 
 // Transaction hooks
 export const useRecentTransactions = (page = 1, limit = 10) => {
   return useQuery({
     queryKey: ['transactions', 'recent', page, limit],
-    queryFn: () => transactionService.getRecentTransactions(page, limit),
+    queryFn: () => TransactionService.getRecentTransactions(page, limit),
   });
 };
 
 export const useTransaction = (id: string) => {
   return useQuery({
     queryKey: ['transactions', id],
-    queryFn: () => transactionService.getTransactionById(id),
+    queryFn: () => TransactionService.getTransactionById(id),
     enabled: !!id,
   });
 };
@@ -40,7 +27,7 @@ export const useTransactionStats = (): {
 } => {
   return useQuery({
     queryKey: ['transactions', 'stats'],
-    queryFn: () => transactionService.getTransactionStats(),
+    queryFn: () => TransactionService.getTransactionStats(),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 };
@@ -48,78 +35,55 @@ export const useTransactionStats = (): {
 export const useTransactionSearch = (query: string) => {
   return useQuery({
     queryKey: ['transactions', 'search', query],
-    queryFn: () => transactionService.searchTransactions(query),
+    queryFn: () => TransactionService.searchTransactions(query),
     enabled: query.length > 2, // Only search with 3+ characters
   });
 };
 
-// Alert hooks
-export const useAlerts = () => {
-  return useQuery({
-    queryKey: ['alerts'],
-    queryFn: () => alertService.getAlerts(),
-    refetchInterval: 60000, // Refetch every minute
-  });
-};
-
-export const useAlertRules = () => {
-  return useQuery({
-    queryKey: ['alertRules'],
-    queryFn: () => alertService.getAlertRules(),
-  });
-};
-
-export const useValidateAlertRule = () => {
-  return useMutation({
-    mutationFn: (rule: string) => alertService.validateAlertRule(rule),
-  });
-};
-
-export const useCreateAlertRuleFromValidation = () => {
+// Transaction Mutations
+export const useCreateTransaction = () => {
   const queryClient = useQueryClient();
+  const auth = useAuth();
 
   return useMutation({
-    mutationFn: (validationResult: {
-      alert_rule: AlertRule;
-      sql_query: string;
-      natural_language_query: string;
-    }) => alertService.createAlertRuleFromValidation(validationResult),
+    mutationFn: async (transaction: CreateTransaction) => {
+      if (!auth.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      return TransactionService.createTransaction(transaction, auth.user.id);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alertRules'] });
+      // Invalidate related queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['users', auth.user?.id] });
     },
   });
 };
 
-export const useCreateAlertRule = () => {
+export const useUpdateTransaction = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (rule: string) => alertService.createAlertRule(rule),
+    mutationFn: ({
+      id,
+      transaction,
+    }: {
+      id: string;
+      transaction: Partial<CreateTransaction>;
+    }) => TransactionService.updateTransaction(id, transaction),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alertRules'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
 };
 
-export const useToggleAlertRule = () => {
+export const useDeleteTransaction = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => alertService.toggleAlertRule(id),
+    mutationFn: (id: string) => TransactionService.deleteTransaction(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alertRules'] });
-    },
-  });
-};
-
-export const useDeleteAlertRule = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => alertService.deleteAlertRule(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alertRules'] });
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
 };
@@ -127,7 +91,7 @@ export const useDeleteAlertRule = () => {
 export const useTransactionChartData = (timeRange: '7d' | '30d' | '90d' | '1y') => {
   return useQuery({
     queryKey: ['transactions', 'chart', timeRange],
-    queryFn: () => transactionService.getTransactionChartData(timeRange),
+    queryFn: () => TransactionService.getTransactionChartData(timeRange),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

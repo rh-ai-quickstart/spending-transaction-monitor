@@ -98,7 +98,7 @@ services:
       - "3002:80"   # Web UI
       # smtp4dev listens on port 25 for incoming SMTP traffic.
       # Uncomment the following line to also accept SMTP traffic from the host on port 2525.
-      # - "2525:25"
+      - "2525:25"
     networks:
       - spending-monitor
 

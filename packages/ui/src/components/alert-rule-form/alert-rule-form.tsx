@@ -12,18 +12,12 @@ export interface AlertRuleFormProps {
   className?: string;
   onSubmit?: (data: CreateAlertRuleInput) => void | Promise<void>;
   isSubmitting?: boolean;
-  exampleRules?: string[];
 }
 
 export function AlertRuleForm({
   className,
   onSubmit,
   isSubmitting = false,
-  exampleRules = [
-    'Alert me when daily spending exceeds $5,000',
-    'Notify me of transactions after 11 PM',
-    'Alert for international transactions over $1,000',
-  ],
 }: AlertRuleFormProps) {
   const form = useForm({
     defaultValues: {
@@ -38,10 +32,6 @@ export function AlertRuleForm({
       onChange: CreateAlertRuleSchema,
     },
   });
-
-  const handleExampleClick = (example: string) => {
-    form.setFieldValue('rule', example);
-  };
 
   return (
     <form
@@ -105,25 +95,6 @@ export function AlertRuleForm({
           )}
         </form.Field>
       </div>
-
-      {exampleRules.length > 0 && (
-        <div className="text-center">
-          <div className="flex flex-wrap justify-center items-center gap-2">
-            <span className="text-sm text-muted-foreground">Try examples:</span>
-            {exampleRules.map((example, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => handleExampleClick(example)}
-                disabled={isSubmitting}
-                className="text-xs text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-full transition-colors disabled:opacity-50"
-              >
-                "{example}"
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </form>
   );
 }

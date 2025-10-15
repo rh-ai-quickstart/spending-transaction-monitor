@@ -50,20 +50,22 @@ export function useUserLocation(
         const { apiClient } = await import('../services/apiClient');
 
         // Update user location consent and coordinates
-        await apiClient.fetch('/api/users/location', {
-          method: 'POST',
-          headers: {
-            'X-User-Latitude': loc.latitude.toString(),
-            'X-User-Longitude': loc.longitude.toString(),
-            'X-User-Location-Accuracy': loc.accuracy.toString(),
-          },
-          body: JSON.stringify({
+        await apiClient.post(
+          '/users/location',
+          {
             location_consent_given: true,
             last_app_location_latitude: loc.latitude,
             last_app_location_longitude: loc.longitude,
             last_app_location_accuracy: loc.accuracy,
-          }),
-        });
+          },
+          {
+            headers: {
+              'X-User-Latitude': loc.latitude.toString(),
+              'X-User-Longitude': loc.longitude.toString(),
+              'X-User-Location-Accuracy': loc.accuracy.toString(),
+            },
+          },
+        );
 
         console.log('✅ Location sent to backend successfully');
       } catch (err) {

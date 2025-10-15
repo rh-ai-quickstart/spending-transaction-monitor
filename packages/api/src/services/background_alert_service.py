@@ -298,7 +298,7 @@ class BackgroundAlertService:
             try:
                 db_url = os.getenv(
                     'DATABASE_URL',
-                    'postgresql+asyncpg://postgres:password@localhost:5432/spending_monitor',
+                    'postgresql+asyncpg://user:password@localhost:5432/spending-monitor',
                 )
                 engine = create_async_engine(db_url, echo=False, future=True)
                 SessionLocalThread = async_sessionmaker(engine, expire_on_commit=False)

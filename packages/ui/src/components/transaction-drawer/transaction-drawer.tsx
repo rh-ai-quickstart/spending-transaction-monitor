@@ -8,7 +8,8 @@ import {
 } from '../atoms/drawer/drawer';
 import { statusColors } from '../../lib/colors';
 import { cn } from '../../lib/utils';
-import { Copy, Flag, ExternalLink, Calendar, CreditCard } from 'lucide-react';
+import { getCategoryIcon } from '../../lib/category-icons';
+import { Copy, Calendar, CreditCard, MapPin } from 'lucide-react';
 import type { Transaction } from '../../schemas/transaction';
 
 export interface TransactionDrawerProps {
@@ -36,38 +37,6 @@ export function TransactionDrawer({
     console.log('Transaction ID copied');
   };
 
-  const getCategoryIcon = (category?: string) => {
-    if (!category) return '💰';
-
-    const lowerCategory = category.toLowerCase();
-
-    if (lowerCategory.includes('cloud') || lowerCategory.includes('software'))
-      return '☁️';
-    if (lowerCategory.includes('food') || lowerCategory.includes('dining')) return '🍽️';
-    if (
-      lowerCategory.includes('transport') ||
-      lowerCategory.includes('uber') ||
-      lowerCategory.includes('taxi')
-    )
-      return '🚗';
-    if (lowerCategory.includes('business') || lowerCategory.includes('office'))
-      return '🏢';
-    if (lowerCategory.includes('transfer') || lowerCategory.includes('bank'))
-      return '🏦';
-    if (lowerCategory.includes('shopping') || lowerCategory.includes('retail'))
-      return '🛒';
-    if (lowerCategory.includes('entertainment') || lowerCategory.includes('streaming'))
-      return '🎬';
-    if (lowerCategory.includes('health') || lowerCategory.includes('medical'))
-      return '🏥';
-    if (lowerCategory.includes('education') || lowerCategory.includes('learning'))
-      return '📚';
-    if (lowerCategory.includes('travel') || lowerCategory.includes('hotel'))
-      return '✈️';
-
-    return '💰'; // Default fallback
-  };
-
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[80vh]">
@@ -81,7 +50,7 @@ export function TransactionDrawer({
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
                 <span>
-                  {new Date(transaction.time).toLocaleDateString('en-US', {
+                  {new Date(transaction.transaction_date).toLocaleDateString('en-US', {
                     weekday: 'long',
                     month: 'short',
                     day: 'numeric',
@@ -91,7 +60,12 @@ export function TransactionDrawer({
               </div>
               <Badge
                 variant="secondary"
-                className={cn('capitalize', statusColors[transaction.status]?.badge)}
+                className={cn(
+                  'capitalize',
+                  statusColors[
+                    transaction.status.toLowerCase() as keyof typeof statusColors
+                  ]?.badge,
+                )}
               >
                 {transaction.status}
               </Badge>
@@ -101,7 +75,7 @@ export function TransactionDrawer({
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <h2 className="text-2xl font-bold text-foreground leading-tight">
-                  {transaction.merchant}
+                  {transaction.merchant_name}
                 </h2>
                 <p className="text-2xl font-bold text-foreground">
                   {formatCurrency(transaction.amount)}
@@ -111,9 +85,11 @@ export function TransactionDrawer({
               {/* Pills */}
               <div className="flex flex-wrap gap-3">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-info-muted text-info-muted-foreground rounded-full">
-                  <div className="text-sm">{getCategoryIcon(transaction.category)}</div>
+                  <div className="text-sm">
+                    {getCategoryIcon(transaction.merchant_category)}
+                  </div>
                   <span className="text-sm font-medium uppercase tracking-wide">
-                    {transaction.category || transaction.type}
+                    {transaction.merchant_category || transaction.transaction_type}
                   </span>
                 </div>
 
@@ -133,11 +109,14 @@ export function TransactionDrawer({
                     Time
                   </p>
                   <p className="text-sm font-medium text-foreground">
-                    {new Date(transaction.time).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
+                    {new Date(transaction.transaction_date).toLocaleTimeString(
+                      'en-US',
+                      {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      },
+                    )}
                   </p>
                 </div>
                 <div className="text-center">
@@ -170,19 +149,38 @@ export function TransactionDrawer({
               </div>
             )}
 
-            {/* Actions */}
-            <div className="grid grid-cols-1 gap-2 pt-4 border-t border-border">
-              {transaction.status === 'flagged' && (
-                <Button variant="outline" size="sm">
-                  <Flag className="h-4 w-4 mr-2" />
-                  Unflag Transaction
-                </Button>
-              )}
-              <Button variant="outline" size="sm">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View in System
-              </Button>
-            </div>
+            {/* Location Info */}
+            {(transaction.merchant_city ||
+              transaction.merchant_state ||
+              transaction.merchant_country) && (
+              <div className="pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">
+                  Location
+                </p>
+                <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    {transaction.merchant_city && (
+                      <p className="text-sm font-medium text-foreground">
+                        {transaction.merchant_city}
+                      </p>
+                    )}
+                    {(transaction.merchant_state || transaction.merchant_country) && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {[transaction.merchant_state, transaction.merchant_country]
+                          .filter(Boolean)
+                          .join(', ')}
+                      </p>
+                    )}
+                    {transaction.merchant_zipcode && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {transaction.merchant_zipcode}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </DrawerContent>

@@ -12,36 +12,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from .config import settings
 
-# Only create async engine if using async driver (asyncpg)
-# For alembic (which uses sync psycopg2), skip async engine creation
-engine = None
-_SessionLocal = None
-
-def get_engine():
-    global engine
-    if engine is None and '+asyncpg' in settings.DATABASE_URL:
-        engine = create_async_engine(settings.DATABASE_URL, echo=True)
-    return engine
-
-def get_session_local():
-    global _SessionLocal
-    if _SessionLocal is None:
-        eng = get_engine()
-        if eng:
-            _SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=eng, class_=AsyncSession
-            )
-    return _SessionLocal
-
-# Backwards compatibility - create SessionLocal on first access
-class SessionLocalFactory:
-    def __call__(self):
-        session_local = get_session_local()
-        if session_local is None:
-            raise RuntimeError("Database not configured for async operations")
-        return session_local()
-
-SessionLocal = SessionLocalFactory()
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
+SessionLocal = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine, class_=AsyncSession
+)
 
 Base = declarative_base()
 

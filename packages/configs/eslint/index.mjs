@@ -32,6 +32,7 @@ export default [
         innerWidth: 'readonly',
         innerHeight: 'readonly',
         HTMLInputElement: 'readonly',
+        HTMLTextAreaElement: 'readonly',
         HTMLDivElement: 'readonly',
         HTMLButtonElement: 'readonly',
         HTMLFormElement: 'readonly',
@@ -67,6 +68,8 @@ export default [
       'react/jsx-uses-react': 'off',
       // Allow unescaped entities in JSX (quotes, apostrophes are fine)
       'react/no-unescaped-entities': 'off',
+      // Disable prop-types validation since we use TypeScript
+      'react/prop-types': 'off',
     }
   },
   // Node.js config for build tools

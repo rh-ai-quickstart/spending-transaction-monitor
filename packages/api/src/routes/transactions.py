@@ -183,8 +183,11 @@ async def create_transaction(
     current_user: dict = Depends(require_authentication),
 ):
     """Create a new transaction"""
+    # Use the authenticated user's ID instead of payload.user_id
+    user_id = current_user['id']
+
     # Verify user exists
-    user_result = await session.execute(select(User).where(User.id == payload.user_id))
+    user_result = await session.execute(select(User).where(User.id == user_id))
     user = user_result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail='User not found')
@@ -213,7 +216,7 @@ async def create_transaction(
     transaction_id = str(uuid.uuid4())
     tx = Transaction(
         id=transaction_id,
-        user_id=payload.user_id,
+        user_id=user_id,  # Use authenticated user's ID
         credit_card_num=payload.credit_card_num,
         amount=payload.amount,
         currency=payload.currency,
@@ -241,7 +244,7 @@ async def create_transaction(
 
     background_tasks.add_task(
         background_alert_service.process_alert_rules_background,
-        payload.user_id,
+        user_id,  # Use authenticated user's ID
         tx.id,
     )
 

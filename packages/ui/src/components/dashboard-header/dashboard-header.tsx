@@ -1,6 +1,7 @@
-import { Bell, Menu, CreditCard } from 'lucide-react';
+import { Menu, CreditCard } from 'lucide-react';
 import { Button } from '../atoms/button/button';
 import { UserAvatar } from '../user-avatar/user-avatar';
+import { AlertHistoryPopover } from '../alert-history-popover/alert-history-popover';
 import { cn } from '../../lib/utils';
 import { Link } from '@tanstack/react-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -34,7 +35,7 @@ export function DashboardHeader({ className, onMenuClick }: DashboardHeaderProps
                   <CreditCard className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <span className="font-semibold text-xl text-foreground hidden sm:block">
-                  TransactionGuard
+                  Transaction Monitor
                 </span>
               </Link>
             </div>
@@ -42,7 +43,7 @@ export function DashboardHeader({ className, onMenuClick }: DashboardHeaderProps
             <nav className="hidden md:flex items-center gap-6">
               <Link
                 to="/"
-                className="text-foreground hover:text-primary transition-colors text-sm font-medium"
+                className="text-muted-foreground hover:text-primary transition-colors text-sm font-medium"
                 activeProps={{ className: 'text-primary' }}
               >
                 Dashboard
@@ -66,10 +67,7 @@ export function DashboardHeader({ className, onMenuClick }: DashboardHeaderProps
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="relative rounded-full">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-2 w-2 bg-error rounded-full" />
-            </Button>
+            <AlertHistoryPopover />
 
             <UserAvatar
               userName={user?.name}

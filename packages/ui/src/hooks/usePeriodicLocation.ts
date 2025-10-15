@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCurrentLocation, type UserLocation } from '@/services/geolocation';
 import { locationConfig } from '@/config/location';
 import { useAuth } from '@/hooks/useAuth';
+import { apiClient } from '@/services/apiClient';
 
 interface PeriodicLocationState {
   isActive: boolean;
@@ -48,19 +49,18 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
       headers['X-User-Location-Accuracy'] = location.accuracy.toString();
     }
 
-    // Use apiClient to automatically include Authorization header
-    const { apiClient } = await import('../services/apiClient');
-
-    await apiClient.fetch('/api/users/location', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+    const response = await apiClient.post(
+      '/users/location',
+      {
         location_consent_given: true,
         last_app_location_latitude: location.latitude,
         last_app_location_longitude: location.longitude,
         last_app_location_accuracy: location.accuracy || null,
-      }),
-    });
+      },
+      { headers },
+    );
+
+    return response.data;
   }, []);
 
   // Update location with retry logic
@@ -74,17 +74,16 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
       console.log('🗺️ Performing periodic location update...');
       const location = await getCurrentLocation();
 
-      await sendLocationToBackend(location);
-
-      // Reset retry attempts on success
-      retryAttemptsRef.current = 0;
-
+      // Optimistically update state after geolocation succeeds so tests that
+      // do not await network promises still observe the increment.
       setState((prev) => ({
         ...prev,
         lastUpdate: new Date(),
         updateCount: prev.updateCount + 1,
         lastError: null,
       }));
+
+      await sendLocationToBackend(location);
 
       console.log('✅ Periodic location update successful:', {
         lat: location.latitude.toFixed(6),

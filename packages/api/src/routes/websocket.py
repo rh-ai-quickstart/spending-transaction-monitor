@@ -74,8 +74,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str) -> None:
         while True:
             # Keep the connection alive and handle incoming messages
             data = await websocket.receive_text()
-            # Echo back any received data (optional)
-            await websocket.send_text(f'Echo: {data}')
+            # Log received data but don't echo back (client expects only JSON messages)
+            logger.debug(f'Received WebSocket message from user {user_id}: {data}')
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
     except Exception as e:

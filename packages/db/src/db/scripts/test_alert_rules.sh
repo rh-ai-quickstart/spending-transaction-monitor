@@ -22,10 +22,54 @@ NC='\033[0m' # No Color
 API_BASE_URL="http://localhost:8000/api"
 JSON_DIR="json"
 
+# Auth Configuration
+# You can provide AUTH_TOKEN directly, or we'll get one using admin credentials
+AUTH_TOKEN="${AUTH_TOKEN:-}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
+KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
+KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
+
 # Counter variables
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
+
+# Function to get auth token from Keycloak using admin credentials
+get_auth_token() {
+    if [[ -n "$AUTH_TOKEN" ]]; then
+        echo "$AUTH_TOKEN"
+        return 0
+    fi
+    
+    local token_url="${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
+    
+    local response=$(curl -s -X POST "$token_url" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "username=${KEYCLOAK_ADMIN_USER}" \
+        -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+        -d "grant_type=password" \
+        -d "client_id=admin-cli")
+    
+    local access_token=""
+    if command -v jq >/dev/null 2>&1; then
+        access_token=$(echo "$response" | jq -r '.access_token // ""')
+    else
+        access_token=$(echo "$response" | python3 -c "import json, sys; data = json.load(sys.stdin); print(data.get('access_token', ''))" 2>/dev/null || echo "")
+    fi
+    
+    if [[ -z "$access_token" || "$access_token" == "null" ]]; then
+        echo -e "${YELLOW}⚠️  Could not obtain auth token from Keycloak${NC}" >&2
+        echo -e "${YELLOW}   Keycloak URL: $token_url${NC}" >&2
+        echo -e "${YELLOW}   Admin user: $KEYCLOAK_ADMIN_USER${NC}" >&2
+        echo -e "${YELLOW}   Response: $response${NC}" >&2
+        echo -e "${YELLOW}   Continuing without authentication (BYPASS_AUTH should be enabled)${NC}" >&2
+        echo ""
+        return 1
+    fi
+    
+    echo "$access_token"
+    return 0
+}
 
 # Function to show usage
 show_help() {
@@ -40,6 +84,12 @@ show_help() {
     echo "Examples:"
     echo "  $0 alert_rule_spending_daily_300_trigger.json"
     echo "  $0 spending_daily_300       # Partial filename match"
+    echo ""
+    echo "Environment Variables:"
+    echo "  AUTH_TOKEN              Optional: Pre-obtained JWT token (bypasses Keycloak)"
+    echo "  KEYCLOAK_URL            Keycloak server URL (default: http://localhost:8080)"
+    echo "  KEYCLOAK_ADMIN_USER     Admin username (default: admin)"
+    echo "  KEYCLOAK_ADMIN_PASSWORD Admin password (default: admin)"
     echo ""
 }
 
@@ -101,6 +151,19 @@ if ! curl -s "http://localhost:8000/health/" > /dev/null; then
     exit 1
 fi
 echo -e "${GREEN}✅ API server is running${NC}"
+echo ""
+
+# Get authentication token
+echo -e "${YELLOW}🔐 Getting authentication token...${NC}"
+AUTH_TOKEN=$(get_auth_token)
+AUTH_STATUS=$?
+if [[ $AUTH_STATUS -eq 0 ]]; then
+    echo -e "${GREEN}✅ Authentication token obtained${NC}"
+    AUTH_HEADER="Authorization: Bearer $AUTH_TOKEN"
+else
+    echo -e "${YELLOW}⚠️  No authentication token - requests will be made without auth${NC}"
+    AUTH_HEADER=""
+fi
 echo ""
 
 # Function to extract alert_text from JSON file
@@ -313,9 +376,17 @@ test_alert_rule() {
     # Step 2a: Validate alert rule via API
     echo -e "${YELLOW}🔍 Validating alert rule via API...${NC}"
     
-    local validate_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/validate" \
-        -H "Content-Type: application/json" \
-        -d "{\"natural_language_query\": \"$alert_text\"}")
+    local validate_response
+    if [[ -n "$AUTH_HEADER" ]]; then
+        validate_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/validate" \
+            -H "Content-Type: application/json" \
+            -H "$AUTH_HEADER" \
+            -d "{\"natural_language_query\": \"$alert_text\"}")
+    else
+        validate_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/validate" \
+            -H "Content-Type: application/json" \
+            -d "{\"natural_language_query\": \"$alert_text\"}")
+    fi
     
     local validate_http_status=$(echo "$validate_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
     local validate_response_body=$(echo "$validate_response" | sed -e 's/HTTPSTATUS:.*//g')
@@ -413,9 +484,17 @@ print(json.dumps(payload))
                 rm -f /tmp/validation_result.json /tmp/alert_text.txt
             fi
             
-            local create_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules" \
-                -H "Content-Type: application/json" \
-                -d "$create_payload")
+            local create_response
+            if [[ -n "$AUTH_HEADER" ]]; then
+                create_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules" \
+                    -H "Content-Type: application/json" \
+                    -H "$AUTH_HEADER" \
+                    -d "$create_payload")
+            else
+                create_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules" \
+                    -H "Content-Type: application/json" \
+                    -d "$create_payload")
+            fi
             
             local http_status=$(echo "$create_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
             local response_body=$(echo "$create_response" | sed -e 's/HTTPSTATUS:.*//g')
@@ -451,8 +530,15 @@ except:
                     # Step 3: Trigger the alert rule
                     echo -e "${YELLOW}🔔 Triggering alert rule...${NC}"
                     
-                    local trigger_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/${rule_id}/trigger" \
-                        -H "Content-Type: application/json")
+                    local trigger_response
+                    if [[ -n "$AUTH_HEADER" ]]; then
+                        trigger_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/${rule_id}/trigger" \
+                            -H "Content-Type: application/json" \
+                            -H "$AUTH_HEADER")
+                    else
+                        trigger_response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST "${API_BASE_URL}/alerts/rules/${rule_id}/trigger" \
+                            -H "Content-Type: application/json")
+                    fi
                     
                     local trigger_http_status=$(echo "$trigger_response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
                     local trigger_response_body=$(echo "$trigger_response" | sed -e 's/HTTPSTATUS:.*//g')

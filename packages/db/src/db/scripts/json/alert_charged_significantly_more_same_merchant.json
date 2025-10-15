@@ -1,75 +1,74 @@
 {
-    "alert_text": "Alert me if I’m charged significantly more than usual by the same merchant.",
-    "user": {
-      "id": "u-merchant-high-001",
-      "email": "alex.thompson@example.com",
-      "first_name": "Alex",
-      "last_name": "Thompson",
-      "address_city": "San Francisco",
-      "address_state": "CA",
-      "address_country": "US"
+  "alert_text": "Alert me if I’m charged significantly more than usual by the same merchant.",
+  "user": {
+    "id": "u-merchant-high-001",
+    "email": "alex.thompson@example.com",
+    "first_name": "Alex",
+    "last_name": "Thompson",
+    "address_city": "San Francisco",
+    "address_state": "CA",
+    "address_country": "US"
+  },
+  "transactions": [
+    {
+      "id": "txn-sig-0001",
+      "user_id": "u-merchant-high-001",
+      "credit_card_num": "5555555555554444",
+      "amount": 35.2,
+      "currency": "USD",
+      "description": "Dinner at Olive Garden",
+      "merchant_name": "Olive Garden",
+      "merchant_category": "dining",
+      "transaction_date": "2025-07-15T19:20:00Z",
+      "transaction_type": "PURCHASE",
+      "status": "SETTLED",
+      "authorization_code": "AUTH-SIG-001",
+      "trans_num": "SIG0001"
     },
-    "transactions": [
-      {
-        "id": "txn-sig-0001",
-        "user_id": "u-merchant-high-001",
-        "credit_card_num": "5555555555554444",
-        "amount": 35.20,
-        "currency": "USD",
-        "description": "Dinner at Olive Garden",
-        "merchant_name": "Olive Garden",
-        "merchant_category": "dining",
-        "transaction_date": "2025-07-15T19:20:00Z",
-        "transaction_type": "PURCHASE",
-        "status": "SETTLED",
-        "authorization_code": "AUTH-SIG-001",
-        "trans_num": "SIG0001"
-      },
-      {
-        "id": "txn-sig-0002",
-        "user_id": "u-merchant-high-001",
-        "credit_card_num": "5555555555554444",
-        "amount": 42.75,
-        "currency": "USD",
-        "description": "Family lunch",
-        "merchant_name": "Olive Garden",
-        "merchant_category": "dining",
-        "transaction_date": "2025-08-03T13:10:00Z",
-        "transaction_type": "PURCHASE",
-        "status": "SETTLED",
-        "authorization_code": "AUTH-SIG-002",
-        "trans_num": "SIG0002"
-      },
-      {
-        "id": "txn-sig-0003",
-        "user_id": "u-merchant-high-001",
-        "credit_card_num": "5555555555554444",
-        "amount": 50.00,
-        "currency": "USD",
-        "description": "Dinner with friends",
-        "merchant_name": "Olive Garden",
-        "merchant_category": "dining",
-        "transaction_date": "2025-08-18T18:50:00Z",
-        "transaction_type": "PURCHASE",
-        "status": "SETTLED",
-        "authorization_code": "AUTH-SIG-003",
-        "trans_num": "SIG0003"
-      },
-      {
-        "id": "txn-sig-0004",
-        "user_id": "u-merchant-high-001",
-        "credit_card_num": "5555555555554444",
-        "amount": 200.00,
-        "currency": "USD",
-        "description": "Large dinner party",
-        "merchant_name": "Olive Garden",
-        "merchant_category": "dining",
-        "transaction_date": "2025-09-11T20:15:00Z",
-        "transaction_type": "PURCHASE",
-        "status": "SETTLED",
-        "authorization_code": "AUTH-SIG-004",
-        "trans_num": "SIG0004"
-      }
-    ]
-  }
-  
+    {
+      "id": "txn-sig-0002",
+      "user_id": "u-merchant-high-001",
+      "credit_card_num": "5555555555554444",
+      "amount": 42.75,
+      "currency": "USD",
+      "description": "Family lunch",
+      "merchant_name": "Olive Garden",
+      "merchant_category": "dining",
+      "transaction_date": "2025-08-03T13:10:00Z",
+      "transaction_type": "PURCHASE",
+      "status": "SETTLED",
+      "authorization_code": "AUTH-SIG-002",
+      "trans_num": "SIG0002"
+    },
+    {
+      "id": "txn-sig-0003",
+      "user_id": "u-merchant-high-001",
+      "credit_card_num": "5555555555554444",
+      "amount": 50.0,
+      "currency": "USD",
+      "description": "Dinner with friends",
+      "merchant_name": "Olive Garden",
+      "merchant_category": "dining",
+      "transaction_date": "2025-08-18T18:50:00Z",
+      "transaction_type": "PURCHASE",
+      "status": "SETTLED",
+      "authorization_code": "AUTH-SIG-003",
+      "trans_num": "SIG0003"
+    },
+    {
+      "id": "txn-sig-0004",
+      "user_id": "u-merchant-high-001",
+      "credit_card_num": "5555555555554444",
+      "amount": 200.0,
+      "currency": "USD",
+      "description": "Large dinner party",
+      "merchant_name": "Olive Garden",
+      "merchant_category": "dining",
+      "transaction_date": "2025-09-11T20:15:00Z",
+      "transaction_type": "PURCHASE",
+      "status": "SETTLED",
+      "authorization_code": "AUTH-SIG-004",
+      "trans_num": "SIG0004"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
   type ValidationResult,
 } from '../../components/alert-rule-validation/alert-rule-validation';
 import { AlertRecommendations } from '../../components/alert-recommendations/alert-recommendations';
+import { AlertRuleCard } from '../../components/alert-rule-card/alert-rule-card';
 import { LocationPermissionAlert } from '../../components/location/LocationPermissionAlert';
 import {
   Dialog,
@@ -18,14 +19,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/atoms/dialog/dialog';
-import { Bell, Pause, Play, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Bell, AlertTriangle, X } from 'lucide-react';
 import {
   useAlertRules,
   useCreateAlertRuleFromValidation,
   useToggleAlertRule,
   useDeleteAlertRule,
   useValidateAlertRule,
-} from '../../hooks/transactions';
+} from '../../hooks/alert';
 import { cn } from '../../lib/utils';
 import { statusColors } from '../../lib/colors';
 import type { CreateAlertRuleInput } from '../../schemas/alert-rule';
@@ -82,7 +83,7 @@ function AlertsPage() {
     try {
       setCreateError(null);
       await createRuleFromValidation.mutateAsync({
-        alert_rule: validationResult.alert_rule,
+        alert_rule: validationResult.alert_rule as unknown as Record<string, unknown>,
         sql_query: validationResult.sql_query,
         natural_language_query: pendingRule,
       });
@@ -218,7 +219,15 @@ function AlertsPage() {
       {/* Active Rules */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-foreground">Active Rules</h2>
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">Active Rules</h2>
+              <p className="text-sm text-muted-foreground">
+                Rules currently monitoring your transactions
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Location Permission Alert - positioned under Active Rules with matching width */}
@@ -238,67 +247,14 @@ function AlertsPage() {
         ) : (
           <div className="space-y-3">
             {rules?.map((rule) => (
-              <Card
+              <AlertRuleCard
                 key={rule.id}
-                className={cn(
-                  'border-l-4 p-4',
-                  rule.status === 'active' ? 'border-l-primary' : 'border-l-muted',
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Bell className="h-4 w-4 text-muted-foreground" />
-                      <p className="font-medium text-foreground">{rule.rule}</p>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Triggered {rule.triggered} times</span>
-                      <span>•</span>
-                      <span>Last: {rule.last_triggered}</span>
-                      {rule.status === 'inactive' && (
-                        <span className="text-orange-600 font-medium">• Paused</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="secondary"
-                      className={cn(
-                        'capitalize',
-                        statusColors[rule.status as keyof typeof statusColors]?.badge ||
-                          'bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {rule.status}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleRule(rule.id)}
-                      disabled={toggleRule.isPending}
-                      title={
-                        rule.status === 'active'
-                          ? 'Pause alert rule'
-                          : 'Resume alert rule'
-                      }
-                    >
-                      {rule.status === 'active' ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4 text-green-600" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openDeleteDialog(rule.id, rule.rule)}
-                      disabled={deleteRule.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
+                rule={rule}
+                onToggle={handleToggleRule}
+                onDelete={openDeleteDialog}
+                isToggling={toggleRule.isPending}
+                isDeleting={deleteRule.isPending}
+              />
             ))}
 
             {rules?.length === 0 && (

@@ -1,11 +1,12 @@
-import type {
-  Transaction,
-  TransactionStats,
-  Alert,
-  AlertRule,
+// Recommendation types imported where needed
+import { type ApiTransactionResponse } from '../schemas/transaction';
+import type { AlertRule as ApiAlertRuleResponse } from '../schemas/transaction';
+import {
+  type Transaction,
+  type TransactionStats,
+  type Alert,
+  type AlertRule,
 } from '../schemas/transaction';
-import { type ApiTransactionResponse, type ApiAlertRuleResponse } from './user';
-
 // Type definitions for API responses
 interface ApiNotificationResponse {
   id: string;
@@ -59,23 +60,36 @@ export const apiTransactionService = {
     const allTransactions = await response.json();
 
     // Transform API data to match UI schema
-    const transformedTransactions: Transaction[] = allTransactions.map(
+    const transformedTransactions = allTransactions.map(
       (tx: ApiTransactionResponse) => ({
         id: tx.id,
+        user_id: tx.user_id,
+        credit_card_num: '1234',
         amount: tx.amount,
-        merchant: tx.merchant_name,
-        status: tx.status.toLowerCase(),
-        time: tx.transaction_date,
-        type: tx.transaction_type.toLowerCase(),
         currency: tx.currency,
-        category: tx.merchant_category,
         description: tx.description,
+        merchant_name: tx.merchant_name,
+        merchant_category: tx.merchant_category,
+        transaction_date: tx.transaction_date,
+        transaction_type: tx.transaction_type as Transaction['transaction_type'],
+        status: 'PENDING',
+        merchant_city: undefined,
+        merchant_state: undefined,
+        merchant_country: undefined,
+        merchant_zipcode: undefined,
+        merchant_latitude: undefined,
+        merchant_longitude: undefined,
+        authorization_code: undefined,
+        trans_num: tx.trans_num,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }),
     );
 
     // Sort by time descending
     transformedTransactions.sort(
-      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+      (a, b) =>
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime(),
     );
 
     // Apply pagination
@@ -104,14 +118,26 @@ export const apiTransactionService = {
     // Transform API data to match UI schema
     return {
       id: tx.id,
+      user_id: tx.user_id,
+      credit_card_num: '1234',
       amount: tx.amount,
-      merchant: tx.merchant_name,
-      status: tx.status.toLowerCase(),
-      time: tx.transaction_date,
-      type: tx.transaction_type.toLowerCase(),
       currency: tx.currency,
-      category: tx.merchant_category,
       description: tx.description,
+      merchant_name: tx.merchant_name,
+      merchant_category: tx.merchant_category,
+      transaction_date: tx.transaction_date,
+      transaction_type: tx.transaction_type as Transaction['transaction_type'],
+      status: 'PENDING',
+      merchant_city: undefined,
+      merchant_state: undefined,
+      merchant_country: undefined,
+      merchant_zipcode: undefined,
+      merchant_latitude: undefined,
+      merchant_longitude: undefined,
+      authorization_code: undefined,
+      trans_num: tx.trans_num,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
   },
 
@@ -123,7 +149,7 @@ export const apiTransactionService = {
 
     const totalTransactions = transactions.length;
     const totalVolume = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const flaggedCount = transactions.filter((t) => t.status === 'flagged').length;
+    const flaggedCount = transactions.filter((t) => t.status === 'DECLINED').length;
 
     return {
       totalTransactions,
@@ -146,10 +172,10 @@ export const apiTransactionService = {
     const lowercaseQuery = query.toLowerCase();
     return transactions.filter(
       (t) =>
-        t.merchant.toLowerCase().includes(lowercaseQuery) ||
+        t.merchant_name.toLowerCase().includes(lowercaseQuery) ||
         t.id.toLowerCase().includes(lowercaseQuery) ||
-        t.type.includes(lowercaseQuery) ||
-        t.category?.toLowerCase().includes(lowercaseQuery),
+        t.transaction_type.includes(lowercaseQuery) ||
+        t.merchant_category?.toLowerCase().includes(lowercaseQuery),
     );
   },
 
@@ -181,9 +207,9 @@ export const apiTransactionService = {
     const transactionsByDate = new Map<string, { volume: number; count: number }>();
 
     transactions
-      .filter((tx) => new Date(tx.time) >= cutoffDate)
+      .filter((tx) => new Date(tx.transaction_date) >= cutoffDate)
       .forEach((tx) => {
-        const date = new Date(tx.time).toISOString().split('T')[0];
+        const date = new Date(tx.transaction_date).toISOString().split('T')[0];
         const existing = transactionsByDate.get(date) || { volume: 0, count: 0 };
         transactionsByDate.set(date, {
           volume: existing.volume + tx.amount,
@@ -474,6 +500,92 @@ export const realAlertService = {
       console.error('Error deleting alert rule:', error);
       throw new Error(
         error instanceof Error ? error.message : 'Failed to delete alert rule',
+      );
+    }
+  },
+
+  // Get alert recommendations
+  async getAlertRecommendations(): Promise<{
+    user_id: string;
+    recommendation_type: 'new_user' | 'transaction_based';
+    recommendations: Array<{
+      title: string;
+      description: string;
+      natural_language_query: string;
+      category: string;
+      priority: 'high' | 'medium' | 'low';
+      reasoning: string;
+    }>;
+    generated_at: string;
+  }> {
+    try {
+      const response = await apiClient.fetch('/api/alerts/recommendations');
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch alert recommendations: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const recommendations = await response.json();
+      return recommendations;
+    } catch (error) {
+      console.error('Error fetching alert recommendations:', error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch alert recommendations',
+      );
+    }
+  },
+
+  // Create rule from recommendation
+  async createRuleFromRecommendation(recommendation: {
+    title: string;
+    description: string;
+    natural_language_query: string;
+    category: string;
+    priority: string;
+    reasoning: string;
+  }): Promise<{
+    message: string;
+    rule_id: string;
+    rule_name: string;
+    recommendation_used: {
+      title: string;
+      description: string;
+      natural_language_query: string;
+      category: string;
+      priority: string;
+      reasoning: string;
+    };
+  }> {
+    try {
+      const response = await apiClient.fetch(
+        '/api/alerts/recommendations/create-rule',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(recommendation),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to create rule from recommendation: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error creating rule from recommendation:', error);
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to create rule from recommendation',
       );
     }
   },

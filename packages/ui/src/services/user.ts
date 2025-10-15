@@ -12,20 +12,6 @@ export interface ApiUserResponse {
   created_at: string;
 }
 
-export interface ApiTransactionResponse {
-  id: string;
-  amount: number;
-  merchant_name: string;
-  status: string;
-  transaction_date: string;
-  transaction_type: string;
-  currency: string;
-  merchant_category: string;
-  description: string;
-  user_id: string;
-  trans_num: string;
-}
-
 export interface ApiCreditCardResponse {
   id: string;
   user_id: string;
@@ -64,6 +50,7 @@ export interface CurrentUser {
 const CURRENT_USER_STORAGE_KEY = 'spending-monitor-current-user';
 
 import { apiClient } from './apiClient';
+import { type ApiTransactionResponse } from '../schemas/transaction';
 
 // User service for real API data
 export const userService = {
@@ -193,11 +180,11 @@ export const currentUserService = {
         } else {
           // Fallback demo user if no users in API
           user = {
-            id: '1',
-            firstName: 'John',
-            lastName: 'Doe',
-            email: 'john.doe@example.com',
-            fullName: 'John Doe',
+            id: 'u-merchant-high-001',
+            firstName: 'Alex',
+            lastName: 'Thompson',
+            email: 'alex.thompson@example.com',
+            fullName: 'Alex Thompson',
           };
           this.setCurrentUser(user);
         }
@@ -208,11 +195,11 @@ export const currentUserService = {
         );
         // Fallback demo user
         user = {
-          id: '1',
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john.doe@example.com',
-          fullName: 'John Doe',
+          id: 'u-merchant-high-001',
+          firstName: 'Alex',
+          lastName: 'Thompson',
+          email: 'alex.thompson@example.com',
+          fullName: 'Alex Thompson',
         };
         this.setCurrentUser(user);
       }

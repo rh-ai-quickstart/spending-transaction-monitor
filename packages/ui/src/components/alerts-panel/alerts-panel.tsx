@@ -4,7 +4,7 @@ import { Button } from '../atoms/button/button';
 import { Badge } from '../atoms/badge/badge';
 import { cn } from '../../lib/utils';
 import { severityColors } from '../../lib/colors';
-import { useAlerts } from '../../hooks/transactions';
+import { useAlerts } from '../../hooks/alert';
 import type { Alert } from '../../schemas/transaction';
 
 export interface AlertsPanelProps {

@@ -72,9 +72,9 @@ describe('AuthContext', () => {
       await waitFor(() => {
         expect(screen.getByTestId('authenticated')).toHaveTextContent('true');
         expect(screen.getByTestId('loading')).toHaveTextContent('false');
-        expect(screen.getByTestId('user-name')).toHaveTextContent('John Doe');
+        expect(screen.getByTestId('user-name')).toHaveTextContent('Alex Thompson');
         expect(screen.getByTestId('user-email')).toHaveTextContent(
-          'john.doe@example.com',
+          'alex.thompson@example.com',
         );
         expect(screen.getByTestId('dev-mode')).toHaveTextContent('true');
       });

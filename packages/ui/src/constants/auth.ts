@@ -4,10 +4,10 @@
 import type { User } from '../types/auth';
 
 export const DEV_USER: User = {
-  id: '1',
-  email: 'john.doe@example.com',
-  username: 'johndoe',
-  name: 'John Doe',
+  id: 'u-merchant-high-001',
+  email: 'alex.thompson@example.com',
+  username: 'alexthompson',
+  name: 'Alex Thompson',
   roles: ['user', 'admin'],
   isDevMode: true,
 } as const;

@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '../atoms/alert/alert';
 import { Button } from '../atoms/button/button';
 import { MapPinOff, ChevronDown, ChevronUp } from 'lucide-react';
 import { checkLocationPermission } from '../../services/geolocation';
+import { useLocationContext } from './LocationProvider';
 
 interface LocationPermissionAlertProps {
   className?: string;
@@ -24,6 +25,11 @@ export function LocationPermissionAlert({ className }: LocationPermissionAlertPr
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Use location context to check if location updates are actually working
+  const locationContext = useLocationContext();
+  const isLocationWorking =
+    locationContext?.isActive && locationContext?.updateCount > 0;
+
   useEffect(() => {
     const checkPermissions = async () => {
       try {
@@ -38,11 +44,12 @@ export function LocationPermissionAlert({ className }: LocationPermissionAlertPr
       }
     };
 
+    // Single check on mount - component will re-render when locationContext updates
     checkPermissions();
   }, []);
 
-  // Don't show anything while loading or if permissions are granted
-  if (isLoading || permissionState === 'granted') {
+  // Don't show anything while loading, if permissions are granted, or if location is actually working
+  if (isLoading || permissionState === 'granted' || isLocationWorking) {
     return null;
   }
 

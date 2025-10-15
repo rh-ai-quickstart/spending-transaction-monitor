@@ -5,16 +5,8 @@ import { AlertsPanel } from '../../components/alerts-panel/alerts-panel';
 import { StatsList } from '../../components/stats-list/stats-list';
 import { Card } from '../../components/atoms/card/card';
 import { Button } from '../../components/atoms/button/button';
-import { useHealth } from '../../hooks/health';
 import { useTransactionStats } from '../../hooks/transactions';
-import {
-  Server,
-  Database,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-} from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Alert } from '../../schemas/transaction';
 import type { Stat } from '../../components/stats-list/stats-list';
@@ -24,7 +16,6 @@ export const Route = createFileRoute('/_protected/')({
 });
 
 function Index() {
-  const { data: healthData } = useHealth();
   const { data: transactionStatsData } = useTransactionStats();
 
   const handleAlertClick = (alert: Alert) => {
@@ -53,63 +44,6 @@ function Index() {
       isPositive: change > 0,
     };
   };
-
-  // Create stats for system health
-  const services = [
-    {
-      id: 'api',
-      name: 'API Service',
-      status:
-        healthData?.find((s: { name: string }) => s.name === 'API')?.status ||
-        'unknown',
-      icon: <Server className="h-8 w-8 text-success" />,
-    },
-    {
-      id: 'db',
-      name: 'Database',
-      status:
-        healthData?.find((s: { name: string }) => s.name === 'Database')?.status ||
-        'unknown',
-      icon: <Database className="h-8 w-8 text-info" />,
-    },
-  ];
-
-  const healthyCount = services.filter((s) => s.status === 'healthy').length;
-  const totalServices = services.length;
-  const overallStatus =
-    healthyCount === totalServices
-      ? 'Operational'
-      : healthyCount > totalServices / 2
-        ? 'Degraded'
-        : 'Down';
-  const statusTone =
-    healthyCount === totalServices
-      ? 'emerald'
-      : healthyCount > totalServices / 2
-        ? 'sky'
-        : 'violet';
-
-  const systemStats: Stat[] = [
-    {
-      id: 'overall',
-      title: 'Overall Health',
-      value: overallStatus,
-      tone: statusTone,
-    },
-    {
-      id: 'services',
-      title: 'Services',
-      value: `${totalServices} total`,
-      tone: 'sky',
-    },
-    {
-      id: 'healthy',
-      title: 'Healthy',
-      value: `${healthyCount}/${totalServices}`,
-      tone: 'emerald',
-    },
-  ];
-
   // Create transaction stats for the main dashboard
   const transactionStats: Stat[] = transactionStatsData
     ? [
@@ -210,52 +144,23 @@ function Index() {
             );
           })(),
         },
-        {
-          id: 'processing-time',
-          title: 'Avg. Processing Time',
-          value: `${transactionStatsData.avgProcessingTime.toFixed(1)}s`,
-          description: 'average transaction time',
-          icon: <TrendingDown className="h-4 w-4 text-muted-foreground" />,
-          tone: 'sky',
-          action: (() => {
-            const change = calculateChange(
-              transactionStatsData.avgProcessingTime,
-              transactionStatsData.previousPeriod.avgProcessingTime,
-            );
-            const isPositive = !change.isPositive; // Inverted for processing time (lower is better)
-            return (
-              <div className="mt-4 flex items-center gap-1">
-                {isPositive ? (
-                  <TrendingUp className="h-3 w-3 text-success" />
-                ) : (
-                  <TrendingDown className="h-3 w-3 text-error" />
-                )}
-                <span
-                  className={cn(
-                    'text-xs font-medium',
-                    isPositive ? 'text-success' : 'text-error',
-                  )}
-                >
-                  {change.value}%
-                </span>
-                <span className="text-xs text-muted-foreground">from last period</span>
-              </div>
-            );
-          })(),
-        },
       ]
     : [];
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* Transaction Statistics */}
-      <StatsList stats={transactionStats} variant="default" columns={4} />
-
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Chart and Transactions */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Transaction Statistics */}
+          <StatsList stats={transactionStats} variant="default" columns={3} />
           <TransactionChart />
+        </div>
+
+        {/* Right Column - Alerts */}
+        <div className="space-y-6">
+          <AlertsPanel onAlertClick={handleAlertClick} />
           <Card>
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -266,22 +171,7 @@ function Index() {
                   <Link to="/transactions">View All</Link>
                 </Button>
               </div>
-              <TransactionList itemsPerPage={5} />
-            </div>
-          </Card>
-        </div>
-
-        {/* Right Column - Alerts */}
-        <div className="space-y-6">
-          <AlertsPanel onAlertClick={handleAlertClick} />
-
-          {/* System Health */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">
-                System Health
-              </h3>
-              <StatsList stats={systemStats} variant="default" columns={1} />
+              <TransactionList itemsPerPage={3} />
             </div>
           </Card>
         </div>

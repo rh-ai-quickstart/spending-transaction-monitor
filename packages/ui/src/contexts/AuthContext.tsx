@@ -49,7 +49,9 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
         setIsLoading(true);
         setError(null);
 
-        const response = await fetch('/api/users/profile');
+        // Create apiClient instance for this request
+        const client = new ApiClient();
+        const response = await client.fetch('/api/users/profile');
         if (response.ok) {
           const apiUser = await response.json();
           const devUser: User = {
@@ -116,17 +118,14 @@ const ProductionAuthProvider = React.memo(
         post_logout_redirect_uri: authConfig.keycloak.postLogoutRedirectUri,
         response_type: 'code',
         scope: 'openid profile email',
-        automaticSilentRenew: true, // Enable automatic token refresh
-        includeIdTokenInSilentRenew: true,
+        automaticSilentRenew: false, // Disable for debugging
+        includeIdTokenInSilentRenew: false, // Disable for debugging
         // Ensure localStorage persistence
         storeUser: true, // Explicitly enable user storage
         userStore: undefined, // Use default WebStorageStateStore (localStorage)
         // Remove problematic config
         loadUserInfo: false,
-        monitorSession: true, // Enable session monitoring for proper auth state
-        // Token refresh settings
-        accessTokenExpiringNotificationTimeInSeconds: 60, // Notify 60s before token expires
-        silentRequestTimeoutInSeconds: 10000, // 10s timeout for silent refresh
+        monitorSession: false,
       }),
       [],
     );
@@ -153,15 +152,6 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
   // Note: Location is now handled by LocationCapture component on user interaction
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('OIDC Auth State:', {
-        isLoading: oidcAuth.isLoading,
-        isAuthenticated: !!oidcAuth.user,
-        user: oidcAuth.user,
-        error: oidcAuth.error,
-      });
-    }
-
     if (oidcAuth.error) {
       console.error('OIDC Authentication Error:', oidcAuth.error);
     }
@@ -181,24 +171,12 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       // Pass token to ApiClient
       if (oidcAuth.user.access_token) {
         ApiClient.setToken(oidcAuth.user.access_token);
-        if (import.meta.env.DEV) {
-          console.log('🔑 JWT Token set in API client:', {
-            tokenLength: oidcAuth.user.access_token.length,
-            tokenStart: oidcAuth.user.access_token.substring(0, 20) + '...',
-          });
-        }
-      } else {
-        if (import.meta.env.DEV) {
-          console.warn('⚠️ No access token found in OIDC user');
-        }
       }
 
       if (import.meta.env.DEV) {
         console.log('🔒 User authenticated via OIDC:', {
           id: oidcAuth.user.profile.sub,
           email: oidcAuth.user.profile.email,
-          hasAccessToken: !!oidcAuth.user.access_token,
-          hasIdToken: !!oidcAuth.user.id_token,
         });
       }
     } else {
@@ -208,71 +186,13 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       ApiClient.setToken(null);
       // Note: Location clearing also handled by backend on logout
     }
-  }, [oidcAuth.user, oidcAuth.error, oidcAuth.isLoading]);
+  }, [oidcAuth.user, oidcAuth.error]);
 
   // Location is now handled by LocationCapture component
 
   const login = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
-  const logout = useCallback(() => {
-    // Clear frontend state
-    setUser(null);
-    ApiClient.setToken(null);
-    clearStoredLocation();
-
-    // Let OIDC handle the logout redirect properly
-    // This will redirect to Keycloak logout, then back to post_logout_redirect_uri
-    oidcAuth.signoutRedirect();
-  }, [oidcAuth]);
+  const logout = useCallback(() => oidcAuth.signoutRedirect(), [oidcAuth]);
   const signinRedirect = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
-
-  // Setup global auth error handler
-  useEffect(() => {
-    const handleAuthError = () => {
-      console.warn('🔒 Global auth error handler triggered - redirecting to login');
-      // Clear everything
-      setUser(null);
-      ApiClient.setToken(null);
-      clearStoredLocation();
-      // Redirect to login
-      window.location.href = '/login';
-    };
-
-    ApiClient.setAuthErrorHandler(handleAuthError);
-
-    // Cleanup
-    return () => {
-      ApiClient.setAuthErrorHandler(() => {});
-    };
-  }, []);
-
-  // Listen for token refresh events
-  useEffect(() => {
-    const events = oidcAuth.events;
-
-    const handleUserLoaded = (user: unknown) => {
-      const userData = user as { access_token?: string };
-      if (userData?.access_token) {
-        console.log('🔄 Token refreshed, updating API client');
-        ApiClient.setToken(userData.access_token);
-      }
-    };
-
-    const handleSilentRenewError = (error: unknown) => {
-      console.error('❌ Silent token renewal failed:', error);
-      // Redirect to login on silent renew failure
-      window.location.href = '/login';
-    };
-
-    // Subscribe to events
-    events.addUserLoaded(handleUserLoaded);
-    events.addSilentRenewError(handleSilentRenewError);
-
-    // Cleanup
-    return () => {
-      events.removeUserLoaded(handleUserLoaded);
-      events.removeSilentRenewError(handleSilentRenewError);
-    };
-  }, [oidcAuth.events]);
 
   const contextValue: AuthContextType = useMemo(() => {
     const authState = {
@@ -285,10 +205,7 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       error: oidcAuth.error ? new Error(oidcAuth.error.message) : null,
     };
 
-    // Debug logging
-    if (import.meta.env.DEV) {
-      console.log('Auth Context State:', authState);
-    }
+    // Auth context state updated
 
     return authState;
   }, [

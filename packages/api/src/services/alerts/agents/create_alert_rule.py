@@ -1,6 +1,6 @@
 import uuid
 
-from db.models import AlertType
+from db.models import AlertType, NotificationMethod
 
 from .utils import clean_and_parse_json_response, get_llm_client
 
@@ -88,7 +88,9 @@ Return the parsed dictionary as JSON.
         'timeframe': content_json.get('timeframe'),
         'recurring_interval_days': content_json.get('recurring_interval_days', 30),
         'sql_query': None,
-        'notification_methods': None,
+        'notification_methods': [
+            NotificationMethod.EMAIL
+        ],  # Default to email notifications
     }
 
     return alert_rule_dict

@@ -57,12 +57,16 @@ async def send_smtp_notification(
         #     msg.attach(html_part)
 
         # Connect to SMTP server
+        logger.info(
+            f'🔌 Attempting SMTP connection to {settings.SMTP_HOST}:{settings.SMTP_PORT} (SSL={settings.SMTP_USE_SSL}, TLS={settings.SMTP_USE_TLS})'
+        )
         if settings.SMTP_USE_SSL:
             server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
         else:
             server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
             if settings.SMTP_USE_TLS:
                 server.starttls()
+        logger.info('✅ Successfully connected to SMTP server')
 
         if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
             server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)

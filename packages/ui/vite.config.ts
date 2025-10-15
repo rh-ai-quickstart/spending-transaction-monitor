@@ -7,6 +7,12 @@ import { TanStackRouterVite } from '@tanstack/router-vite-plugin';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react(), TanStackRouterVite(), tailwindcss()],
+  define: {
+    // Pass through BYPASS_AUTH to frontend as VITE_BYPASS_AUTH
+    'import.meta.env.VITE_BYPASS_AUTH': JSON.stringify(
+      process.env.BYPASS_AUTH || 'false',
+    ),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

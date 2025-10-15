@@ -1,68 +1,28 @@
-import type {
+import {
+  CreateTransaction,
   Transaction,
   TransactionStats,
-  Alert,
-  AlertRule,
+  ApiTransactionResponse,
+  TRANSACTION_TYPES,
+  TRANSACTION_STATUSES,
 } from '../schemas/transaction';
+import { apiClient } from './apiClient';
 
-// Mock data generators
-const generateTransactions = (count: number): Transaction[] => {
-  const merchants = [
-    'Amazon Web Services',
-    'Stripe Payment',
-    'Google Cloud',
-    'Shopify',
-    'Netflix',
-    'Adobe Creative Suite',
-    'Microsoft Azure',
-    'GitHub',
-    'Slack',
-    'Zoom',
-    'Dropbox',
-    'Coffee Shop',
-    'Restaurant',
-    'Wire Transfer',
-    'International Transfer',
-    'PayPal',
-  ];
+export class TransactionService {
+  private static baseUrl = '/transactions';
 
-  const statuses: Transaction['status'][] = [
-    'completed',
-    'pending',
-    'flagged',
-    'failed',
-  ];
-  const types: Transaction['type'][] = [
-    'subscription',
-    'payment',
-    'transfer',
-    'purchase',
-    'refund',
-  ];
+  /**
+   * Fetch all transactions
+   */
+  static async getTransactions(): Promise<Transaction[]> {
+    const response = await apiClient.get<Transaction[]>(this.baseUrl);
+    return response.data;
+  }
 
-  const now = Date.now();
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: `TXN-${String(i + 1).padStart(4, '0')}`,
-    amount: Math.random() * 5000 + 10,
-    merchant: merchants[Math.floor(Math.random() * merchants.length)],
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    time: new Date(now - Math.random() * 86400000).toISOString(), // Random time in last 24h
-    type: types[Math.floor(Math.random() * types.length)],
-    currency: 'USD',
-    category: ['Software', 'Cloud Services', 'Food & Dining', 'Business', 'Transfer'][
-      Math.floor(Math.random() * 5)
-    ],
-    description: `Transaction for ${merchants[Math.floor(Math.random() * merchants.length)]}`,
-  }));
-};
-
-const mockTransactions = generateTransactions(50);
-
-// Mock service functions
-export const transactionService = {
-  // Get recent transactions with pagination
-  async getRecentTransactions(
+  /**
+   * Get recent transactions with pagination
+   */
+  static async getRecentTransactions(
     page = 1,
     limit = 10,
   ): Promise<{
@@ -71,36 +31,108 @@ export const transactionService = {
     page: number;
     totalPages: number;
   }> {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const response = await apiClient.fetch('/api/transactions/');
+    if (!response.ok) {
+      throw new Error('Failed to fetch transactions');
+    }
 
+    const allTransactions = await response.json();
+
+    // Transform API data to match UI schema
+    const transformedTransactions: Transaction[] = allTransactions.map(
+      (tx: ApiTransactionResponse) => ({
+        id: tx.id,
+        user_id: tx.user_id,
+        credit_card_num: '1234', // Default since not in API response
+        amount: tx.amount,
+        currency: tx.currency,
+        description: tx.description,
+        merchant_name: tx.merchant_name,
+        merchant_category: tx.merchant_category,
+        transaction_date: tx.transaction_date,
+        transaction_type: tx.transaction_type as (typeof TRANSACTION_TYPES)[number],
+        status: tx.status as (typeof TRANSACTION_STATUSES)[number],
+        merchant_city: tx.merchant_city || undefined,
+        merchant_state: tx.merchant_state || undefined,
+        merchant_country: tx.merchant_country || undefined,
+        merchant_zipcode: tx.merchant_zipcode || undefined,
+        merchant_latitude: tx.merchant_latitude || undefined,
+        merchant_longitude: tx.merchant_longitude || undefined,
+        authorization_code: tx.authorization_code || undefined,
+        trans_num: tx.trans_num || undefined,
+        created_at: new Date().toISOString(), // Default since not in API response
+        updated_at: new Date().toISOString(), // Default since not in API response
+      }),
+    );
+
+    // Sort by time descending
+    transformedTransactions.sort(
+      (a, b) =>
+        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime(),
+    );
+
+    // Apply pagination
     const start = (page - 1) * limit;
     const end = start + limit;
-    const transactions = mockTransactions
-      .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-      .slice(start, end);
+    const transactions = transformedTransactions.slice(start, end);
 
     return {
       transactions,
-      total: mockTransactions.length,
+      total: transformedTransactions.length,
       page,
-      totalPages: Math.ceil(mockTransactions.length / limit),
+      totalPages: Math.ceil(transformedTransactions.length / limit),
     };
-  },
+  }
 
-  // Get transaction by ID
-  async getTransactionById(id: string): Promise<Transaction | null> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    return mockTransactions.find((t) => t.id === id) || null;
-  },
+  /**
+   * Get transaction by ID
+   */
+  static async getTransactionById(id: string): Promise<Transaction | null> {
+    const response = await apiClient.fetch(`/api/transactions/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error('Failed to fetch transaction');
+    }
 
-  // Get transaction statistics
-  async getTransactionStats(): Promise<TransactionStats> {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    const tx = await response.json();
 
-    const totalTransactions = mockTransactions.length;
-    const totalVolume = mockTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const flaggedCount = mockTransactions.filter((t) => t.status === 'flagged').length;
+    // Transform API data to match UI schema
+    return {
+      id: tx.id,
+      user_id: tx.user_id,
+      credit_card_num: '1234', // Default since not in API response
+      amount: tx.amount,
+      currency: tx.currency,
+      description: tx.description,
+      merchant_name: tx.merchant_name,
+      merchant_category: tx.merchant_category,
+      transaction_date: tx.transaction_date,
+      transaction_type: tx.transaction_type as (typeof TRANSACTION_TYPES)[number],
+      status: tx.status as (typeof TRANSACTION_STATUSES)[number],
+      merchant_city: tx.merchant_city || undefined,
+      merchant_state: tx.merchant_state || undefined,
+      merchant_country: tx.merchant_country || undefined,
+      merchant_zipcode: tx.merchant_zipcode || undefined,
+      merchant_latitude: tx.merchant_latitude || undefined,
+      merchant_longitude: tx.merchant_longitude || undefined,
+      authorization_code: tx.authorization_code || undefined,
+      trans_num: tx.trans_num || undefined,
+      created_at: new Date().toISOString(), // Default since not in API response
+      updated_at: new Date().toISOString(), // Default since not in API response
+    };
+  }
+
+  /**
+   * Get transaction statistics
+   */
+  static async getTransactionStats(): Promise<TransactionStats> {
+    // For now, calculate stats from the transactions data
+    // In the future, you could create a dedicated stats endpoint
+    const { transactions } = await this.getRecentTransactions(1, 1000);
+
+    const totalTransactions = transactions.length;
+    const totalVolume = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const flaggedCount = transactions.filter((t) => t.status === 'DECLINED').length;
 
     return {
       totalTransactions,
@@ -114,24 +146,28 @@ export const transactionService = {
         avgProcessingTime: 1.27,
       },
     };
-  },
+  }
 
-  // Search transactions
-  async searchTransactions(query: string): Promise<Transaction[]> {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+  /**
+   * Search transactions
+   */
+  static async searchTransactions(query: string): Promise<Transaction[]> {
+    const { transactions } = await this.getRecentTransactions(1, 1000);
 
     const lowercaseQuery = query.toLowerCase();
-    return mockTransactions.filter(
+    return transactions.filter(
       (t) =>
-        t.merchant.toLowerCase().includes(lowercaseQuery) ||
+        t.merchant_name.toLowerCase().includes(lowercaseQuery) ||
         t.id.toLowerCase().includes(lowercaseQuery) ||
-        t.type.includes(lowercaseQuery) ||
-        t.category?.toLowerCase().includes(lowercaseQuery),
+        t.transaction_type.includes(lowercaseQuery) ||
+        t.merchant_category?.toLowerCase().includes(lowercaseQuery),
     );
-  },
+  }
 
-  // Get chart data for transaction volume over time
-  async getTransactionChartData(timeRange: '7d' | '30d' | '90d' | '1y'): Promise<
+  /**
+   * Get chart data for transaction volume over time
+   */
+  static async getTransactionChartData(timeRange: '7d' | '30d' | '90d' | '1y'): Promise<
     Array<{
       date: string;
       volume: number;
@@ -139,7 +175,7 @@ export const transactionService = {
       formattedDate: string;
     }>
   > {
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    const { transactions } = await this.getRecentTransactions(1, 1000);
 
     const days =
       timeRange === '7d'
@@ -149,24 +185,37 @@ export const transactionService = {
           : timeRange === '90d'
             ? 90
             : 365;
-    const data = [];
 
+    const data = [];
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    // Group transactions by date
+    const transactionsByDate = new Map<string, { volume: number; count: number }>();
+
+    transactions
+      .filter((tx) => new Date(tx.transaction_date) >= cutoffDate)
+      .forEach((tx) => {
+        const date = new Date(tx.transaction_date).toISOString().split('T')[0];
+        const existing = transactionsByDate.get(date) || { volume: 0, count: 0 };
+        transactionsByDate.set(date, {
+          volume: existing.volume + tx.amount,
+          count: existing.count + 1,
+        });
+      });
+
+    // Fill in missing dates with zeros
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
 
-      // Generate realistic-looking data with some trends
-      const baseVolume = 25000;
-      const trend = Math.sin((i / days) * Math.PI * 2) * 5000;
-      const randomVariation = (Math.random() - 0.5) * 10000;
-      const volume = Math.max(5000, baseVolume + trend + randomVariation);
-
-      const transactions = Math.floor(volume / 200) + Math.floor(Math.random() * 50);
+      const dayData = transactionsByDate.get(dateStr) || { volume: 0, count: 0 };
 
       data.push({
-        date: date.toISOString().split('T')[0],
-        volume: Math.floor(volume),
-        transactions,
+        date: dateStr,
+        volume: Math.floor(dayData.volume),
+        transactions: dayData.count,
         formattedDate: date.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -175,117 +224,62 @@ export const transactionService = {
     }
 
     return data;
-  },
-};
+  }
 
-// Alert service
-export const alertService = {
-  // Get active alerts
-  async getAlerts(): Promise<Alert[]> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const alerts: Alert[] = [
-      {
-        id: 'ALT-001',
-        title: 'Large Transaction Detected',
-        description: 'Transaction of $2,500 exceeds your daily limit',
-        severity: 'high',
-        timestamp: new Date(Date.now() - 1800000).toISOString(),
-        transaction_id: 'TXN-0003',
-        resolved: false,
-      },
-      {
-        id: 'ALT-002',
-        title: 'Unusual Activity Pattern',
-        description: 'Multiple transactions from new location',
-        severity: 'medium',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        resolved: false,
-      },
-      {
-        id: 'ALT-003',
-        title: 'Failed Transaction',
-        description: 'Payment to Stripe failed due to insufficient funds',
-        severity: 'low',
-        timestamp: new Date(Date.now() - 7200000).toISOString(),
-        resolved: true,
-      },
-    ];
-
-    return alerts;
-  },
-
-  // Get alert rules
-  async getAlertRules(): Promise<AlertRule[]> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const rules: AlertRule[] = [
-      {
-        id: 'RULE-001',
-        rule: 'Alert me when transactions exceed $10,000',
-        status: 'active',
-        triggered: 3,
-        last_triggered: '2 hours ago',
-        created_at: new Date(Date.now() - 86400000 * 30).toISOString(),
-      },
-      {
-        id: 'RULE-002',
-        rule: 'Notify me of suspicious login attempts',
-        status: 'active',
-        triggered: 0,
-        last_triggered: 'Never',
-        created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
-      },
-      {
-        id: 'RULE-003',
-        rule: 'Alert for transactions from new countries',
-        status: 'active',
-        triggered: 12,
-        last_triggered: '1 day ago',
-        created_at: new Date(Date.now() - 86400000 * 60).toISOString(),
-      },
-      {
-        id: 'RULE-004',
-        rule: 'Notify when daily spending exceeds $5,000',
-        status: 'paused',
-        triggered: 8,
-        last_triggered: '5 days ago',
-        created_at: new Date(Date.now() - 86400000 * 45).toISOString(),
-      },
-    ];
-
-    return rules;
-  },
-
-  // Create new alert rule
-  async createAlertRule(rule: string): Promise<AlertRule> {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const newRule: AlertRule = {
-      id: `RULE-${Date.now()}`,
-      rule,
-      status: 'active',
-      triggered: 0,
-      last_triggered: 'Never',
-      created_at: new Date().toISOString(),
+  /**
+   * Create a new transaction
+   * Transforms the frontend form data to match backend API schema
+   */
+  static async createTransaction(
+    formData: CreateTransaction,
+    userId: string,
+  ): Promise<Transaction> {
+    // Transform form data to backend API format
+    const backendPayload = {
+      id: globalThis.crypto.randomUUID(), // Generate client-side ID
+      user_id: userId,
+      credit_card_num: 'demo-card-1234', // Default demo card
+      amount: formData.amount,
+      currency: 'USD',
+      description: formData.description,
+      merchant_name: formData.merchant || 'Unknown Merchant',
+      merchant_category: formData.category,
+      transaction_date: new Date(formData.date).toISOString(),
+      transaction_type: formData.type === 'credit' ? 'REFUND' : 'PURCHASE',
+      status: 'PENDING',
+      // Optional fields
+      merchant_city: formData.merchant_city || null,
+      merchant_state: formData.merchant_state || null,
+      merchant_country: formData.merchant_country || null,
+      merchant_zipcode: null,
+      merchant_latitude: null,
+      merchant_longitude: null,
+      authorization_code: null,
+      trans_num: null,
     };
 
-    return newRule;
-  },
+    const response = await apiClient.post<Transaction>(this.baseUrl, backendPayload);
+    return response.data;
+  }
 
-  // Toggle alert rule status
-  async toggleAlertRule(id: string): Promise<AlertRule | null> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
+  /**
+   * Update an existing transaction
+   */
+  static async updateTransaction(
+    id: string,
+    transaction: Partial<CreateTransaction>,
+  ): Promise<Transaction> {
+    const response = await apiClient.put<Transaction>(
+      `${this.baseUrl}/${id}`,
+      transaction,
+    );
+    return response.data;
+  }
 
-    // In a real app, this would update the database
-    const rules = await alertService.getAlertRules();
-    const rule = rules.find((r) => r.id === id);
-
-    if (rule) {
-      rule.status = rule.status === 'active' ? 'paused' : 'active';
-      return rule;
-    }
-
-    return null;
-  },
-};
+  /**
+   * Delete a transaction
+   */
+  static async deleteTransaction(id: string): Promise<void> {
+    await apiClient.delete(`${this.baseUrl}/${id}`);
+  }
+}

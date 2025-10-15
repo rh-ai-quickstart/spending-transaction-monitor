@@ -14,6 +14,120 @@ from db.database import SessionLocal
 from db.models import AlertNotification, AlertRule, CreditCard, Transaction, User
 from sqlalchemy import func, select, text
 
+# Optional: Import requests for Keycloak API calls
+try:
+    import requests
+
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    print(
+        "⚠️  'requests' library not available. Keycloak user creation will be skipped."
+    )
+
+# Keycloak configuration from environment
+KEYCLOAK_URL = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'spending-monitor')
+KEYCLOAK_ADMIN_USER = os.getenv('KEYCLOAK_ADMIN_USER', 'admin')
+KEYCLOAK_ADMIN_PASSWORD = os.getenv('KEYCLOAK_ADMIN_PASSWORD', 'admin')
+
+
+def get_keycloak_admin_token() -> str | None:
+    """Get admin access token from Keycloak"""
+    if not REQUESTS_AVAILABLE:
+        return None
+
+    try:
+        url = f'{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token'
+        data = {
+            'username': KEYCLOAK_ADMIN_USER,
+            'password': KEYCLOAK_ADMIN_PASSWORD,
+            'grant_type': 'password',
+            'client_id': 'admin-cli',
+        }
+
+        response = requests.post(url, data=data, timeout=5)
+        response.raise_for_status()
+        return response.json().get('access_token')
+    except Exception as e:
+        print(f'⚠️  Could not get Keycloak admin token: {e}')
+        return None
+
+
+def create_keycloak_user(
+    email: str, first_name: str, last_name: str, password: str = 'password'
+) -> bool:
+    """Create or update a user in Keycloak"""
+    if not REQUESTS_AVAILABLE:
+        return False
+
+    token = get_keycloak_admin_token()
+    if not token:
+        return False
+
+    try:
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        }
+
+        # Check if user exists
+        users_url = f'{KEYCLOAK_URL}/admin/realms/{KEYCLOAK_REALM}/users'
+        check_url = f'{users_url}?email={email}'
+        response = requests.get(check_url, headers=headers, timeout=5)
+
+        if response.status_code == 200 and len(response.json()) > 0:
+            print(f"   ℹ️  Keycloak user '{email}' already exists")
+            return True
+
+        # Extract username from email
+        username = email.split('@')[0]
+
+        # Create new user
+        user_data = {
+            'username': username,
+            'email': email,
+            'firstName': first_name,
+            'lastName': last_name,
+            'enabled': True,
+            'emailVerified': True,
+            'credentials': [
+                {'type': 'password', 'value': password, 'temporary': False}
+            ],
+        }
+
+        response = requests.post(users_url, json=user_data, headers=headers, timeout=5)
+
+        if response.status_code == 201:
+            print(f"   ✅ Created Keycloak user '{email}' (password: {password})")
+
+            # Assign 'user' role
+            user_id = response.headers.get('Location', '').split('/')[-1]
+            if user_id:
+                role_url = f'{KEYCLOAK_URL}/admin/realms/{KEYCLOAK_REALM}/roles/user'
+                role_response = requests.get(role_url, headers=headers, timeout=5)
+                if role_response.status_code == 200:
+                    role_data = role_response.json()
+                    assign_url = f'{KEYCLOAK_URL}/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/role-mappings/realm'
+                    requests.post(
+                        assign_url, json=[role_data], headers=headers, timeout=5
+                    )
+                    print(f"   ✅ Assigned 'user' role to '{email}'")
+
+            return True
+        elif response.status_code == 409:
+            print(f"   ℹ️  Keycloak user '{email}' already exists")
+            return True
+        else:
+            print(
+                f"   ⚠️  Failed to create Keycloak user '{email}': {response.status_code}"
+            )
+            return False
+
+    except Exception as e:
+        print(f'   ⚠️  Error creating Keycloak user: {e}')
+        return False
+
 
 def get_user_confirmation() -> bool:
     """Get user confirmation to proceed with data deletion"""
@@ -21,6 +135,7 @@ def get_user_confirmation() -> bool:
     print('⚠️  WARNING: DATABASE RESET IMMINENT')
     print('=' * 60)
     print('🗑️  This script will DELETE ALL existing data from:')
+    print('   • Cached Recommendations')
     print('   • Users')
     print('   • Credit Cards')
     print('   • Transactions')
@@ -49,6 +164,9 @@ async def reset_database(session) -> None:
 
     try:
         # Delete in correct order (respecting foreign key constraints)
+        print('🔄 Deleting cached_recommendations...')
+        await session.execute(text('DELETE FROM cached_recommendations'))
+
         print('📋 Deleting alert_notifications...')
         await session.execute(text('DELETE FROM alert_notifications'))
 
@@ -149,6 +267,16 @@ async def seed_from_json(json_file_path: str) -> None:
                 user = User(**user_data_copy)
                 await session.merge(user)
                 print(f'👤 Seeded User: {user.first_name} {user.last_name}')
+
+                # Also create user in Keycloak for authentication
+                if REQUESTS_AVAILABLE and user.email:
+                    print(f'🔐 Creating Keycloak user for: {user.email}')
+                    create_keycloak_user(
+                        email=user.email,
+                        first_name=user.first_name or '',
+                        last_name=user.last_name or '',
+                        password='password',  # Default password for test users
+                    )
 
             # --- Insert Credit Cards ---
             for card_data in fixture['credit_cards']:

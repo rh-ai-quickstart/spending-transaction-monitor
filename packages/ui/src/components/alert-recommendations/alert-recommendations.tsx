@@ -82,15 +82,13 @@ export function AlertRecommendations() {
         <div className="flex items-center gap-3">
           <Lightbulb className="h-5 w-5 text-primary" />
           <div>
-            <h2 className="text-xl font-semibold text-foreground">
-              Recommended Alerts
-            </h2>
+            <h2 className="text-xl font-semibold text-foreground">Recommended Rules</h2>
             <p className="text-sm text-muted-foreground">
               {recommendation_type === 'new_user'
-                ? 'Get started with these essential alerts based on your profile'
+                ? 'Get started with these essential rules based on your profile'
                 : recommendation_type === 'placeholder'
                   ? 'Showing general recommendations while we analyze your spending patterns...'
-                  : 'Personalized alerts based on your spending patterns'}
+                  : 'Personalized rules based on your spending patterns'}
             </p>
           </div>
         </div>
