@@ -158,9 +158,34 @@ class AlertRuleService:
             else self.transaction_service.get_dummy_transaction(user_id)
         )
 
-        # Get existing rules for similarity checking
+        # Get user data for location context
         from sqlalchemy import select
 
+        user_dict = {}
+        try:
+            user_result = await session.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
+            if user:
+                user_dict = {
+                    'id': user.id,
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                    'address_city': user.address_city,
+                    'address_state': user.address_state,
+                    'address_country': user.address_country,
+                    'address_zipcode': user.address_zipcode,
+                    'last_app_location_latitude': user.last_app_location_latitude,
+                    'last_app_location_longitude': user.last_app_location_longitude,
+                    'last_app_location_timestamp': user.last_app_location_timestamp.isoformat()
+                    if user.last_app_location_timestamp
+                    else None,
+                }
+        except Exception as e:
+            print(f'Error fetching user data: {e}')
+            # Continue with empty user_dict if fetching fails
+
+        # Get existing rules for similarity checking
         try:
             result = await session.execute(
                 select(AlertRule).where(AlertRule.user_id == user_id)
@@ -187,6 +212,7 @@ class AlertRuleService:
                     'transaction': transaction_dict,
                     'alert_text': rule,
                     'user_id': user_id,
+                    'user': user_dict,
                     'existing_rules': existing_rules_dict,
                 }
             )

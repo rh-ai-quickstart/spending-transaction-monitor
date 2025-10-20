@@ -14,6 +14,7 @@ class ValidationState(dict):
     transaction: dict
     alert_text: str
     user_id: str
+    user: dict  # User profile data including location
     existing_rules: list[dict]
     sql_query: str
     query_result: str
@@ -41,10 +42,13 @@ def parse_alert_node(state):
     """Parse alert text to SQL query"""
     return {
         **state,
-        'sql_query': parse_alert_to_sql_with_context.func(
-            state['transaction'],
-            state['alert_text'],
-            state['alert_rule'],
+        'sql_query': parse_alert_to_sql_with_context(
+            {
+                'transaction': state['transaction'],
+                'alert_text': state['alert_text'],
+                'alert_rule': state['alert_rule'],
+                'user': state.get('user'),
+            }
         ),
     }
 
