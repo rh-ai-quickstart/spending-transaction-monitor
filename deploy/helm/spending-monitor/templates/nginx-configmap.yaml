@@ -39,7 +39,6 @@ data:
 
         # API endpoints - proxy to API service, strip /api prefix
         location /api/ {
-            rewrite ^/api/(.*)$ /$1 break;
             proxy_pass http://api_backend;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
