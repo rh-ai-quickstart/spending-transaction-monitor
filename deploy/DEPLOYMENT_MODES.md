@@ -75,11 +75,14 @@ ingestion:
 
 ### Prerequisites
 
-1. **Keycloak Must Be Running**
+1. **Keycloak Operator Must Be Installed**
    ```bash
-   # Deploy Keycloak first, or use external Keycloak
-   # Update KEYCLOAK_URL in .env.production
+   # Install Keycloak Operator via OperatorHub or:
+   # See deploy/KEYCLOAK_OPERATOR.md for detailed instructions
    ```
+   
+   The Helm chart will deploy Keycloak via the operator automatically.
+   **No manual Keycloak deployment needed!**
 
 2. **Configure `.env.production`**
    ```bash

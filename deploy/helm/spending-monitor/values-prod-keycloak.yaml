@@ -31,8 +31,10 @@ secrets:
   SMTP_USE_TLS: "true"
   SMTP_USE_SSL: "false"
   
-  # Keycloak - MUST be configured
-  KEYCLOAK_URL: "http://spending-monitor-keycloak:8080"
+  # Keycloak - Will use internal service name created by operator
+  # The operator creates service as: <keycloak-name>-service
+  # For external Keycloak, override with actual URL: https://keycloak.example.com
+  KEYCLOAK_URL: "http://spending-monitor-keycloak-service:8080"
   KEYCLOAK_REALM: "spending-monitor"
   KEYCLOAK_CLIENT_ID: "spending-monitor"
   
@@ -82,4 +84,23 @@ migration:
     limits:
       memory: "1Gi"
       cpu: "500m"
+
+# Enable Keycloak via Operator
+# PREREQUISITE: Keycloak Operator must be installed in the cluster
+keycloak:
+  enabled: true  # Deploy Keycloak CR via operator
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  route:
+    enabled: true  # Operator creates OpenShift route
+  realm:
+    create: true  # Automatically create realm and client
+    name: "spending-monitor"
+    clientId: "spending-monitor"
 

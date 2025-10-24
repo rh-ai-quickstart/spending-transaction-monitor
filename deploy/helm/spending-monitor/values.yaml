@@ -148,6 +148,31 @@ nginx:
     initialDelaySeconds: 5
     periodSeconds: 10
 
+# Keycloak Operator configuration
+# Requires: Keycloak Operator installed in the cluster
+# Install operator: kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.0.7/kubernetes/keycloaks.k8s.keycloak.org-v1.yml
+# Or use OLM on OpenShift
+keycloak:
+  enabled: false  # Disabled by default, enable in prod-keycloak values
+  name: spending-monitor-keycloak
+  image:
+    repository: ""  # Leave empty to use operator default image
+    tag: "latest"
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  route:
+    enabled: true  # Operator will create OpenShift route automatically
+  realm:
+    create: true  # Create realm via KeycloakRealmImport CR
+    name: "spending-monitor"
+    clientId: "spending-monitor"
+
 # OpenShift Routes configuration (preferred over Ingress)
 routes:
   enabled: true

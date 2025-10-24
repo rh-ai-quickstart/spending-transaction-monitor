@@ -1,0 +1,48 @@
+{{- if and .Values.keycloak.enabled .Values.keycloak.realm.create }}
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: {{ .Values.keycloak.realm.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.keycloak.name }}
+    app.kubernetes.io/component: keycloak
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  keycloakCRName: {{ .Values.keycloak.name }}
+  realm:
+    id: {{ .Values.keycloak.realm.name }}
+    realm: {{ .Values.keycloak.realm.name }}
+    enabled: true
+    displayName: "Spending Transaction Monitor"
+    sslRequired: "none"
+    registrationAllowed: false
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: false
+    bruteForceProtected: true
+    
+    # Client configuration
+    clients:
+      - clientId: {{ .Values.keycloak.realm.clientId }}
+        name: "Spending Monitor Application"
+        description: "Main application client"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        redirectUris:
+          - "*"
+        webOrigins:
+          - "*"
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: true
+        serviceAccountsEnabled: false
+        publicClient: true
+        protocol: openid-connect
+        attributes:
+          "access.token.lifespan": "300"
+          "backchannel.logout.session.required": "true"
+          "post.logout.redirect.uris": "*"
+{{- end }}
+

@@ -1,0 +1,60 @@
+{{- if .Values.keycloak.enabled }}
+---
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: {{ .Values.keycloak.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.keycloak.name }}
+    app.kubernetes.io/component: keycloak
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  instances: {{ .Values.keycloak.replicas }}
+  {{- if .Values.keycloak.image.repository }}
+  image: {{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}
+  {{- end }}
+  
+  # Use PostgreSQL database for persistence
+  db:
+    vendor: postgres
+    host: {{ .Values.database.name }}
+    port: {{ .Values.database.service.port }}
+    database: {{ .Values.secrets.POSTGRES_DB }}
+    usernameSecret:
+      name: {{ include "spending-monitor.fullname" . }}-secret
+      key: POSTGRES_USER
+    passwordSecret:
+      name: {{ include "spending-monitor.fullname" . }}-secret
+      key: POSTGRES_PASSWORD
+  
+  # HTTP settings
+  http:
+    httpEnabled: true
+    httpPort: 8080
+  
+  # Hostname configuration
+  hostname:
+    strict: false
+    strictBackchannel: false
+  
+  # Ingress/Route configuration for OpenShift
+  ingress:
+    enabled: {{ .Values.keycloak.route.enabled }}
+  
+  # Resource limits
+  resources:
+    requests:
+      {{- toYaml .Values.keycloak.resources.requests | nindent 6 }}
+    limits:
+      {{- toYaml .Values.keycloak.resources.limits | nindent 6 }}
+  
+  # Additional configuration
+  additionalOptions:
+    - name: health-enabled
+      value: "true"
+    - name: metrics-enabled
+      value: "true"
+    - name: http-enabled
+      value: "true"
+{{- end }}
+
