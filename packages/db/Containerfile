@@ -1,8 +1,15 @@
 # Containerfile
-FROM python:3.12-alpine
+FROM registry.access.redhat.com/ubi9/python-311:latest
 
-# Install deps
-RUN apk add --no-cache gcc musl-dev libpq-dev postgresql-client bash
+USER 0
+
+# Install system dependencies
+RUN dnf install -y \
+    gcc \
+    gcc-c++ \
+    libpq-devel \
+    postgresql \
+    && dnf clean all
 
 # Copy db package
 WORKDIR /app
@@ -12,14 +19,17 @@ COPY packages/db /app/packages/db
 COPY data/ /app/data/
 
 # Install uv + deps
-RUN pip install uv
-RUN uv venv /app/venv
+RUN pip install --no-cache-dir uv
+RUN uv venv /app/venv --python python3.11
 ENV PATH="/app/venv/bin:$PATH"
 RUN uv pip install -e ./packages/db
 
 # Copy and setup startup script
 COPY packages/db/startup.sh /app/startup.sh
 RUN chmod +x /app/startup.sh
+
+# Switch to non-root user for runtime (OpenShift best practice)
+USER 1001
 
 # Run startup script which handles migrations and data loading
 CMD ["/app/startup.sh"]

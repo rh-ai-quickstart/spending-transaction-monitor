@@ -6,6 +6,7 @@ REGISTRY_URL ?= quay.io
 REPOSITORY ?= rh-ai-quickstart
 NAMESPACE ?= spending-transaction-monitor
 IMAGE_TAG ?= latest
+GIT_BRANCH ?= main
 
 # Component image names
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
@@ -213,10 +214,21 @@ help:
 	@echo "    push-db            Push database migration image to registry"
 	@echo ""
 	@echo "  Deploying:"
-	@echo "    deploy             Deploy application using Helm"
-	@echo "    deploy-dev         Deploy in development mode"
+	@echo "    deploy             Deploy application using Helm (production with env vars)"
+	@echo "    deploy-noauth      🔓 Deploy with AUTH BYPASS (dev/testing only)"
+	@echo "    deploy-keycloak    🔐 Deploy with KEYCLOAK AUTH (production)"
+	@echo "    deploy-dev         Deploy in development mode (reduced resources)"
 	@echo "    deploy-all         Build, push and deploy all components"
 	@echo "    full-deploy        Complete pipeline: login, build, push, deploy"
+	@echo ""
+	@echo "  OpenShift Builds (build images in-cluster):"
+	@echo "    openshift-create-builds       Create BuildConfigs and ImageStreams"
+	@echo "    openshift-build-all          Build all images in OpenShift"
+	@echo "    openshift-build-api          Build API image only"
+	@echo "    openshift-build-ui           Build UI image only"
+	@echo "    openshift-build-db           Build DB image only"
+	@echo "    openshift-deploy-noauth      Build in OpenShift and deploy (no auth)"
+	@echo "    openshift-deploy-keycloak    Build in OpenShift and deploy (Keycloak)"
 	@echo ""
 	@echo "  Undeploying:"
 	@echo "    undeploy           Remove application deployment"
@@ -349,6 +361,43 @@ deploy: create-project check-env-prod
 		--set global.imageTag=$(IMAGE_TAG) \
 		$(HELM_SECRET_PARAMS)
 
+# Deploy in development mode with auth bypass (no authentication required)
+.PHONY: deploy-noauth
+deploy-noauth: create-project
+	@echo "🔓 Deploying in DEVELOPMENT mode with AUTH BYPASS..."
+	@echo "⚠️  WARNING: Authentication is DISABLED - use only for development/testing"
+	@echo ""
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-dev-noauth.yaml \
+		--set global.imageRegistry=$(REGISTRY_URL) \
+		--set global.imageRepository=$(REPOSITORY) \
+		--set global.imageTag=$(IMAGE_TAG)
+	@echo ""
+	@echo "✅ Deployment complete!"
+	@echo "🔓 Auth bypass is ENABLED - no login required"
+	@echo "📍 Get your route: oc get route $(PROJECT_NAME)-nginx-route -n $(NAMESPACE)"
+
+# Deploy in production mode with Keycloak authentication
+.PHONY: deploy-keycloak
+deploy-keycloak: create-project check-env-prod
+	@echo "🔐 Deploying in PRODUCTION mode with KEYCLOAK AUTH..."
+	@echo "Using production environment file: $(ENV_FILE_PROD)"
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL; \
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-prod-keycloak.yaml \
+		--set global.imageRegistry=$(REGISTRY_URL) \
+		--set global.imageRepository=$(REPOSITORY) \
+		--set global.imageTag=$(IMAGE_TAG) \
+		$(HELM_SECRET_PARAMS)
+	@echo ""
+	@echo "✅ Deployment complete!"
+	@echo "🔐 Keycloak authentication is ENABLED"
+	@echo "⚠️  Make sure Keycloak is deployed and configured"
+	@echo "📍 Get your route: oc get route $(PROJECT_NAME)-nginx-route -n $(NAMESPACE)"
+
 .PHONY: deploy-dev
 deploy-dev: create-project check-env-prod
 	@echo "Deploying application in development mode with production environment variables..."
@@ -369,6 +418,68 @@ deploy-dev: create-project check-env-prod
 .PHONY: deploy-all
 deploy-all: build-all push-all deploy
 	@echo "Complete deployment finished successfully"
+
+# OpenShift Build targets (build images in-cluster)
+.PHONY: openshift-create-builds
+openshift-create-builds:
+	@echo "Creating OpenShift BuildConfigs and ImageStreams..."
+	@cat deploy/openshift-builds-template.yaml | \
+		sed 's/$${GIT_URI}/https:\/\/github.com\/rh-ai-quickstart\/spending-transaction-monitor.git/g' | \
+		sed 's/$${GIT_REF}/$(GIT_BRANCH)/g' | \
+		sed 's/$${VITE_BYPASS_AUTH}/false/g' | \
+		sed 's/$${VITE_ENVIRONMENT}/staging/g' | \
+		oc apply -f - -n $(NAMESPACE)
+	@echo "✅ BuildConfigs and ImageStreams created!"
+	@echo "To start builds, run: make openshift-build-all"
+
+.PHONY: openshift-build-all
+openshift-build-all:
+	@echo "Starting all OpenShift builds..."
+	@echo "This will take 10-20 minutes depending on cluster resources"
+	@oc start-build spending-monitor-db -n $(NAMESPACE) --follow &
+	@oc start-build spending-monitor-api -n $(NAMESPACE) --follow &
+	@oc start-build spending-monitor-ui -n $(NAMESPACE) --follow &
+	@wait
+	@echo "✅ All builds completed!"
+
+.PHONY: openshift-build-api
+openshift-build-api:
+	@echo "Building API in OpenShift..."
+	oc start-build spending-monitor-api -n $(NAMESPACE) --follow
+
+.PHONY: openshift-build-ui
+openshift-build-ui:
+	@echo "Building UI in OpenShift..."
+	oc start-build spending-monitor-ui -n $(NAMESPACE) --follow
+
+.PHONY: openshift-build-db
+openshift-build-db:
+	@echo "Building DB in OpenShift..."
+	oc start-build spending-monitor-db -n $(NAMESPACE) --follow
+
+.PHONY: openshift-deploy-noauth
+openshift-deploy-noauth: openshift-create-builds openshift-build-all
+	@echo "Deploying with OpenShift-built images (no auth)..."
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-dev-noauth.yaml \
+		--set global.imageRegistry=image-registry.openshift-image-registry.svc:5000 \
+		--set global.imageRepository=$(NAMESPACE) \
+		--set global.imageTag=latest
+	@echo "✅ Deployment complete with OpenShift-built images!"
+
+.PHONY: openshift-deploy-keycloak
+openshift-deploy-keycloak: create-project check-env-prod openshift-create-builds openshift-build-all
+	@echo "Deploying with OpenShift-built images (Keycloak auth)..."
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--values ./deploy/helm/spending-monitor/values-prod-keycloak.yaml \
+		--set global.imageRegistry=image-registry.openshift-image-registry.svc:5000 \
+		--set global.imageRepository=$(NAMESPACE) \
+		--set global.imageTag=latest \
+		$(HELM_SECRET_PARAMS)
+	@echo "✅ Deployment complete with OpenShift-built images!"
 
 # Undeploy targets
 .PHONY: undeploy
@@ -558,32 +669,120 @@ reset-local: setup-dev-env
 	@echo ""
 	@echo "✅ Local environment has been reset and database is ready!"
 
+# Clean UI images to ensure fresh build with correct environment variables
+.PHONY: clean-ui-images
+clean-ui-images:
+	@echo "🗑️  Removing old UI images to ensure clean build..."
+	@podman rmi -f spending-monitor-ui:local localhost/spending-transaction-monitor_ui:latest 2>/dev/null || true
+	@echo "✅ UI images removed"
+
+# Build and run locally with Keycloak authentication (default/production mode)
 .PHONY: build-run-local
-build-run-local: setup-dev-env build-local
-	@echo "Starting all services locally with freshly built images (tagged as 'local')..."
-	@echo "This will start: PostgreSQL, API, UI, nginx proxy, and SMTP server"
+build-run-local: setup-dev-env clean-ui-images
+	@echo "🔨 Building images (environment-agnostic)..."
+	podman-compose -f podman-compose.yml -f podman-compose.build.yml build --no-cache migrations api ui
+	@echo "Tagging built images as 'local'..."
+	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
+	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
+	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	podman tag $(INGESTION_IMAGE) $(INGESTION_IMAGE_LOCAL) || true
+	@echo ""
+	@echo "✅ Starting with Keycloak authentication (runtime config)..."
+	@echo "   - Login required (user1@example.com / password123)"
+	@echo "   - Keycloak authentication enabled"
+	@echo "   - Frontend: http://localhost:3000"
+	@echo "   - API (proxied): http://localhost:3000/api/*"
+	@echo "   - API (direct): http://localhost:8000"
+	@echo "   - Keycloak: http://localhost:8080"
+	@echo ""
+	IMAGE_TAG=local BYPASS_AUTH=false VITE_BYPASS_AUTH=false VITE_ENVIRONMENT=staging \
+		podman-compose -f podman-compose.yml up -d --no-build
+
+# Build and run locally with auth bypass (no authentication)
+.PHONY: build-run-local-noauth
+build-run-local-noauth: setup-dev-env clean-ui-images
+	@echo "🔨 Building images (environment-agnostic)..."
+	podman-compose -f podman-compose.yml -f podman-compose.build.yml build --no-cache migrations api ui
+	@echo "Tagging built images as 'local'..."
+	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
+	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
+	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	@echo ""
+	@echo "✅ Starting with auth bypass (runtime config)..."
+	@echo "   - No login required"
+	@echo "   - Yellow dev banner will be visible"
+	@echo "   - Frontend: http://localhost:3000"
+	@echo "   - API (proxied): http://localhost:3000/api/*"
+	@echo "   - API (direct): http://localhost:8000"
+	@echo ""
+	IMAGE_TAG=local BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development \
+		podman-compose -f podman-compose.yml up -d --no-build
+	@echo ""
+	@echo "Waiting for services to be ready..."
+	@sleep 30
+	@echo "Running database migrations..."
+	@pnpm db:upgrade || (echo "❌ Database upgrade failed. Check if database is running." && exit 1)
+	@echo "Seeding database with test data..."
+	@pnpm db:seed || (echo "❌ Database seeding failed. Check migration status." && exit 1)
+	@echo ""
+	@echo "✅ All services started including Keycloak and database is ready!"
+	@echo ""
+	@echo "To also start pgAdmin for database management, run:"
+	@echo "  IMAGE_TAG=local podman-compose -f podman-compose.yml --profile tools up -d pgadmin"
+	@echo "  Then access pgAdmin at: http://localhost:8081"
+	@echo ""
+	@echo "To setup Keycloak with database users:"
+	@echo "  make setup-keycloak"
+	@echo "  or directly: pnpm auth:setup-keycloak-with-users"
+	@echo ""
+	@echo "💡 Auth Bypass (Development Mode):"
+	@echo "  To disable authentication in development, set:"
+	@echo "    export BYPASS_AUTH=true"
+	@echo "  This affects both backend API and frontend UI"
+	@echo "  Default: BYPASS_AUTH=false (authentication required)"
+	@echo ""
+	@echo "To view logs: make logs-local"
+	@echo "To stop services: make stop-local"
+
+# New target for running with Keycloak enabled
+.PHONY: run-local-with-auth
+run-local-with-auth: setup-dev-env
+	@echo "Starting all services including Keycloak locally with Podman Compose using development environment..."
+	@echo "Using development environment file: $(ENV_FILE_DEV)"
+	@echo "This will start: PostgreSQL, API, UI, nginx proxy, SMTP server, and Keycloak"
 	@echo "Services will be available at:"
 	@echo "  - Frontend: http://localhost:3000"
 	@echo "  - API (proxied): http://localhost:3000/api/*"
 	@echo "  - API (direct): http://localhost:8000"
 	@echo "  - API Docs: http://localhost:8000/docs"
 	@echo "  - SMTP Web UI: http://localhost:3002"
+	@echo "  - Keycloak: http://localhost:8080"
 	@echo "  - Database: localhost:5432"
 	@echo ""
-	IMAGE_TAG=local podman-compose -f podman-compose.yml up -d
+	@echo "Pulling latest images from quay.io registry..."
+	IMAGE_TAG=latest podman-compose -f podman-compose.yml pull
+	IMAGE_TAG=latest podman-compose -f podman-compose.yml up -d
 	@echo ""
-	@echo "Waiting for database to be ready..."
-	@sleep 15
-	@echo "Database migrations and seeding are handled automatically by the migrations container..."
+	@echo "Waiting for services to be ready..."
+	@sleep 30
 	@echo ""
-	@echo "✅ All services started and database is ready!"
-	@echo ""
-	@echo "To also start pgAdmin for database management, run:"
-	@echo "  IMAGE_TAG=local podman-compose -f podman-compose.yml --profile tools up -d pgadmin"
-	@echo "  Then access pgAdmin at: http://localhost:8080"
-	@echo ""
-	@echo "To view logs: make logs-local"
-	@echo "To stop services: make stop-local"
+	@echo "✅ All services started including Keycloak!"
+	@echo "Use 'make setup-keycloak' to configure Keycloak with database users"
+
+# Setup Keycloak with database users using pnpm
+.PHONY: setup-keycloak
+setup-keycloak: setup-dev-env
+	@echo "Setting up Keycloak with database users using pnpm..."
+	@echo "Waiting for Keycloak to be ready..."
+	@timeout 60 bash -c 'until curl -sf http://localhost:8080/health/ready >/dev/null 2>&1; do sleep 2; done' || (echo "❌ Keycloak not ready after 60s" && exit 1)
+	@echo "Keycloak is ready, running setup..."
+	pnpm auth:setup-keycloak-with-users
+	@echo "✅ Keycloak setup completed!"
+
+# Setup Keycloak with database users (alias for consistency)
+.PHONY: setup-keycloak-local
+setup-keycloak-local: setup-keycloak
+	@echo "ℹ️  Note: setup-keycloak-local is now an alias for setup-keycloak (both use pnpm)"
 
 .PHONY: setup-local
 setup-local: check-env-dev pull-local run-local
