@@ -149,9 +149,16 @@ nginx:
     periodSeconds: 10
 
 # Keycloak Operator configuration
-# Requires: Keycloak Operator installed in the cluster
-# Install operator: kubectl apply -f https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.0.7/kubernetes/keycloaks.k8s.keycloak.org-v1.yml
-# Or use OLM on OpenShift
+# 
+# ⚠️  PREREQUISITE: Keycloak Operator must be installed by cluster admin BEFORE deploying
+# 
+# Installation:
+#   OpenShift: Operators → OperatorHub → Search "Keycloak"
+#   CLI: See deploy/KEYCLOAK_OPERATOR.md
+#
+# The Helm chart includes a pre-flight check that will FAIL if operator is not installed.
+# This is intentional to ensure proper setup.
+#
 keycloak:
   enabled: false  # Disabled by default, enable in prod-keycloak values
   name: spending-monitor-keycloak

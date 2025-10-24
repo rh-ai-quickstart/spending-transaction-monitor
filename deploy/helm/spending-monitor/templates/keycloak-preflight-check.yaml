@@ -1,0 +1,99 @@
+{{- if .Values.keycloak.enabled }}
+---
+# Pre-flight check to ensure Keycloak Operator is installed
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "spending-monitor.fullname" . }}-keycloak-preflight
+  labels:
+    app.kubernetes.io/name: {{ include "spending-monitor.name" . }}
+    app.kubernetes.io/component: keycloak-preflight
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 60
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "spending-monitor.fullname" . }}-keycloak-preflight
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
+      containers:
+      - name: check-operator
+        image: quay.io/openshift/origin-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          
+          echo "=========================================="
+          echo "🔍 Keycloak Operator Pre-flight Check"
+          echo "=========================================="
+          echo ""
+          
+          # Check if Keycloak CRD exists (indicates operator is installed)
+          if oc get crd keycloaks.k8s.keycloak.org &>/dev/null; then
+            echo "✅ Keycloak CRD found: keycloaks.k8s.keycloak.org"
+          else
+            echo "❌ ERROR: Keycloak Operator is NOT installed!"
+            echo ""
+            echo "The Keycloak Operator must be installed before deploying with Keycloak authentication."
+            echo ""
+            echo "📋 Installation Instructions:"
+            echo "   1. Open OpenShift Console"
+            echo "   2. Navigate to: Operators → OperatorHub"
+            echo "   3. Search for: 'Red Hat Build of Keycloak Operator' or 'Keycloak Operator'"
+            echo "   4. Click Install and follow the prompts"
+            echo "   5. Wait for operator to be ready"
+            echo ""
+            echo "Or use CLI:"
+            echo "   See: deploy/KEYCLOAK_OPERATOR.md for detailed instructions"
+            echo ""
+            exit 1
+          fi
+          
+          # Check if RealmImport CRD exists
+          if oc get crd keycloakrealmimports.k8s.keycloak.org &>/dev/null; then
+            echo "✅ KeycloakRealmImport CRD found: keycloakrealmimports.k8s.keycloak.org"
+          else
+            echo "⚠️  WARNING: KeycloakRealmImport CRD not found"
+            echo "   Realm auto-import may not work."
+          fi
+          
+          # Check if operator pod is running
+          echo ""
+          echo "🔍 Checking for running operator pods..."
+          OPERATOR_PODS=$(oc get pods --all-namespaces -l app.kubernetes.io/name=keycloak-operator -o name 2>/dev/null || echo "")
+          
+          if [ -z "$OPERATOR_PODS" ]; then
+            # Try alternative label
+            OPERATOR_PODS=$(oc get pods --all-namespaces -l name=keycloak-operator -o name 2>/dev/null || echo "")
+          fi
+          
+          if [ -z "$OPERATOR_PODS" ]; then
+            # Try RHBK operator
+            OPERATOR_PODS=$(oc get pods --all-namespaces -l app.kubernetes.io/name=rhbk-operator -o name 2>/dev/null || echo "")
+          fi
+          
+          if [ -n "$OPERATOR_PODS" ]; then
+            echo "✅ Keycloak operator pod(s) found and running"
+            echo "$OPERATOR_PODS"
+          else
+            echo "⚠️  WARNING: Could not find running Keycloak operator pods"
+            echo "   The operator may still be starting up."
+            echo "   If deployment fails, check operator status."
+          fi
+          
+          echo ""
+          echo "=========================================="
+          echo "✅ Pre-flight check PASSED"
+          echo "   Proceeding with Keycloak deployment..."
+          echo "=========================================="
+{{- end }}
+

@@ -1,5 +1,7 @@
 # Keycloak Operator Setup Guide
 
+⚠️ **IMPORTANT**: The Keycloak Operator is a **REQUIRED PREREQUISITE** for deploying with Keycloak authentication. The Helm chart will fail the pre-flight check if the operator is not installed.
+
 This guide explains how to install and configure the Keycloak Operator for use with the Spending Transaction Monitor.
 
 ## 🎯 Why Use the Keycloak Operator?
@@ -14,8 +16,18 @@ The [Keycloak Operator](https://www.keycloak.org/guides#operator) provides:
 ## 📋 Prerequisites
 
 - OpenShift 4.10+ or Kubernetes 1.24+
-- Cluster admin permissions (for operator installation)
+- **Cluster admin permissions** (required for operator installation)
 - `oc` or `kubectl` CLI installed
+
+## ⚠️ Before You Deploy
+
+**The Keycloak Operator MUST be installed by a cluster administrator BEFORE deploying the application with `make deploy-keycloak`.**
+
+The Helm chart includes a pre-flight check that will **fail the deployment** if:
+- Keycloak CRDs are not present
+- Operator is not installed
+
+This is intentional to ensure proper setup.
 
 ---
 

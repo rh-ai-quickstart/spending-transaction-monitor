@@ -75,13 +75,25 @@ ingestion:
 
 ### Prerequisites
 
-1. **Keycloak Operator Must Be Installed**
+1. **⚠️ Keycloak Operator Must Be Installed (REQUIRED)**
+   
+   **The operator must be installed by a cluster admin BEFORE deploying.**
+   
    ```bash
-   # Install Keycloak Operator via OperatorHub or:
-   # See deploy/KEYCLOAK_OPERATOR.md for detailed instructions
+   # Option 1: Install via OpenShift Console (Recommended)
+   # 1. Navigate to: Operators → OperatorHub
+   # 2. Search for: "Red Hat Build of Keycloak" or "Keycloak Operator"
+   # 3. Click Install
+   
+   # Option 2: CLI Installation
+   # See: deploy/KEYCLOAK_OPERATOR.md for detailed instructions
    ```
    
-   The Helm chart will deploy Keycloak via the operator automatically.
+   ✅ The Helm chart includes a **pre-flight check** that verifies the operator is installed.
+   
+   ❌ The deployment will **fail with clear error messages** if the operator is missing.
+   
+   Once the operator is installed, the Helm chart will deploy Keycloak automatically.
    **No manual Keycloak deployment needed!**
 
 2. **Configure `.env.production`**
