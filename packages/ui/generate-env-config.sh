@@ -2,7 +2,7 @@
 # Generate runtime environment configuration for the UI
 # This allows us to change configuration without rebuilding the image
 
-cat > /app/dist/env-config.js << EOF
+cat > /app/dist/env-config/env-config.js << EOF
 // Runtime Environment Configuration
 // This file is generated at container startup based on environment variables
 window.ENV = {

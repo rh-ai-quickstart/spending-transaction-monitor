@@ -41,7 +41,9 @@ RUN chmod +x /usr/local/bin/generate-env-config.sh
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 -G nodejs
 
 # Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
+RUN mkdir -p /app/dist/env-config \
+    && chmod -R 777 /app/dist/env-config \
+    && chown -R nodejs:nodejs /app
 
 # Switch to non-root user
 USER nodejs

@@ -42,7 +42,10 @@ export class ApiClient {
   }
 
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || '/api';
+    this.baseUrl =
+      config.baseUrl ||
+      (typeof window !== 'undefined' && window.ENV?.API_BASE_URL) ||
+      '/api';
     this.timeout = config.timeout || 30000;
     this.includeLocation = config.includeLocation ?? true;
     this.defaultHeaders = {

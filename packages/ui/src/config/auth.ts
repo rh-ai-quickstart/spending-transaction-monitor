@@ -14,13 +14,16 @@ export interface AuthConfig {
   };
 }
 
-// Environment detection
+// Environment detection - check both build-time and runtime configuration
 const environment = (import.meta.env.VITE_ENVIRONMENT ||
+  (typeof window !== 'undefined' && window.ENV?.ENVIRONMENT) ||
   'development') as AuthConfig['environment'];
 
-// Bypass detection - use the same BYPASS_AUTH setting as the backend
+// Bypass detection - check both build-time and runtime configuration
 // This ensures frontend and backend auth bypass are always in sync
-const bypassAuth = import.meta.env.VITE_BYPASS_AUTH === 'true';
+const bypassAuth =
+  import.meta.env.VITE_BYPASS_AUTH === 'true' ||
+  (typeof window !== 'undefined' && window.ENV?.BYPASS_AUTH === true);
 
 export const authConfig: AuthConfig = {
   environment,
@@ -28,8 +31,12 @@ export const authConfig: AuthConfig = {
   keycloak: {
     authority:
       import.meta.env.VITE_KEYCLOAK_URL ||
+      (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_URL) ||
       'http://localhost:8080/realms/spending-monitor',
-    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'spending-monitor',
+    clientId:
+      import.meta.env.VITE_KEYCLOAK_CLIENT_ID ||
+      (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_CLIENT_ID) ||
+      'spending-monitor',
     redirectUri:
       import.meta.env.VITE_KEYCLOAK_REDIRECT_URI ||
       (typeof window !== 'undefined'
