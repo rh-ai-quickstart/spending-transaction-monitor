@@ -43,6 +43,9 @@ secrets:
   KEYCLOAK_DB_PASSWORD: "keycloak"  # Change in production!
   KEYCLOAK_ADMIN_PASSWORD: "keycloak"  # Change in production!
 
+  LLAMASTACK_BASE_URL: "http://llamastack:8321"
+  LLAMASTACK_MODEL: "RedHatAI/Llama-3.2-1B-Instruct-quantized.w8a8"
+
   # UI secrets
   VITE_API_BASE_URL: "http://localhost:8000"
 
