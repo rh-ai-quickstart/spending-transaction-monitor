@@ -4,7 +4,7 @@ node_modules/
 **/node_modules/
 
 # Exclude non-essential packages to avoid symlink issues
-packages/auth/
+# packages/auth/ - NOW NEEDED: auth package included in API image for user sync scripts
 packages/evaluation/
 packages/ingestion-service/
 
