@@ -4,12 +4,14 @@ FROM python:3.12-slim
 # Build argument to control PyTorch variant (cpu or cuda)
 ARG TORCH_VARIANT=cpu
 
-# Install deps
+# Install system dependencies including python dev headers for asyncpg
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    g++ \
     libpq-dev \
     postgresql-client \
     bash \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy db package
