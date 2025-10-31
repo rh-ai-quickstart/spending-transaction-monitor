@@ -22,30 +22,48 @@ ENV_FILE_DEV = .env.development
 ENV_FILE_PROD = .env.production
 ENV_FILE = $(ENV_FILE_DEV)  # Default to development for backwards compatibility
 
+TOLERATIONS_TEMPLATE=[{"key":"$(1)","effect":"NoSchedule","operator":"Exists"}]
+
 # Helper function to generate helm parameters from environment variables
 define HELM_SECRET_PARAMS
---set secrets.POSTGRES_DB="$$POSTGRES_DB" \
---set secrets.POSTGRES_USER="$$POSTGRES_USER" \
---set secrets.POSTGRES_PASSWORD="$$POSTGRES_PASSWORD" \
---set secrets.DATABASE_URL="$$DATABASE_URL" \
---set secrets.API_KEY="$$API_KEY" \
---set secrets.BASE_URL="$$BASE_URL" \
---set secrets.LLM_PROVIDER="$$LLM_PROVIDER" \
---set secrets.MODEL="$$MODEL" \
---set secrets.ENVIRONMENT="$$ENVIRONMENT" \
---set secrets.DEBUG="$$DEBUG" \
---set secrets.BYPASS_AUTH="$$BYPASS_AUTH" \
---set secrets.CORS_ALLOWED_ORIGINS="$${CORS_ALLOWED_ORIGINS//,/\\,}" \
---set secrets.ALLOWED_ORIGINS="$${ALLOWED_ORIGINS//,/\\,}" \
---set secrets.SMTP_HOST="$$SMTP_HOST" \
---set secrets.SMTP_PORT="$$SMTP_PORT" \
---set secrets.SMTP_FROM_EMAIL="$$SMTP_FROM_EMAIL" \
---set secrets.SMTP_USE_TLS="$$SMTP_USE_TLS" \
---set secrets.SMTP_USE_SSL="$$SMTP_USE_SSL" \
---set secrets.KEYCLOAK_URL="$$KEYCLOAK_URL" \
---set secrets.KEYCLOAK_REALM="$$KEYCLOAK_REALM" \
---set secrets.KEYCLOAK_CLIENT_ID="$$KEYCLOAK_CLIENT_ID" \
---set secrets.VITE_API_BASE_URL="$$VITE_API_BASE_URL"
+$$(if [ -n "$$POSTGRES_DB" ]; then echo "--set secrets.POSTGRES_DB=$$POSTGRES_DB"; fi) \
+$$(if [ -n "$$POSTGRES_USER" ]; then echo "--set secrets.POSTGRES_USER=$$POSTGRES_USER"; fi) \
+$$(if [ -n "$$POSTGRES_PASSWORD" ]; then echo "--set secrets.POSTGRES_PASSWORD=$$POSTGRES_PASSWORD"; fi) \
+$$(if [ -n "$$DATABASE_URL" ]; then echo "--set secrets.DATABASE_URL=$$DATABASE_URL"; fi) \
+$$(if [ -n "$$API_KEY" ]; then echo "--set secrets.API_KEY=$$API_KEY"; fi) \
+$$(if [ -n "$$BASE_URL" ]; then echo "--set secrets.BASE_URL=$$BASE_URL"; fi) \
+$$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi) \
+$$(if [ -n "$$MODEL" ]; then echo "--set secrets.MODEL=$$MODEL"; fi) \
+$$(if [ -n "$$ENVIRONMENT" ]; then echo "--set secrets.ENVIRONMENT=$$ENVIRONMENT"; fi) \
+$$(if [ -n "$$DEBUG" ]; then echo "--set secrets.DEBUG=$$DEBUG"; fi) \
+$$(if [ -n "$$BYPASS_AUTH" ]; then echo "--set secrets.BYPASS_AUTH=$$BYPASS_AUTH"; fi) \
+$$(if [ -n "$$CORS_ALLOWED_ORIGINS" ]; then echo "--set secrets.CORS_ALLOWED_ORIGINS=$$CORS_ALLOWED_ORIGINS"; fi) \
+$$(if [ -n "$$ALLOWED_ORIGINS" ]; then echo "--set secrets.ALLOWED_ORIGINS=$$ALLOWED_ORIGINS"; fi) \
+$$(if [ -n "$$SMTP_HOST" ]; then echo "--set secrets.SMTP_HOST=$$SMTP_HOST"; fi) \
+$$(if [ -n "$$SMTP_PORT" ]; then echo "--set secrets.SMTP_PORT=$$SMTP_PORT"; fi) \
+$$(if [ -n "$$SMTP_FROM_EMAIL" ]; then echo "--set secrets.SMTP_FROM_EMAIL=$$SMTP_FROM_EMAIL"; fi) \
+$$(if [ -n "$$SMTP_USE_TLS" ]; then echo "--set secrets.SMTP_USE_TLS=$$SMTP_USE_TLS"; fi) \
+$$(if [ -n "$$SMTP_USE_SSL" ]; then echo "--set secrets.SMTP_USE_SSL=$$SMTP_USE_SSL"; fi) \
+$$(if [ -n "$$KEYCLOAK_URL" ]; then echo "--set secrets.KEYCLOAK_URL=$$KEYCLOAK_URL"; fi) \
+$$(if [ -n "$$KEYCLOAK_REALM" ]; then echo "--set secrets.KEYCLOAK_REALM=$$KEYCLOAK_REALM"; fi) \
+$$(if [ -n "$$KEYCLOAK_CLIENT_ID" ]; then echo "--set secrets.KEYCLOAK_CLIENT_ID=$$KEYCLOAK_CLIENT_ID"; fi) \
+$$(if [ -n "$$VITE_API_BASE_URL" ]; then echo "--set secrets.VITE_API_BASE_URL=$$VITE_API_BASE_URL"; fi) \
+$$(if [ -n "$$LLAMASTACK_BASE_URL" ]; then echo "--set secrets.LLAMASTACK_BASE_URL=$$LLAMASTACK_BASE_URL"; fi) \
+$$(if [ -n "$$LLAMASTACK_MODEL" ]; then echo "--set secrets.LLAMASTACK_MODEL=$$LLAMASTACK_MODEL"; fi) \
+$$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi)
+endef
+
+define HELM_LLAMASTACK_PARAMS
+$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.enabled=true"; fi) \
+$$(if [ -n "$$MODEL_ID" ]; then echo "--set global.models.$$MODEL.id=$$MODEL_ID"; fi) \
+$$(if [ -n "$$MODEL_URL" ]; then echo "--set global.models.$$MODEL.url=$$MODEL_URL"; fi) \
+$$(if [ -n "$$MODEL_API_KEY" ]; then echo "--set global.models.$$MODEL.apiToken=$$MODEL_API_KEY"; fi) \
+$$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi)
+endef
+
+define HELM_LLM_SERVICE_PARAMS
+$$(if [ -n "$$HF_TOKEN" ]; then echo "--set llm-service.secret.hf_token=$$HF_TOKEN"; fi) \
+$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$MODEL.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi)
 endef
 
 # Default target when running 'make' without arguments
@@ -340,22 +358,26 @@ push-all: push-ui push-api push-db
 deploy: create-project check-env-prod
 	@echo "Deploying application using Helm with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
+	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
-		$(HELM_SECRET_PARAMS)
+		$(HELM_SECRET_PARAMS) \
+		$(HELM_LLAMASTACK_PARAMS) \
+		$(HELM_LLM_SERVICE_PARAMS)
 
 .PHONY: deploy-dev
 deploy-dev: create-project check-env-prod
 	@echo "Deploying application in development mode with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@echo "Note: This is still a production deployment with reduced resources for development/testing"
+	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
 		--set global.imageRegistry=$(REGISTRY_URL) \
@@ -364,7 +386,9 @@ deploy-dev: create-project check-env-prod
 		--set database.persistence.enabled=false \
 		--set api.replicas=1 \
 		--set ui.replicas=1 \
-		$(HELM_SECRET_PARAMS)
+		$(HELM_SECRET_PARAMS) \
+		$(HELM_LLAMASTACK_PARAMS) \
+		$(HELM_LLM_SERVICE_PARAMS)
 
 .PHONY: deploy-all
 deploy-all: build-all push-all deploy

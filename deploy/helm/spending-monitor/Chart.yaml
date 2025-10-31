@@ -4,6 +4,16 @@ description: A Helm chart for Spending Transaction Monitor application
 type: application
 version: 0.1.0
 appVersion: "latest"
+dependencies:
+  - name: pgvector
+    version: 0.1.0
+    repository: https://rhecosystemappeng.github.io/ai-architecture-charts
+  - name: llm-service
+    version: 0.1.0
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+  - name: llama-stack
+    version: 0.2.18
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
 keywords:
   - monitoring
   - transactions
