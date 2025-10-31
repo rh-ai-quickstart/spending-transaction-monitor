@@ -2,15 +2,20 @@ apiVersion: v2
 name: spending-monitor
 description: A Helm chart for Spending Transaction Monitor application
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "latest"
 keywords:
   - monitoring
   - transactions
   - finance
+  - ai
+  - fraud-detection
 home: https://github.com/example/spending-monitor
 sources:
   - https://github.com/example/spending-monitor
 maintainers:
   - name: Development Team
     email: dev@example.com
+annotations:
+  category: Financial
+  licenses: MIT
