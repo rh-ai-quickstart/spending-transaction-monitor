@@ -5,12 +5,42 @@ from langchain.tools import tool
 from .utils import extract_sql, get_llm_client
 
 
-def build_prompt(last_transaction: dict, alert_text: str, alert_rule: dict) -> str:
+def build_prompt(
+    last_transaction: dict, alert_text: str, alert_rule: dict, user: dict = None
+) -> str:
     user_id = last_transaction.get('user_id', '').strip()
     transaction_date = last_transaction.get('transaction_date', '')
     merchant_name = alert_rule.get('merchant_name', '').lower()
     merchant_category = alert_rule.get('merchant_category', '').lower()
     recurring_interval_days = alert_rule.get('recurring_interval_days', 35)
+
+    # Build user context section if user data is provided
+    user_context = ''
+    if user:
+        # Extract user location information
+        home_city = user.get('address_city', 'Unknown')
+        home_state = user.get('address_state', 'Unknown')
+        home_country = user.get('address_country', 'Unknown')
+        last_app_lat = user.get('last_app_location_latitude')
+        last_app_lon = user.get('last_app_location_longitude')
+
+        user_context = f"""
+---
+USER LOCATION CONTEXT:
+When the user refers to "this city", "my city", "my current location", "here", or similar:
+- User's home address: {home_city}, {home_state}, {home_country}
+- User's last known GPS location: {f'({last_app_lat:.6f}, {last_app_lon:.6f})' if last_app_lat and last_app_lon else 'Not available'}
+
+To reference the user's location in SQL queries, JOIN to the users table:
+  JOIN users u ON t.user_id = u.id
+
+Examples:
+- "transactions outside this city" → WHERE t.merchant_city != u.address_city
+- "transactions outside my state" → WHERE t.merchant_state != u.address_state
+- "transactions far from my location" → Use haversine_distance_km(u.last_app_location_latitude, u.last_app_location_longitude, t.merchant_latitude, t.merchant_longitude)
+
+---
+"""
 
     schema = """
 Table: transactions
@@ -59,7 +89,7 @@ Columns:
     prompt = f"""
 You are a SQL assistant.
 You must generate **PostgreSQL-compatible SQL** only.
-
+{user_context}
 ❗ HARD RULES:
 1. Always filter by the current user: transactions.user_id = '{user_id}'.
 2. `last_txn` must ALWAYS include:
@@ -254,14 +284,14 @@ SQL:
 
 @tool
 def parse_alert_to_sql_with_context(
-    transaction: dict, alert_text: str, alert_rule: dict
+    transaction: dict, alert_text: str, alert_rule: dict, user: dict = None
 ) -> str:
     """
-    Inputs: { "transaction": {dict}, "alert_text": str, "alert_rule": dict }
+    Inputs: { "transaction": {dict}, "alert_text": str, "alert_rule": dict, "user": {dict} (optional) }
     Returns: SQL query
     """
     client = get_llm_client()
-    prompt = build_prompt(transaction, alert_text, alert_rule)
+    prompt = build_prompt(transaction, alert_text, alert_rule, user)
     response = client.invoke(prompt)
 
     return extract_sql(str(response))
