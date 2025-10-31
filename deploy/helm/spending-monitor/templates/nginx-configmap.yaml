@@ -37,7 +37,7 @@ data:
             listen 8080;
             server_name _;
 
-        # API endpoints - proxy to API service, strip /api prefix
+        # API endpoints - proxy to API service (keep /api prefix)
         location /api/ {
             proxy_pass http://api_backend;
             proxy_set_header Host $host;

@@ -62,6 +62,7 @@ app = FastAPI(
     description='AI-powered alerts for credit card transactions',
     version='0.0.0',
     lifespan=lifespan,
+    redirect_slashes=True,  # Automatically redirect /path to /path/ and vice versa
 )
 
 # Configure CORS
