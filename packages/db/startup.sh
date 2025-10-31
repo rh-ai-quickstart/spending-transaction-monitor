@@ -57,15 +57,15 @@ if [ -f "$USERS_CSV" ] && [ -f "$TRANSACTIONS_CSV" ]; then
     # Set PYTHONPATH to ensure imports work correctly
     export PYTHONPATH="/app/packages/db/src:/app/packages/api/src:$PYTHONPATH"
     
-    # Load CSV data
-    python3 -m db.scripts.load_csv_data
+    # Load CSV data (use venv python)
+    python -m db.scripts.load_csv_data
     
     if [ $? -eq 0 ]; then
         echo "✅ Sample data loaded successfully"
     else
-        echo "❌ Sample data loading failed"
+        echo "⚠️  Sample data loading failed (non-fatal)"
         echo "Check the logs above for details"
-        exit 1
+        echo "Continuing anyway..."
     fi
 else
     echo "⚠️  CSV data files not found:"

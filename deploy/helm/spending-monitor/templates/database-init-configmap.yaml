@@ -1,0 +1,30 @@
+{{- if .Values.database.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.database.name }}-init-scripts
+  labels:
+    {{- include "spending-monitor.database.labels" . | nindent 4 }}
+data:
+  01-enable-pgvector.sql: |
+    -- Enable pgvector extension
+    -- This script runs automatically when the PostgreSQL container starts for the first time
+
+    -- Create the vector extension
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    -- Grant usage on the extension to the application user
+    GRANT USAGE ON SCHEMA public TO "user";
+
+    -- Verify the extension is installed
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
+            RAISE NOTICE 'pgvector extension successfully installed';
+        ELSE
+            RAISE EXCEPTION 'Failed to install pgvector extension';
+        END IF;
+    END
+    $$;
+{{- end }}
+
