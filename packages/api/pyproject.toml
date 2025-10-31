@@ -30,9 +30,10 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "requests>=2.31.0",
     "spending-monitor-db",
-    "llama-stack-client>=0.2.12",
-    "sentence-transformers>=2.2.0",
+    "llama-stack-client>=0.2.12,<0.3.0",
+    "sentence-transformers>=3.0.0",
     "torch>=2.0.0",
+    "fire>=0.7.1", # for llama-stack-client (https://github.com/llamastack/llama-stack-client-python/pull/232)
 ]
 
 [project.optional-dependencies]

@@ -2,6 +2,7 @@ import json
 import os
 import re
 
+from .llamastack import LlamastackClient
 from .llm import LLMClient
 from .vertexai import VertexAIClient
 
@@ -53,5 +54,7 @@ def get_llm_client():
     provider = os.getenv('LLM_PROVIDER', 'openai')
     if provider == 'vertexai':
         return VertexAIClient()
+    elif provider == 'llamastack':
+        return LlamastackClient()
     else:
         return LLMClient()
