@@ -1479,15 +1479,25 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "greenlet" },
-    { name = "httpx" },
-    { name = "openai" },
     { name = "pandas" },
     { name = "pgvector" },
     { name = "psycopg2-binary" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
-    { name = "sentence-transformers" },
     { name = "sqlalchemy" },
+]
+
+[package.optional-dependencies]
+ml = [
+    { name = "httpx" },
+    { name = "openai" },
+    { name = "sentence-transformers" },
+    { name = "torch", marker = "platform_machine != 'x86_64'" },
+]
+ml-cpu = [
+    { name = "httpx" },
+    { name = "openai" },
+    { name = "sentence-transformers" },
     { name = "torch" },
 ]
 
@@ -1506,17 +1516,22 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13.0" },
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "greenlet", specifier = ">=3.0.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "openai", specifier = ">=1.109.1" },
+    { name = "httpx", marker = "extra == 'ml'", specifier = ">=0.28.1" },
+    { name = "httpx", marker = "extra == 'ml-cpu'", specifier = ">=0.28.1" },
+    { name = "openai", marker = "extra == 'ml'", specifier = ">=1.109.1" },
+    { name = "openai", marker = "extra == 'ml-cpu'", specifier = ">=1.109.1" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pgvector", specifier = ">=0.2.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "sentence-transformers", specifier = ">=2.2.0" },
+    { name = "sentence-transformers", marker = "extra == 'ml'", specifier = ">=2.2.0" },
+    { name = "sentence-transformers", marker = "extra == 'ml-cpu'", specifier = ">=2.2.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
-    { name = "torch", specifier = ">=2.0.0" },
+    { name = "torch", marker = "platform_machine != 'x86_64' and extra == 'ml'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'ml-cpu'", specifier = ">=2.0.0" },
 ]
+provides-extras = ["ml", "ml-cpu"]
 
 [package.metadata.requires-dev]
 dev = [

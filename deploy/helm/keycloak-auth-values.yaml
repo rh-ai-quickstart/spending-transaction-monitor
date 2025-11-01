@@ -1,0 +1,32 @@
+# Helm values override for Keycloak auth deployment
+# Usage: helm upgrade spending-monitor ./deploy/helm/spending-monitor -n NAMESPACE -f deploy/helm/keycloak-auth-values.yaml
+# Example: helm upgrade spending-monitor ./deploy/helm/spending-monitor -n sid-test-1 -f deploy/helm/keycloak-auth-values.yaml
+
+global:
+  imageRegistry: quay.io
+  imageRepository: <your-quay-username>  # Replace with your Quay.io username (e.g., skattoju)
+  imageTag: latest
+
+secrets:
+  # Database secrets
+  POSTGRES_PASSWORD: "CHANGE-ME-SECURE-PASSWORD"
+  
+  # API secrets
+  DATABASE_URL: "postgresql+asyncpg://user:CHANGE-ME-SECURE-PASSWORD@spending-monitor-db:5432/spending-monitor"
+  BYPASS_AUTH: "false"
+  
+  # Keycloak configuration (API uses base URL, will append /realms/{realm})
+  KEYCLOAK_URL: "https://<your-keycloak-route-url>"  # Replace with your Keycloak route URL
+  KEYCLOAK_REALM: "spending-monitor"
+  KEYCLOAK_CLIENT_ID: "spending-monitor"
+
+api:
+  replicas: 2
+
+ui:
+  replicas: 2
+
+# Keycloak is managed by Keycloak Operator
+keycloak:
+  enabled: true
+  externalUrl: "https://<your-keycloak-route-url>"  # Replace with your Keycloak route URL

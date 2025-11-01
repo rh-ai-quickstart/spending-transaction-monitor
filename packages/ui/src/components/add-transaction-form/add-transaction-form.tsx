@@ -472,7 +472,7 @@ export function AddTransactionDialog() {
                   <Label htmlFor={field.name}>Type *</Label>
                   <Select
                     value={field.state.value}
-                    onValueChange={(value) =>
+                    onValueChange={(value: string) =>
                       field.handleChange(value as 'debit' | 'credit')
                     }
                   >

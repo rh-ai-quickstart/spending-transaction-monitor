@@ -10,6 +10,8 @@ export const RuntimeEnvSchema = z.object({
   ENVIRONMENT: z.enum(['development', 'staging', 'production']),
   KEYCLOAK_URL: z.string(),
   KEYCLOAK_CLIENT_ID: z.string(),
+  KEYCLOAK_REALM: z.string(),
+  DEV: z.boolean().optional(), // Debug logging flag
 });
 
 // Export type

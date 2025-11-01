@@ -22,7 +22,7 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: postgres
-          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag}}"
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
             - name: postgres
@@ -49,6 +49,8 @@ spec:
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
           resources:
             {{- toYaml .Values.database.resources | nindent 12 }}
           livenessProbe:
@@ -81,6 +83,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: init-scripts
+          configMap:
+            name: {{ .Values.database.name }}-init-scripts
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

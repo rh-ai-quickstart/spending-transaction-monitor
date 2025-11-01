@@ -41,8 +41,8 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: postgres
-    tag: 16-alpine
+    repository: pgvector/pgvector
+    tag: pg16
   service:
     type: ClusterIP
     port: 5432
@@ -147,6 +147,38 @@ nginx:
     path: /health
     initialDelaySeconds: 5
     periodSeconds: 10
+
+# Keycloak Operator configuration
+# 
+# ⚠️  PREREQUISITE: Keycloak Operator must be installed by cluster admin BEFORE deploying
+# 
+# Installation:
+#   OpenShift: Operators → OperatorHub → Search "Keycloak"
+#   CLI: See deploy/KEYCLOAK_OPERATOR.md
+#
+# The Helm chart includes a pre-flight check that will FAIL if operator is not installed.
+# This is intentional to ensure proper setup.
+#
+keycloak:
+  enabled: false  # Disabled by default, enable in prod-keycloak values
+  name: spending-monitor-keycloak
+  image:
+    repository: ""  # Leave empty to use operator default image
+    tag: "latest"
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  route:
+    enabled: true  # Operator will create OpenShift route automatically
+  realm:
+    create: true  # Create realm via KeycloakRealmImport CR
+    name: "spending-monitor"
+    clientId: "spending-monitor"
 
 # OpenShift Routes configuration (preferred over Ingress)
 routes:

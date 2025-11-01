@@ -15,13 +15,16 @@ RUN dnf install -y gcc gcc-c++ postgresql-devel curl --allowerasing && dnf clean
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && mv ~/.local/bin/uv /usr/local/bin/uv
 
 # Create packages directory structure
-RUN mkdir -p /app/packages/api /app/packages/db
+RUN mkdir -p /app/packages/api /app/packages/db /app/packages/auth
 
 # Copy the API package (context is root)
 COPY packages/api/ ./packages/api/
 
 # Copy the db package (context is root)
 COPY packages/db/ ./packages/db/
+
+# Copy the auth package (context is root) - needed for user sync scripts
+COPY packages/auth/ ./packages/auth/
 
 # Install Python dependencies using uv with explicit Python binary
 # Install PyTorch based on TORCH_VARIANT (cpu for local, cuda for production)
@@ -35,6 +38,8 @@ RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
 
 # Install DB package first (without torch since we installed it above)
 RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/db
+# Install auth package (includes Keycloak utilities)
+RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/auth
 # Then install API package with dev dependencies
 RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/api[dev]  
 # Install psycopg2 for PostgreSQL sync operations (migrations)

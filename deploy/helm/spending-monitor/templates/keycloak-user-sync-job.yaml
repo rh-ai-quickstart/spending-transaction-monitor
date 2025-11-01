@@ -1,0 +1,165 @@
+{{- if .Values.keycloak.enabled }}
+{{- if .Values.keycloak.realm.create }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "spending-monitor.fullname" . }}-keycloak-user-sync
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-user-sync
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "20" # Run after realm setup (weight 15)
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300 # Clean up after 5 minutes
+  template:
+    metadata:
+      labels:
+        {{- include "spending-monitor.labels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak-user-sync
+    spec:
+      serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
+      restartPolicy: Never
+      initContainers:
+        # Wait for database to be ready
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for database to be ready..."
+              until nc -z {{ .Values.database.name }} {{ .Values.database.service.port }}; do
+                echo "Database not ready, waiting..."
+                sleep 3
+              done
+              echo "✅ Database is ready!"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+        
+        # Wait for Keycloak to be ready
+        - name: wait-for-keycloak
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "⏳ Waiting for Keycloak to be ready..."
+              until nc -z {{ .Values.keycloak.name }}-service 8080; do
+                echo "Keycloak not ready, waiting..."
+                sleep 5
+              done
+              # Extra wait for Keycloak to fully initialize
+              sleep 10
+              echo "✅ Keycloak is ready!"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+      
+      containers:
+        - name: user-sync
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.global.imageRepository }}/spending-monitor-api:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.api.imagePullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "🚀 Starting user sync to Keycloak..."
+              echo "=================================================="
+              echo "Database: $DATABASE_HOST:$DATABASE_PORT/$POSTGRES_DB"
+              echo "Keycloak: $KEYCLOAK_URL"
+              echo "Realm: $KEYCLOAK_REALM"
+              echo "Default password: $KEYCLOAK_DEFAULT_PASSWORD"
+              echo "=================================================="
+              
+              # Run the sync script (auth package is included in API image)
+              cd /app
+              python3 packages/auth/scripts/sync_db_users_to_keycloak.py
+              
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -eq 0 ]; then
+                echo "✅ User sync completed successfully!"
+              else
+                echo "❌ User sync failed with exit code: $EXIT_CODE"
+                exit $EXIT_CODE
+              fi
+          env:
+            # Database connection
+            - name: DATABASE_HOST
+              value: {{ .Values.database.name }}
+            - name: DATABASE_PORT
+              value: "{{ .Values.database.service.port }}"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(POSTGRES_DB)"
+            
+            # Keycloak connection (internal service URL for API communication)
+            - name: KEYCLOAK_URL
+              value: "http://{{ .Values.keycloak.name }}-service:8080"
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_CLIENT_ID
+            
+            # Keycloak admin credentials
+            - name: KEYCLOAK_ADMIN_USER
+              value: "temp-admin"
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.name }}-initial-admin
+                  key: password
+            
+            # Default password for created users
+            - name: KEYCLOAK_DEFAULT_PASSWORD
+              value: {{ .Values.keycloak.defaultUserPassword | default "password123" | quote }}
+            
+            # Environment
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ENVIRONMENT
+          
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+{{- end }}
+{{- end }}
+
