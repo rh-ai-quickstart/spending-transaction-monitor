@@ -13,11 +13,6 @@ UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
 API_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:$(IMAGE_TAG)
 DB_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:$(IMAGE_TAG)
 
-# Local development image names (tagged as 'local')
-UI_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:local
-API_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:local
-DB_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:local
-
 # Environment file paths
 ENV_FILE_DEV = .env.development
 ENV_FILE_PROD = .env.production
@@ -376,7 +371,7 @@ clean-images:
 .PHONY: clean-local-images
 clean-local-images:
 	@echo "Cleaning up local development images..."
-	@podman rmi $(UI_IMAGE_LOCAL) $(API_IMAGE_LOCAL) $(DB_IMAGE_LOCAL) || true
+	@podman rmi spending-monitor-ui:local spending-monitor-api:local spending-monitor-db:local || true
 
 .PHONY: clean-all
 clean-all: undeploy-all clean-images clean-local-images
@@ -457,11 +452,7 @@ stop-local:
 build-local:
 	@echo "Building local Podman images with 'local' tag..."
 	podman-compose -f podman-compose.yml -f podman-compose.build.yml build
-	@echo "Tagging built images as 'local'..."
-	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
-	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
-	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
-	@echo "✅ Local images built and tagged successfully"
+	@echo "✅ Local images built successfully"
 
 .PHONY: pull-local
 pull-local:
@@ -503,10 +494,7 @@ clean-ui-images:
 build-local-images: setup-dev-env clean-ui-images
 	@echo "🔨 Building images (environment-agnostic)..."
 	podman-compose -f podman-compose.yml -f podman-compose.build.yml build --no-cache migrations api ui
-	@echo "Tagging built images as 'local'..."
-	podman tag $(UI_IMAGE) $(UI_IMAGE_LOCAL) || true
-	podman tag $(API_IMAGE) $(API_IMAGE_LOCAL) || true
-	podman tag $(DB_IMAGE) $(DB_IMAGE_LOCAL) || true
+	@echo "✅ Images built successfully"
 
 # Build and run locally
 # Usage: make build-run-local [MODE=noauth]
