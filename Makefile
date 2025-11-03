@@ -120,10 +120,6 @@ help:
 	@echo "    make deploy MODE=dev              Deploy with reduced resources"
 	@echo "    make undeploy                     Remove deployment"
 	@echo ""
-	@echo "  OpenShift Builds (in-cluster):"
-	@echo "    make openshift-create-builds      Create BuildConfigs"
-	@echo "    make openshift-build-all          Build all images"
-	@echo ""
 	@echo "📦 Build & Push:"
 	@echo "  make build-all        Build all images"
 	@echo "  make push-all         Push all images to registry"
@@ -147,7 +143,6 @@ help:
 	@echo "💡 Examples:"
 	@echo "  make build-run-local MODE=noauth"
 	@echo "  make deploy MODE=keycloak NAMESPACE=my-app"
-	@echo "  make openshift-build-all NAMESPACE=my-project"
 
 # Login to OpenShift registry
 .PHONY: login
@@ -267,38 +262,6 @@ endif
 .PHONY: deploy-all
 deploy-all: build-all push-all deploy
 	@echo "Complete deployment finished successfully"
-
-# OpenShift Build targets (build images in-cluster)
-# Override these variables as needed: make openshift-create-builds GIT_URI=https://... VITE_BYPASS_AUTH=true
-GIT_URI ?= https://github.com/rh-ai-quickstart/spending-transaction-monitor.git
-VITE_BYPASS_AUTH ?= false
-VITE_ENVIRONMENT ?= staging
-
-.PHONY: openshift-create-builds
-openshift-create-builds:
-	@echo "Creating OpenShift BuildConfigs and ImageStreams..."
-	@cat deploy/openshift-builds-template.yaml | \
-		sed 's|$${GIT_URI}|$(GIT_URI)|g' | \
-		sed 's|$${GIT_REF}|$(GIT_BRANCH)|g' | \
-		sed 's|$${VITE_BYPASS_AUTH}|$(VITE_BYPASS_AUTH)|g' | \
-		sed 's|$${VITE_ENVIRONMENT}|$(VITE_ENVIRONMENT)|g' | \
-		oc apply -f - -n $(NAMESPACE)
-	@echo "✅ BuildConfigs and ImageStreams created!"
-	@echo "To start builds, run: make openshift-build-all"
-
-.PHONY: openshift-build-all
-openshift-build-all:
-	@echo "Starting all OpenShift builds..."
-	@echo "This will take 10-20 minutes depending on cluster resources"
-	@oc start-build spending-monitor-db -n $(NAMESPACE) --follow &
-	@oc start-build spending-monitor-api -n $(NAMESPACE) --follow &
-	@oc start-build spending-monitor-ui -n $(NAMESPACE) --follow &
-	@wait
-	@echo "✅ All builds completed!"
-	@echo ""
-	@echo "💡 To deploy with OpenShift-built images:"
-	@echo "   make deploy MODE=noauth NAMESPACE=$(NAMESPACE)"
-	@echo "   (Add image registry settings: --set global.imageRegistry=image-registry.openshift-image-registry.svc:5000)"
 
 # Undeploy targets
 .PHONY: undeploy

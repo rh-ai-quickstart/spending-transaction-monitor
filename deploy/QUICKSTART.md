@@ -14,13 +14,6 @@ make deploy MODE=keycloak NAMESPACE=staging
 make deploy MODE=noauth NAMESPACE=dev-test
 ```
 
-**With OpenShift In-Cluster Builds:**
-```bash
-make openshift-create-builds NAMESPACE=my-app
-make openshift-build-all NAMESPACE=my-app
-make deploy MODE=keycloak NAMESPACE=my-app
-```
-
 ## 📋 Prerequisites
 
 ```bash
@@ -50,13 +43,6 @@ podman version  # Podman
 make build-all    # Build all images locally
 make push-all     # Push all images to registry
 make deploy-all   # Build, push, and deploy
-```
-
-## 🏗️ OpenShift Builds
-
-```bash
-make openshift-create-builds NAMESPACE=my-app   # Create BuildConfigs
-make openshift-build-all NAMESPACE=my-app        # Build all images
 ```
 
 ## 🔍 Monitoring
@@ -144,8 +130,6 @@ Built images (default registry: quay.io/rh-ai-quickstart):
 - `spending-monitor-ui:latest`
 - `spending-monitor-db:latest`
 
-Or use OpenShift in-cluster builds (internal registry)
-
 ## 🔄 Update Deployment
 
 ```bash
@@ -156,10 +140,6 @@ make deploy MODE=keycloak NAMESPACE=my-app
 
 # Option 2: Or all at once
 make deploy-all NAMESPACE=my-app
-
-# Option 3: With OpenShift builds
-make openshift-build-all NAMESPACE=my-app
-# Pods will auto-restart with new images
 ```
 
 ## 📊 Scaling
@@ -184,7 +164,6 @@ make clean-images       # Clean local images
 
 For detailed information, see:
 - **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Complete deployment instructions with all modes
-- **[OPENSHIFT_BUILDS.md](./OPENSHIFT_BUILDS.md)** - In-cluster image building
 - **[KEYCLOAK_OPERATOR.md](./KEYCLOAK_OPERATOR.md)** - Keycloak installation guide
 - **[Main README](../README.md)** - Project overview
 

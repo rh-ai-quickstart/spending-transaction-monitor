@@ -264,7 +264,6 @@ oc delete project my-namespace
 
 - [Complete Deployment Guide](../DEPLOYMENT_GUIDE.md) - Full deployment instructions with all modes
 - [Quickstart Guide](../QUICKSTART.md) - One-page cheat sheet
-- [OpenShift Builds Guide](../OPENSHIFT_BUILDS.md) - In-cluster builds
 - [Keycloak Operator Setup](../KEYCLOAK_OPERATOR.md) - Keycloak installation
 
 ## 🎓 Helm Commands Reference

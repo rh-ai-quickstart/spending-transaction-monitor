@@ -30,14 +30,6 @@ make deploy MODE=keycloak NAMESPACE=my-app
 make deploy MODE=noauth NAMESPACE=my-test
 ```
 
-**For in-cluster builds (no registry access needed):**
-```bash
-# Build images in OpenShift and deploy
-make openshift-create-builds NAMESPACE=my-app
-make openshift-build-all NAMESPACE=my-app
-make deploy MODE=keycloak NAMESPACE=my-app
-```
-
 **See [QUICKSTART.md](./QUICKSTART.md) for a one-page cheat sheet.**
 
 ## 📦 Prerequisites
@@ -157,23 +149,6 @@ make deploy MODE=dev NAMESPACE=test
 
 ### Deployment Methods
 
-#### Using OpenShift In-Cluster Builds
-
-Build images directly in OpenShift (no registry access needed):
-
-```bash
-# 1. Create BuildConfigs
-make openshift-create-builds NAMESPACE=my-app
-
-# 2. Build all images (runs in parallel, ~15-20 min)
-make openshift-build-all NAMESPACE=my-app
-
-# 3. Deploy using built images
-make deploy MODE=keycloak NAMESPACE=my-app
-```
-
-See [OPENSHIFT_BUILDS.md](./OPENSHIFT_BUILDS.md) for details.
-
 #### Using Pre-built Images
 
 If images are already in a registry:
@@ -282,13 +257,6 @@ make undeploy-all NAMESPACE=my-app          # Remove deployment + namespace
 make build-all          # Build all images locally
 make push-all           # Push all images to registry
 make deploy-all         # Build, push, and deploy
-```
-
-### OpenShift In-Cluster Builds
-
-```bash
-make openshift-create-builds NAMESPACE=my-app    # Create BuildConfigs
-make openshift-build-all NAMESPACE=my-app        # Build all images
 ```
 
 ### Local Development
@@ -542,7 +510,6 @@ The application includes health endpoints compatible with Prometheus:
 ## 📚 Additional Resources
 
 - [Quickstart Guide](./QUICKSTART.md) - One-page cheat sheet
-- [OpenShift Builds Guide](./OPENSHIFT_BUILDS.md) - In-cluster image building
 - [Keycloak Operator Setup](./KEYCLOAK_OPERATOR.md) - Keycloak installation guide
 - [Helm Chart Documentation](./helm/DEPLOYMENT.md) - Helm-specific details
 - [Main README](../README.md) - Project overview and architecture
@@ -578,11 +545,6 @@ make deploy MODE=keycloak NAMESPACE=staging
 
 # Development/testing without auth
 make deploy MODE=noauth NAMESPACE=dev
-
-# With in-cluster builds (no registry access)
-make openshift-create-builds NAMESPACE=my-app
-make openshift-build-all NAMESPACE=my-app
-make deploy MODE=keycloak NAMESPACE=my-app
 ```
 
 **See [QUICKSTART.md](./QUICKSTART.md) for a one-page cheat sheet.**
