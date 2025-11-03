@@ -449,38 +449,362 @@ The test process:
 
 **Note:** Make sure the API server is running (`make run-local`) before testing alert rules.
 
-### ☁️ OpenShift Deployment
+## ☁️ OpenShift Deployment
 
-**Quick Deploy:**
+### 🚀 Quick Deploy
+
+The fastest way to deploy to OpenShift:
 
 ```bash
-make full-deploy
+# 1. Configure environment variables
+cp env.example .env.production
+# Edit .env.production with your settings
+
+# 2. Login to OpenShift
+oc login --token=<your-token> --server=<your-server>
+
+# 3. Deploy with Keycloak authentication (recommended)
+make deploy MODE=keycloak NAMESPACE=my-app
+
+# Or deploy without auth for development/testing
+make deploy MODE=noauth NAMESPACE=dev-test
 ```
 
-**Step-by-step:**
+### 📋 Prerequisites
+
+**Required Tools:**
+- OpenShift CLI (`oc`) - v4.10 or later
+- Helm - v3.8 or later
+- Podman - v4.0 or later (for building images)
+- Make - For using Makefile commands
+
+**Access Requirements:**
+- OpenShift cluster with project admin permissions
+- Container registry access (default: quay.io)
+- Sufficient cluster resources (see resource requirements below)
+
+**Configuration Files:**
+- `.env.production` - OpenShift deployment variables (copy from `env.example`)
+- `.env.development` - Local development variables
+
+### 🎯 Deployment Modes
+
+The application supports three deployment modes via the `MODE` parameter:
+
+#### MODE=keycloak (Authenticated - Recommended)
+
+For staging/production environments requiring authentication:
 
 ```bash
-# Login and setup
-make login
-make create-project
+make deploy MODE=keycloak NAMESPACE=my-app
+```
 
-# Build and push images
+**Features:**
+- ✅ Keycloak SSO authentication
+- ✅ Multiple replicas (API: 2, UI: 2)
+- ✅ Persistent database storage (50Gi)
+- ✅ Automatic user sync from database to Keycloak
+- ✅ Full resource allocation (2 CPU cores, 4Gi memory)
+
+**Resource Requirements:**
+- CPU: ~2000m (2 cores)
+- Memory: ~4Gi
+- Storage: 50Gi (database PVC)
+
+#### MODE=noauth (Development/Testing)
+
+For development and testing without authentication:
+
+```bash
+make deploy MODE=noauth NAMESPACE=dev-test
+```
+
+**Features:**
+- ✅ Authentication bypassed
+- ✅ Single replicas (API: 1, UI: 1)
+- ✅ Ephemeral storage (no PVC)
+- ✅ Reduced resources (600m CPU, 1.5Gi memory)
+- ⚠️ Yellow banner shows "DEV MODE - Authentication Bypassed"
+- ⚠️ **NOT for production**
+
+#### MODE=dev (Reduced Resources)
+
+For resource-constrained environments:
+
+```bash
+make deploy MODE=dev NAMESPACE=my-dev
+```
+
+**Features:**
+- ✅ Keycloak authentication enabled
+- ✅ Single replicas (API: 1, UI: 1)
+- ✅ Reduced resources for testing
+- ⚠️ Not for high-load production
+
+### 🔧 Environment Configuration
+
+Create your `.env.production` file:
+
+```bash
+cp env.example .env.production
+```
+
+**Required Variables:**
+
+```bash
+# Database Configuration
+DATABASE_HOST=spending-monitor-database
+DATABASE_PORT=5432
+DATABASE_NAME=spending_monitor
+DATABASE_USER=postgres
+DATABASE_PASSWORD=<your-secure-password>
+
+# Keycloak Configuration (for MODE=keycloak)
+KEYCLOAK_URL=https://keycloak-<namespace>.apps.<cluster-domain>
+KEYCLOAK_REALM=spending-monitor
+KEYCLOAK_CLIENT_ID=spending-monitor-client
+KEYCLOAK_CLIENT_SECRET=<your-client-secret>
+
+# Notification Settings
+SMTP_HOST=<your-smtp-host>
+SMTP_PORT=587
+SMTP_USER=<your-smtp-user>
+SMTP_PASSWORD=<your-smtp-password>
+SMTP_FROM=noreply@example.com
+
+# Application Settings
+ENVIRONMENT=production
+API_LOG_LEVEL=info
+```
+
+### 📦 Step-by-Step Deployment
+
+#### 1. Login and Create Project
+
+```bash
+# Login to OpenShift
+oc login --token=<your-token> --server=<your-server>
+
+# Create project/namespace
+make create-project NAMESPACE=my-app
+```
+
+#### 2. Build and Push Images
+
+```bash
+# Login to container registry
+make login
+
+# Build all images
 make build-all
+
+# Push to registry
 make push-all
 
-# Deploy
-make deploy
+# Or do all at once
+make deploy-all MODE=keycloak NAMESPACE=my-app
 ```
 
-**OpenShift Management:**
+#### 3. Deploy Application
 
 ```bash
-make deploy           # Deploy to OpenShift
-make undeploy         # Remove deployment
-make status           # Check deployment status
-make logs-api         # View API logs
-make logs-ui          # View UI logs
+# Deploy with Keycloak authentication
+make deploy MODE=keycloak NAMESPACE=my-app
+
+# The deployment will:
+# 1. Create namespace (if needed)
+# 2. Deploy database with persistent storage
+# 3. Run migrations
+# 4. Deploy Keycloak Operator CRs
+# 5. Deploy API and UI services
+# 6. Configure Nginx reverse proxy
+# 7. Create OpenShift routes
+# 8. Sync database users to Keycloak
 ```
+
+#### 4. Access Application
+
+```bash
+# Get the route URL
+oc get route spending-monitor-nginx-route -n my-app
+
+# Or use make command
+make status NAMESPACE=my-app
+```
+
+### 🔍 Monitoring & Management
+
+**Check Status:**
+```bash
+make status NAMESPACE=my-app          # Show all resources
+oc get pods -n my-app                 # List pods
+oc get routes -n my-app               # Show routes
+```
+
+**View Logs:**
+```bash
+make logs-api NAMESPACE=my-app        # API logs
+make logs-ui NAMESPACE=my-app         # UI logs
+oc logs -f deployment/spending-monitor-api -n my-app
+```
+
+**Health Checks:**
+- Nginx: `https://<route>/health`
+- API: `https://<route>/api/health`
+- UI: `https://<route>/`
+
+**Update Deployment:**
+```bash
+# Rebuild and redeploy
+make build-all
+make push-all
+make deploy MODE=keycloak NAMESPACE=my-app
+
+# Or all at once
+make deploy-all NAMESPACE=my-app
+```
+
+**Undeploy:**
+```bash
+make undeploy NAMESPACE=my-app        # Remove Helm release
+make undeploy-all NAMESPACE=my-app    # Remove everything
+```
+
+### 📊 Scaling
+
+**Scale via Helm:**
+```bash
+helm upgrade spending-monitor ./deploy/helm/spending-monitor \
+  --namespace my-app \
+  --set api.replicas=3 \
+  --set ui.replicas=3
+```
+
+**Scale via oc:**
+```bash
+oc scale deployment/spending-monitor-api --replicas=3 -n my-app
+oc scale deployment/spending-monitor-ui --replicas=3 -n my-app
+```
+
+### 🔐 Security Best Practices
+
+1. **Use Strong Secrets:**
+   - Generate strong passwords: `openssl rand -base64 32`
+   - Never commit secrets to git
+   - Use OpenShift Secrets for sensitive data
+
+2. **Enable Authentication:**
+   - Always use `MODE=keycloak` for non-development environments
+   - Never use `MODE=noauth` in production
+
+3. **Network Security:**
+   - Routes are TLS-encrypted by default
+   - Configure network policies as needed
+   - Use service mesh for advanced security
+
+4. **Database Security:**
+   - Enable persistent storage for production
+   - Configure backups via OpenShift
+   - Restrict database access to internal cluster only
+
+### 🛠️ Makefile Commands Reference
+
+**Deployment:**
+```bash
+make deploy MODE=keycloak           # Deploy with Keycloak
+make deploy MODE=noauth             # Deploy without auth
+make deploy MODE=dev                # Deploy with reduced resources
+make undeploy                       # Remove deployment
+make deploy-all                     # Build, push, and deploy
+```
+
+**Building & Pushing:**
+```bash
+make build-all                      # Build all images
+make push-all                       # Push to registry
+make login                          # Login to registry
+```
+
+**Local Development:**
+```bash
+make build-run-local                # Build & run with Keycloak
+make build-run-local MODE=noauth    # Build & run without auth
+make run-local                      # Run with pre-built images
+make stop-local                     # Stop all services
+make reset-local                    # Reset with fresh data
+```
+
+**Management:**
+```bash
+make status                         # Show deployment status
+make logs-api                       # View API logs
+make logs-ui                        # View UI logs
+make create-project                 # Create OpenShift project
+```
+
+### 🐛 Troubleshooting
+
+**Pods not starting:**
+```bash
+# Check pod status
+oc get pods -n my-app
+
+# Check events
+oc get events -n my-app --sort-by='.lastTimestamp'
+
+# Describe problematic pod
+oc describe pod <pod-name> -n my-app
+```
+
+**Database connection issues:**
+```bash
+# Check database pod
+oc logs deployment/spending-monitor-database -n my-app
+
+# Test connection from API pod
+oc exec deployment/spending-monitor-api -n my-app -- \
+  psql -h spending-monitor-database -U postgres -d spending_monitor -c "SELECT 1"
+```
+
+**Keycloak authentication issues:**
+```bash
+# Check Keycloak pods
+oc get pods -l app=keycloak -n my-app
+
+# Verify realm configuration
+oc get keycloakrealm -n my-app
+oc describe keycloakrealm spending-monitor-realm -n my-app
+```
+
+**Image pull issues:**
+```bash
+# Check if images exist in registry
+podman search quay.io/rh-ai-quickstart/spending-monitor-api
+
+# Verify registry credentials
+oc get secrets -n my-app | grep pull
+```
+
+**Common Issues:**
+
+| Issue | Solution |
+|-------|----------|
+| `ImagePullBackOff` | Verify image exists in registry and credentials are correct |
+| `CrashLoopBackOff` | Check pod logs: `oc logs <pod-name>` |
+| Database connection timeout | Ensure database pod is ready before API starts |
+| Keycloak realm not created | Check Keycloak Operator is installed and running |
+| Route not accessible | Verify route exists: `oc get routes` |
+
+### 📚 Additional Resources
+
+**Helm Chart:**
+For advanced Helm configuration, see `deploy/helm/spending-monitor/values.yaml`
+
+**Keycloak Setup:**
+The Keycloak Operator is automatically configured. For manual setup, see `deploy/KEYCLOAK_OPERATOR.md`
+
+**Environment Variables:**
+See `env.example` for complete list of configuration options
 
 ## 🙌 Contributing
 
