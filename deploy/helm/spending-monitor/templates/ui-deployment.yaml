@@ -39,6 +39,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: BYPASS_AUTH
+            - name: VITE_BYPASS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: BYPASS_AUTH
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ENVIRONMENT
+            - name: VITE_ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ENVIRONMENT
             - name: KEYCLOAK_URL
               valueFrom:
                 secretKeyRef:
