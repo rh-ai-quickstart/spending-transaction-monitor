@@ -4,6 +4,32 @@
 
 This guide explains how to install and configure the Keycloak Operator for use with the Spending Transaction Monitor.
 
+## 📑 Table of Contents
+
+- [Prerequisites](#-prerequisites)
+- [Before You Deploy](#-before-you-deploy)
+- [Installation Methods](#-installation-methods)
+  - [Option 1: OpenShift OperatorHub (Recommended)](#option-1-openshift-operatorhub-recommended)
+  - [Option 2: Direct Installation (Kubernetes/OpenShift)](#option-2-direct-installation-kubernetesopenshift)
+- [Verify Installation](#-verify-installation)
+- [Deploy Keycloak with Helm Chart](#-deploy-keycloak-with-helm-chart)
+- [Check Deployment Status](#-check-deployment-status)
+- [Access Keycloak Admin Console](#-access-keycloak-admin-console)
+- [Update Application to Use Keycloak Route](#-update-application-to-use-keycloak-route)
+- [Troubleshooting](#️-troubleshooting)
+  - [Operator Not Installing](#operator-not-installing)
+  - [Keycloak Instance Not Starting](#keycloak-instance-not-starting)
+  - [Realm Not Importing](#realm-not-importing)
+  - [Application Can't Connect to Keycloak](#application-cant-connect-to-keycloak)
+- [Production Considerations](#-production-considerations)
+  - [1. Use External Database](#1-use-external-database)
+  - [2. Configure TLS](#2-configure-tls)
+  - [3. Scale Replicas](#3-scale-replicas)
+  - [4. Resource Tuning](#4-resource-tuning)
+- [Additional Resources](#-additional-resources)
+
+---
+
 ## 📋 Prerequisites
 
 - OpenShift 4.10+ or Kubernetes 1.24+
