@@ -14,12 +14,18 @@ from db.models import AlertNotification, AlertRule, CreditCard, Transaction, Use
 
 
 async def parse_datetime(date_str: str) -> datetime:
-    """Parse datetime string in ISO format"""
+    """Parse datetime string in ISO format and ensure it's timezone-aware"""
     try:
-        return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
     except ValueError:
         # Fallback for different formats
-        return datetime.fromisoformat(date_str)
+        dt = datetime.fromisoformat(date_str)
+
+    # Ensure the datetime is timezone-aware (assume UTC if naive)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+
+    return dt
 
 
 async def clear_existing_data(session) -> None:
