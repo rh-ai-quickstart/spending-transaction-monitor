@@ -79,6 +79,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: ALLOWED_ORIGINS
+            - name: ALLOWED_HOSTS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ALLOWED_HOSTS
             - name: SMTP_HOST
               valueFrom:
                 secretKeyRef:
