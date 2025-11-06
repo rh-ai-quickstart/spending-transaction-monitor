@@ -801,7 +801,7 @@ oc get secrets -n my-app | grep pull
 For advanced Helm configuration, see `deploy/helm/spending-monitor/values.yaml`
 
 **Keycloak Setup:**
-The Keycloak Operator is automatically configured. For manual setup, see `deploy/KEYCLOAK_OPERATOR.md`
+The Keycloak Operator is automatically configured. For manual setup, see `docs/KEYCLOAK_OPERATOR.md`
 
 **Environment Variables:**
 See `env.example` for complete list of configuration options

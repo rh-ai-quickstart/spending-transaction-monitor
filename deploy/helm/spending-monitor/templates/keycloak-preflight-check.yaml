@@ -53,7 +53,7 @@ spec:
             echo "   5. Wait for operator to be ready"
             echo ""
             echo "Or use CLI:"
-            echo "   See: deploy/KEYCLOAK_OPERATOR.md for detailed instructions"
+            echo "   See: docs/KEYCLOAK_OPERATOR.md for detailed instructions"
             echo ""
             exit 1
           fi

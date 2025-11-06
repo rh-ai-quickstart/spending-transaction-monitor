@@ -4,15 +4,6 @@
 
 This guide explains how to install and configure the Keycloak Operator for use with the Spending Transaction Monitor.
 
-## 🎯 Why Use the Keycloak Operator?
-
-The [Keycloak Operator](https://www.keycloak.org/guides#operator) provides:
-- ✅ **Production-ready** Keycloak management
-- ✅ **Automated** upgrades and backups
-- ✅ **High availability** configuration
-- ✅ **Custom Resource** based declarative management
-- ✅ **OpenShift integration** with automatic routes
-
 ## 📋 Prerequisites
 
 - OpenShift 4.10+ or Kubernetes 1.24+
@@ -325,31 +316,4 @@ spec:
 - [Keycloak on OpenShift](https://www.keycloak.org/getting-started/getting-started-openshift)
 - [Keycloak Operator GitHub](https://github.com/keycloak/keycloak-k8s-resources)
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
-
----
-
-## 🎉 Quick Start Summary
-
-```bash
-# 1. Install Keycloak Operator (if not installed)
-oc create namespace keycloak-operator
-# Install via OperatorHub UI or CLI subscription
-
-# 2. Deploy Spending Monitor with Keycloak
-make deploy MODE=keycloak NAMESPACE=sid-test
-
-# 3. Wait for Keycloak to be ready
-oc wait --for=condition=Ready keycloak/spending-monitor-keycloak -n sid-test --timeout=300s
-
-# 4. Get Keycloak URL
-oc get route -n sid-test | grep keycloak
-
-# 5. Update app with Keycloak URL if needed
-# (The helm chart uses internal service name by default)
-
-# 6. Access your application
-oc get route spending-monitor-nginx-route -n sid-test
-```
-
-**Note**: The Helm chart is pre-configured to use the internal Keycloak service URL (`http://spending-monitor-keycloak-service:8080`), which works automatically when Keycloak is deployed in the same namespace.
 

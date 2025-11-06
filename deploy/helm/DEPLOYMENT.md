@@ -153,5 +153,5 @@ helm template spending-monitor ./spending-monitor \
 ## 📚 Additional Resources
 
 - [Main README](../../README.md) - Complete deployment guide
-- [Keycloak Operator Setup](../KEYCLOAK_OPERATOR.md) - Keycloak installation
+- [Keycloak Operator Setup](../../docs/KEYCLOAK_OPERATOR.md) - Keycloak installation
 - [values.yaml](./spending-monitor/values.yaml) - All configuration options

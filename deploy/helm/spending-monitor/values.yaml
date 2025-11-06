@@ -154,7 +154,7 @@ nginx:
 # 
 # Installation:
 #   OpenShift: Operators → OperatorHub → Search "Keycloak"
-#   CLI: See deploy/KEYCLOAK_OPERATOR.md
+#   CLI: See docs/KEYCLOAK_OPERATOR.md
 #
 # The Helm chart includes a pre-flight check that will FAIL if operator is not installed.
 # This is intentional to ensure proper setup.
