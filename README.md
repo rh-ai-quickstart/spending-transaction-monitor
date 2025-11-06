@@ -482,6 +482,142 @@ make logs-api         # View API logs
 make logs-ui          # View UI logs
 ```
 
+### 📊 Scaling
+
+**Scale via Helm:**
+```bash
+helm upgrade spending-monitor ./deploy/helm/spending-monitor \
+  --namespace my-app \
+  --set api.replicas=3 \
+  --set ui.replicas=3
+```
+
+**Scale via oc:**
+```bash
+oc scale deployment/spending-monitor-api --replicas=3 -n my-app
+oc scale deployment/spending-monitor-ui --replicas=3 -n my-app
+```
+
+### 🔐 Security Best Practices
+
+1. **Use Strong Secrets:**
+   - Generate strong passwords: `openssl rand -base64 32`
+   - Never commit secrets to git
+   - Use OpenShift Secrets for sensitive data
+
+2. **Enable Authentication:**
+   - Always use `MODE=keycloak` for non-development environments
+   - Never use `MODE=noauth` in production
+
+3. **Network Security:**
+   - Routes are TLS-encrypted by default
+   - Configure network policies as needed
+   - Use service mesh for advanced security
+
+4. **Database Security:**
+   - Enable persistent storage for production
+   - Configure backups via OpenShift
+   - Restrict database access to internal cluster only
+
+### 🛠️ Makefile Commands Reference
+
+**Deployment:**
+```bash
+make deploy MODE=keycloak           # Deploy with Keycloak
+make deploy MODE=noauth             # Deploy without auth
+make deploy MODE=dev                # Deploy with reduced resources
+make undeploy                       # Remove deployment
+make deploy-all                     # Build, push, and deploy
+```
+
+**Building & Pushing:**
+```bash
+make build-all                      # Build all images
+make push-all                       # Push to registry
+make login                          # Login to registry
+```
+
+**Local Development:**
+```bash
+make build-run-local                # Build & run with Keycloak
+make build-run-local MODE=noauth    # Build & run without auth
+make run-local                      # Run with pre-built images
+make stop-local                     # Stop all services
+make reset-local                    # Reset with fresh data
+```
+
+**Management:**
+```bash
+make status                         # Show deployment status
+make logs-api                       # View API logs
+make logs-ui                        # View UI logs
+make create-project                 # Create OpenShift project
+```
+
+### 🐛 Troubleshooting
+
+**Pods not starting:**
+```bash
+# Check pod status
+oc get pods -n my-app
+
+# Check events
+oc get events -n my-app --sort-by='.lastTimestamp'
+
+# Describe problematic pod
+oc describe pod <pod-name> -n my-app
+```
+
+**Database connection issues:**
+```bash
+# Check database pod
+oc logs deployment/spending-monitor-database -n my-app
+
+# Test connection from API pod
+oc exec deployment/spending-monitor-api -n my-app -- \
+  psql -h spending-monitor-database -U postgres -d spending_monitor -c "SELECT 1"
+```
+
+**Keycloak authentication issues:**
+```bash
+# Check Keycloak pods
+oc get pods -l app=keycloak -n my-app
+
+# Verify realm configuration
+oc get keycloakrealm -n my-app
+oc describe keycloakrealm spending-monitor-realm -n my-app
+```
+
+**Image pull issues:**
+```bash
+# Check if images exist in registry
+podman search quay.io/rh-ai-quickstart/spending-monitor-api
+
+# Verify registry credentials
+oc get secrets -n my-app | grep pull
+```
+
+**Common Issues:**
+
+| Issue | Solution |
+|-------|----------|
+| `ImagePullBackOff` | Verify image exists in registry and credentials are correct |
+| `CrashLoopBackOff` | Check pod logs: `oc logs <pod-name>` |
+| Database connection timeout | Ensure database pod is ready before API starts |
+| Keycloak realm not created | Check Keycloak Operator is installed and running |
+| Route not accessible | Verify route exists: `oc get routes` |
+
+### 📚 Additional Resources
+
+**Helm Chart:**
+For advanced Helm configuration, see `deploy/helm/spending-monitor/values.yaml`
+
+**Keycloak Setup:**
+The Keycloak Operator is automatically configured. For manual setup, see `docs/KEYCLOAK_OPERATOR.md`
+
+**Environment Variables:**
+See `env.example` for complete list of configuration options
+
 ## 🙌 Contributing
 
 Contributions are welcome! Please fork the repo and submit a PR.  
