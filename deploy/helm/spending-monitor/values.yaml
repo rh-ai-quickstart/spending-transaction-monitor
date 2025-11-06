@@ -41,8 +41,8 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: postgres
-    tag: 16-alpine
+    repository: pgvector/pgvector
+    tag: pg16
   service:
     type: ClusterIP
     port: 5432
@@ -70,10 +70,10 @@ migration:
   ttlSecondsAfterFinished: 86400  # 24 hours
   resources:
     requests:
-      memory: "512Mi"
+      memory: "1Gi"
       cpu: "250m"
     limits:
-      memory: "1Gi"
+      memory: "2Gi"  # Increased from 1Gi to accommodate torch/sentence-transformers
       cpu: "1000m"
 
 # API configuration
@@ -125,8 +125,11 @@ ui:
     periodSeconds: 10
 
 # Nginx reverse proxy configuration
+# NOTE: When deploying on OpenShift, it's recommended to disable nginx
+# and use native OpenShift Routes for path-based routing instead.
+# Set enabled: false to use the 2-route approach (UI + API routes)
 nginx:
-  enabled: true
+  enabled: false
   name: spending-monitor-nginx
   image:
     repository: nginx
@@ -152,22 +155,28 @@ nginx:
 routes:
   enabled: true
   annotations: {}
+  # Shared hostname for all routes (REQUIRED for nginx.enabled=false)
+  # IMPORTANT: All routes must use the same hostname for path-based routing
+  # Format: spending-monitor-<namespace>.apps.<cluster-domain>
+  # Example: spending-monitor-my-namespace.apps.my-cluster.com
+  sharedHost: ""  # Set custom hostname or leave empty (will use ui.host fallback)
   # nginx route configuration (when nginx.enabled=true)
   nginx:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Leave empty to auto-generate hostname
     tls:
       enabled: true
       termination: edge
       insecureEdgeTerminationPolicy: Redirect
-  # Legacy routes configuration (when nginx.enabled=false)
+  # Direct routes configuration (when nginx.enabled=false)
+  # NOTE: When using direct routes, set routes.sharedHost for all routes
   ui:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Used as fallback if sharedHost is empty
     tls:
       enabled: true
       termination: edge
       insecureEdgeTerminationPolicy: Redirect
   api:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Ignored - uses sharedHost or ui.host
     tls:
       enabled: true
       termination: edge
