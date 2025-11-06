@@ -41,7 +41,7 @@ def parse_alert_node(state):
     """Parse alert text to SQL query"""
     return {
         **state,
-        'sql_query': parse_alert_to_sql_with_context(
+        'sql_query': parse_alert_to_sql_with_context.invoke(
             {
                 'transaction': state['transaction'],
                 'alert_text': state['alert_text'],
@@ -53,7 +53,7 @@ def parse_alert_node(state):
 
 def execute_sql_node(state):
     """Execute SQL query to validate it works"""
-    return {**state, 'query_result': execute_sql(state['sql_query'])}
+    return {**state, 'query_result': execute_sql.invoke(state['sql_query'])}
 
 
 def validate_sql_node(state):
