@@ -16,6 +16,8 @@ export class ApiClient {
   // Static method to set token from auth context
   private static currentToken: string | null = null;
   private static onAuthError?: () => void;
+  // Static method to set user email for bypass auth mode
+  private static currentUserEmail: string | null = null;
 
   static setToken(token: string | null) {
     ApiClient.currentToken = token;
@@ -23,6 +25,10 @@ export class ApiClient {
 
   static setAuthErrorHandler(handler: () => void) {
     ApiClient.onAuthError = handler;
+  }
+
+  static setUserEmail(email: string | null) {
+    ApiClient.currentUserEmail = email;
   }
 
   constructor(config: ApiClientConfig = {}) {
@@ -118,6 +124,11 @@ export class ApiClient {
     const token = this.getToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Add test user email header for bypass auth mode
+    if (ApiClient.currentUserEmail) {
+      headers['X-Test-User-Email'] = ApiClient.currentUserEmail;
     }
 
     // Add location headers if enabled

@@ -25,12 +25,10 @@ graph.add_node(
     RunnableLambda(
         lambda state: {
             **state,
-            'sql_query': parse_alert_to_sql_with_context(
-                {
-                    'transaction': state['transaction'],
-                    'alert_text': state['alert_text'],
-                    'alert_rule': state['alert_rule'],
-                }
+            'sql_query': parse_alert_to_sql_with_context.func(
+                state['transaction'],
+                state['alert_text'],
+                state['alert_rule'],
             ),
         }
     ),
@@ -52,7 +50,7 @@ graph.add_node(
 graph.add_node(
     'execute_sql',
     RunnableLambda(
-        lambda state: {**state, 'query_result': execute_sql(state['sql_query'])}
+        lambda state: {**state, 'query_result': execute_sql.func(state['sql_query'])}
     ),
 )
 

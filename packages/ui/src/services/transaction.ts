@@ -25,13 +25,18 @@ export class TransactionService {
   static async getRecentTransactions(
     page = 1,
     limit = 10,
+    userId?: string,
   ): Promise<{
     transactions: Transaction[];
     total: number;
     page: number;
     totalPages: number;
   }> {
-    const response = await apiClient.fetch('/api/transactions/');
+    // Build URL with user_id filter if provided
+    const url = userId
+      ? `/api/transactions/?user_id=${userId}&limit=500`
+      : '/api/transactions/?limit=500';
+    const response = await apiClient.fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch transactions');
     }
@@ -235,6 +240,16 @@ export class TransactionService {
     userId: string,
   ): Promise<Transaction> {
     // Transform form data to backend API format
+    // Create transaction_date: use selected date but with current time (not midnight)
+    const selectedDate = new Date(formData.date);
+    const now = new Date();
+    selectedDate.setHours(
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    );
+
     const backendPayload = {
       id: globalThis.crypto.randomUUID(), // Generate client-side ID
       user_id: userId,
@@ -244,7 +259,7 @@ export class TransactionService {
       description: formData.description,
       merchant_name: formData.merchant || 'Unknown Merchant',
       merchant_category: formData.category,
-      transaction_date: new Date(formData.date).toISOString(),
+      transaction_date: selectedDate.toISOString(),
       transaction_type: formData.type === 'credit' ? 'REFUND' : 'PURCHASE',
       status: 'PENDING',
       // Optional fields

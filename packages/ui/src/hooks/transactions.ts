@@ -6,9 +6,12 @@ import { useAuth } from './useAuth';
 
 // Transaction hooks
 export const useRecentTransactions = (page = 1, limit = 10) => {
+  const auth = useAuth();
+
   return useQuery({
-    queryKey: ['transactions', 'recent', page, limit],
-    queryFn: () => TransactionService.getRecentTransactions(page, limit),
+    queryKey: ['transactions', 'recent', page, limit, auth.user?.id],
+    queryFn: () => TransactionService.getRecentTransactions(page, limit, auth.user?.id),
+    enabled: !!auth.user?.id,
   });
 };
 

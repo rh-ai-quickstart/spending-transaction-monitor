@@ -9,10 +9,6 @@ services:
     container_name: postgres
     env_file:
       - .env.development
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-spending-monitor}
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -54,9 +50,6 @@ services:
     platform: linux/amd64
     container_name: spending-monitor-keycloak-setup
     working_dir: /app
-    environment:
-      - KEYCLOAK_URL=http://keycloak:8080
-      - DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/spending-monitor
     volumes:
       - ./packages/auth/scripts:/app/scripts
       - ./data:/app/data
@@ -113,30 +106,8 @@ services:
     container_name: spending-monitor-api
     env_file:
       - .env.development
-    environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://user:password@postgres:5432/spending-monitor}
-      - SMTP_HOST=${SMTP_HOST:-smtp4dev}
-      - SMTP_PORT=${SMTP_PORT:-25}
-      - SMTP_USERNAME=${SMTP_USERNAME:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-spending-monitor@localhost}
-      - SMTP_USE_TLS=${SMTP_USE_TLS:-false}
-      - SMTP_USE_SSL=${SMTP_USE_SSL:-false}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - BYPASS_AUTH=${BYPASS_AUTH:-false}
-      - API_PORT=${API_PORT:-8000}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-http://localhost:5173}
-      - BASE_URL=${BASE_URL:-https://api.openai.com/v1}
-      - API_KEY=${API_KEY:-your-openai-api-key-here}
-      - MODEL=${MODEL:-gpt-3.5-turbo}
-      - LLAMASTACK_BASE_URL=${LLAMASTACK_BASE_URL:-http://llamastack:8321}
-      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
-      - NODE_ENV=${NODE_ENV:-development}
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-spending-monitor}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-spending-monitor}
+
+
     ports:
       - "8000:8000"
     depends_on:
@@ -165,13 +136,6 @@ services:
       - api
     networks:
       - spending-monitor
-    environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
-      - VITE_BYPASS_AUTH=${VITE_BYPASS_AUTH:-false}
-      - VITE_ENVIRONMENT=${VITE_ENVIRONMENT:-staging}
-      # UI needs public Keycloak URL (accessible from browser), not internal container hostname
-      - VITE_KEYCLOAK_URL=${VITE_KEYCLOAK_URL:-http://localhost:8080/realms/spending-monitor}
-      - VITE_KEYCLOAK_CLIENT_ID=${VITE_KEYCLOAK_CLIENT_ID:-spending-monitor}
 
   # Nginx reverse proxy to serve UI and proxy API
   nginx:

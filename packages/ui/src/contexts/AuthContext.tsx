@@ -34,6 +34,7 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
       console.log('🔓 Dev mode: logout() called - staying authenticated');
     }
     clearStoredLocation(); // Clear location data on logout (frontend cleanup)
+    ApiClient.setUserEmail(null); // Clear user email
     // Note: Location clearing also handled by backend on logout
     // No-op in dev mode since user stays authenticated
   }, []);
@@ -64,6 +65,9 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
           };
           setUser(devUser);
 
+          // Set user email in ApiClient for bypass auth mode
+          ApiClient.setUserEmail(devUser.email);
+
           if (import.meta.env.DEV) {
             console.log('🔓 Dev mode: Loaded user from API:', {
               id: devUser.id,
@@ -74,12 +78,14 @@ const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode })
           // Fallback to hardcoded DEV_USER if API fails
           console.warn('Failed to fetch user from API, using fallback DEV_USER');
           setUser(DEV_USER);
+          ApiClient.setUserEmail(DEV_USER.email);
         }
       } catch (err) {
         console.error('Error fetching dev user:', err);
         setError(new Error('Failed to load user'));
         // Fallback to hardcoded DEV_USER
         setUser(DEV_USER);
+        ApiClient.setUserEmail(DEV_USER.email);
       } finally {
         setIsLoading(false);
       }
