@@ -241,9 +241,13 @@ export class TransactionService {
   ): Promise<Transaction> {
     // Transform form data to backend API format
     // Create transaction_date: use selected date but with current time (not midnight)
-    const selectedDate = new Date(formData.date);
+    // Parse date in local timezone to avoid timezone conversion issues
+    const [year, month, day] = formData.date.split('-').map(Number);
     const now = new Date();
-    selectedDate.setHours(
+    const selectedDate = new Date(
+      year,
+      month - 1, // JavaScript months are 0-indexed
+      day,
       now.getHours(),
       now.getMinutes(),
       now.getSeconds(),

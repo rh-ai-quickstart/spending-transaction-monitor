@@ -337,17 +337,27 @@ async def get_current_user(
         f'📋 get_current_user called - Credentials: {"Present" if credentials else "None"}, BYPASS_AUTH: {settings.BYPASS_AUTH}'
     )
 
-    # Development bypass - check for test user header first
+    # Development bypass - always use u-001 (first user)
     if settings.BYPASS_AUTH:
-        logger.info('🔓 Authentication bypassed - development mode enabled')
+        logger.info('🔓 Authentication bypassed - using u-001 (first user)')
 
-        # NEW: Check for test user header (only if request is available)
-        if request is not None:
-            test_user_email = request.headers.get('X-Test-User-Email')
-            if test_user_email:
-                return await get_test_user(test_user_email, session)
+        # In bypass mode, always return u-001 for consistency
+        if session and User:
+            try:
+                result = await session.execute(select(User).where(User.id == 'u-001'))
+                db_user = result.scalar_one_or_none()
 
-        # Fallback to current behavior (first user or mock)
+                if db_user:
+                    logger.info(f'✅ Using u-001: {db_user.email}')
+                    return create_user_context(db_user, is_dev_mode=True)
+                else:
+                    logger.warning('⚠️ u-001 not found, using first user')
+                    return await get_dev_fallback_user(session)
+            except Exception as e:
+                logger.error(f'Error fetching u-001: {e}')
+                return await get_dev_fallback_user(session)
+
+        # Fallback if database unavailable
         return await get_dev_fallback_user(session)
 
     if not credentials:
@@ -439,20 +449,45 @@ async def require_authentication(
     else:
         logger.info('🔐 require_authentication called (no request object)')
 
-    # Development bypass - check for test user header first
+    # Development bypass - always use u-001 (first user)
     if settings.BYPASS_AUTH:
-        logger.info('🔓 Authentication bypassed - development mode enabled')
+        logger.info('🔓 Authentication bypassed - using u-001 (first user)')
 
-        # NEW: Check for test user header (only if request is available)
-        if request is not None:
-            test_user_email = request.headers.get('X-Test-User-Email')
-            if test_user_email:
-                return await get_test_user(test_user_email, session)
-            else:
-                return await get_dev_fallback_user(session)
+        # In bypass mode, always return u-001 for consistency
+        if session and User:
+            try:
+                result = await session.execute(select(User).where(User.id == 'u-001'))
+                db_user = result.scalar_one_or_none()
 
-        # Fallback to current behavior (first user or mock)
-        return await get_dev_fallback_user(session)
+                if db_user:
+                    logger.info(f'✅ Using u-001: {db_user.email}')
+                    user_context = create_user_context(db_user, is_dev_mode=True)
+                    # Capture location on authentication
+                    if request:
+                        await _capture_user_location_safe(
+                            request, user_context, session
+                        )
+                    return user_context
+                else:
+                    logger.warning('⚠️ u-001 not found, using first user')
+                    user_context = await get_dev_fallback_user(session)
+                    if request:
+                        await _capture_user_location_safe(
+                            request, user_context, session
+                        )
+                    return user_context
+            except Exception as e:
+                logger.error(f'Error fetching u-001: {e}')
+                user_context = await get_dev_fallback_user(session)
+                if request:
+                    await _capture_user_location_safe(request, user_context, session)
+                return user_context
+
+        # Fallback if database unavailable
+        user_context = await get_dev_fallback_user(session)
+        if request:
+            await _capture_user_location_safe(request, user_context, session)
+        return user_context
 
     if not credentials:
         logger.error('❌ No credentials provided - returning 401')

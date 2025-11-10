@@ -50,6 +50,8 @@ services:
     platform: linux/amd64
     container_name: spending-monitor-keycloak-setup
     working_dir: /app
+    env_file:
+      - .env.development
     volumes:
       - ./packages/auth/scripts:/app/scripts
       - ./data:/app/data
@@ -62,7 +64,7 @@ services:
         echo 'Keycloak port is open, waiting 20 more seconds for full startup...' &&
         sleep 20 &&
         pip install --quiet requests sqlalchemy asyncpg psycopg2-binary pyyaml &&
-        python /app/scripts/setup_keycloak.py
+        python /app/scripts/setup_keycloak_with_db_users.py
       "
     depends_on:
       - keycloak

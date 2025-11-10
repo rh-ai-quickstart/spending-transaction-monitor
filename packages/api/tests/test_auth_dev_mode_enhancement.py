@@ -30,36 +30,37 @@ class TestHeaderBasedUserSelection:
         self.mock_user.email = 'testuser@example.com'
 
     @pytest.mark.asyncio
-    async def test_get_current_user_with_test_header_valid_user(self):
-        """Test that get_current_user uses header-specified user when valid"""
-        # Setup
-        self.mock_request.headers.get.return_value = 'testuser@example.com'
+    async def test_get_current_user_always_returns_u001(self):
+        """Test that get_current_user always returns u-001 in bypass mode"""
+        # Setup - mock u-001 user
+        mock_u001 = Mock()
+        mock_u001.id = 'u-001'
+        mock_u001.email = 'monica.cohen@example.com'
+
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_u001
+        self.mock_session.execute.return_value = mock_result
+
+        mock_user_class = Mock()
+        mock_user_class.id = Mock()
 
         with (
             patch('src.auth.middleware.settings') as mock_settings,
-            patch('src.auth.middleware.get_test_user') as mock_get_test_user,
+            patch('src.auth.middleware.User', mock_user_class),
+            patch('src.auth.middleware.select') as mock_select,
         ):
             mock_settings.BYPASS_AUTH = True
-            expected_user = {
-                'id': 'user-123',
-                'email': 'testuser@example.com',
-                'username': 'testuser',
-                'roles': ['user', 'admin'],
-                'is_dev_mode': True,
-            }
-            mock_get_test_user.return_value = expected_user
+            mock_select.return_value.where.return_value = Mock()
 
             # Execute
             user = await get_current_user(
                 credentials=None, session=self.mock_session, request=self.mock_request
             )
 
-            # Assert
-            assert user == expected_user
-            mock_get_test_user.assert_called_once_with(
-                'testuser@example.com', self.mock_session
-            )
-            self.mock_request.headers.get.assert_called_once_with('X-Test-User-Email')
+            # Assert - should always return u-001
+            assert user['id'] == 'u-001'
+            assert user['email'] == 'monica.cohen@example.com'
+            assert user['is_dev_mode'] is True
 
     @pytest.mark.asyncio
     async def test_get_current_user_without_test_header_fallback(self):
@@ -89,35 +90,47 @@ class TestHeaderBasedUserSelection:
             mock_fallback.assert_called_once_with(self.mock_session)
 
     @pytest.mark.asyncio
-    async def test_require_authentication_with_test_header(self):
-        """Test that require_authentication uses header-specified user"""
-        # Setup
-        self.mock_request.headers.get.return_value = 'admin@example.com'
+    async def test_require_authentication_always_returns_u001(self):
+        """Test that require_authentication always returns u-001 in bypass mode"""
+        # Setup - mock u-001 user
+        mock_u001 = Mock()
+        mock_u001.id = 'u-001'
+        mock_u001.email = 'monica.cohen@example.com'
+
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_u001
+        self.mock_session.execute.return_value = mock_result
+
+        mock_user_class = Mock()
+        mock_user_class.id = Mock()
+
+        # Create async mock for location capture
+        mock_capture = AsyncMock()
+
+        # Mock request properly to avoid subscript errors
+        mock_request = Mock(spec=Request)
+        mock_request.method = 'GET'
+        mock_request.url.path = '/test'
+        mock_request.headers.get.return_value = 'NOT PRESENT'
 
         with (
             patch('src.auth.middleware.settings') as mock_settings,
-            patch('src.auth.middleware.get_test_user') as mock_get_test_user,
+            patch('src.auth.middleware.User', mock_user_class),
+            patch('src.auth.middleware.select') as mock_select,
+            patch('src.auth.middleware._capture_user_location_safe', mock_capture),
         ):
             mock_settings.BYPASS_AUTH = True
-            expected_user = {
-                'id': 'admin-456',
-                'email': 'admin@example.com',
-                'username': 'admin',
-                'roles': ['user', 'admin'],
-                'is_dev_mode': True,
-            }
-            mock_get_test_user.return_value = expected_user
+            mock_select.return_value.where.return_value = Mock()
 
             # Execute
             user = await require_authentication(
-                credentials=None, session=self.mock_session, request=self.mock_request
+                credentials=None, session=self.mock_session, request=mock_request
             )
 
-            # Assert
-            assert user == expected_user
-            mock_get_test_user.assert_called_once_with(
-                'admin@example.com', self.mock_session
-            )
+            # Assert - should always return u-001
+            assert user['id'] == 'u-001'
+            assert user['email'] == 'monica.cohen@example.com'
+            assert user['is_dev_mode'] is True
 
     @pytest.mark.asyncio
     async def test_production_mode_ignores_test_header(self):
@@ -367,23 +380,20 @@ class TestIntegrationScenarios:
         self.mock_session = AsyncMock()
 
     @pytest.mark.asyncio
-    async def test_complete_header_flow_with_existing_user(self):
-        """Test complete flow from header to user context with real database user"""
-        # Setup - simulate request with test header
-        self.mock_request.headers.get.return_value = 'alice@example.com'
-
-        # Mock database user
-        mock_alice = Mock()
-        mock_alice.id = 'alice-456'
-        mock_alice.email = 'alice@example.com'
+    async def test_complete_flow_always_returns_u001(self):
+        """Test complete flow always returns u-001 with proper context"""
+        # Mock u-001 database user
+        mock_u001 = Mock()
+        mock_u001.id = 'u-001'
+        mock_u001.email = 'monica.cohen@example.com'
 
         mock_result = Mock()
-        mock_result.scalar_one_or_none.return_value = mock_alice
+        mock_result.scalar_one_or_none.return_value = mock_u001
         self.mock_session.execute.return_value = mock_result
 
         # Mock the User class and the select operation
         mock_user_class = Mock()
-        mock_user_class.email = Mock()
+        mock_user_class.id = Mock()
 
         with (
             patch('src.auth.middleware.settings') as mock_settings,
@@ -398,45 +408,50 @@ class TestIntegrationScenarios:
                 credentials=None, session=self.mock_session, request=self.mock_request
             )
 
-            # Assert complete user context
-            assert user['id'] == 'alice-456'
-            assert user['email'] == 'alice@example.com'
-            assert user['username'] == 'alice'
+            # Assert complete user context for u-001
+            assert user['id'] == 'u-001'
+            assert user['email'] == 'monica.cohen@example.com'
+            assert user['username'] == 'monica.cohen'
             assert user['roles'] == ['user', 'admin']
             assert user['is_dev_mode'] is True
             assert 'token_claims' in user
-            assert user['token_claims']['sub'] == 'alice-456'
-            assert user['token_claims']['email'] == 'alice@example.com'
+            assert user['token_claims']['sub'] == 'u-001'
+            assert user['token_claims']['email'] == 'monica.cohen@example.com'
 
     @pytest.mark.asyncio
-    async def test_error_handling_invalid_user_with_header(self):
-        """Test error handling when header specifies non-existent user"""
-        # Setup
-        self.mock_request.headers.get.return_value = 'nonexistent@example.com'
-
+    async def test_fallback_when_u001_not_found(self):
+        """Test fallback behavior when u-001 is not found in database"""
+        # Setup - u-001 doesn't exist, should fall back
         mock_result = Mock()
         mock_result.scalar_one_or_none.return_value = None
         self.mock_session.execute.return_value = mock_result
 
         # Mock the User class and the select operation
         mock_user_class = Mock()
-        mock_user_class.email = Mock()
+        mock_user_class.id = Mock()
 
         with (
             patch('src.auth.middleware.settings') as mock_settings,
             patch('src.auth.middleware.User', mock_user_class),
             patch('src.auth.middleware.select') as mock_select,
+            patch('src.auth.middleware.get_dev_fallback_user') as mock_fallback,
         ):
             mock_settings.BYPASS_AUTH = True
             mock_select.return_value.where.return_value = Mock()
+            expected_fallback = {
+                'id': 'dev-user-123',
+                'email': 'developer@example.com',
+                'is_dev_mode': True,
+            }
+            mock_fallback.return_value = expected_fallback
 
-            # Execute & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                await get_current_user(
-                    credentials=None,
-                    session=self.mock_session,
-                    request=self.mock_request,
-                )
+            # Execute - should not raise, should fallback
+            user = await get_current_user(
+                credentials=None,
+                session=self.mock_session,
+                request=self.mock_request,
+            )
 
-            assert exc_info.value.status_code == 400
-            assert 'nonexistent@example.com' in str(exc_info.value.detail)
+            # Assert - should use fallback user
+            assert user == expected_fallback
+            mock_fallback.assert_called_once()

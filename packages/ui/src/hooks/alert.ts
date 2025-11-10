@@ -5,20 +5,29 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertService } from '../services/alert';
+import { useAuth } from './useAuth';
 
 // Alert hooks
 export const useAlerts = () => {
+  const auth = useAuth();
+
   return useQuery({
-    queryKey: ['alerts'],
+    queryKey: ['alerts', auth.user?.id],
     queryFn: () => AlertService.getAlerts(),
     refetchInterval: 60000, // Refetch every minute
+    enabled: !!auth.user?.id,
+    staleTime: 0, // Always fetch fresh data, don't use stale cache
   });
 };
 
 export const useAlertRules = () => {
+  const auth = useAuth();
+
   return useQuery({
-    queryKey: ['alertRules'],
+    queryKey: ['alertRules', auth.user?.id],
     queryFn: () => AlertService.getAlertRules(),
+    enabled: !!auth.user?.id,
+    staleTime: 0, // Always fetch fresh data, don't use stale cache
   });
 };
 
