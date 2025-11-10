@@ -38,6 +38,15 @@ function Index() {
   };
 
   const calculateChange = (current: number, previous: number) => {
+    // Handle division by zero
+    if (previous === 0) {
+      if (current === 0) {
+        return { value: '0.0', isPositive: true };
+      }
+      // If previous was 0 and current is not, show as 100% increase
+      return { value: '100.0', isPositive: true };
+    }
+
     const change = ((current - previous) / previous) * 100;
     return {
       value: Math.abs(change).toFixed(1),
