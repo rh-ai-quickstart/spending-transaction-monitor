@@ -310,17 +310,18 @@ async def get_dev_fallback_user(session: AsyncSession) -> dict:
             )
 
     # Fallback to mock user if database unavailable or no users found
-    logger.info('🔓 DEV MODE: Using mock fallback user')
+    # Use u-001 as it's the first user in sample data
+    logger.info('🔓 DEV MODE: Using hardcoded fallback user (u-001)')
     return {
-        'id': 'dev-user-123',
-        'email': 'developer@example.com',
-        'username': 'developer',
+        'id': 'u-001',
+        'email': 'monica.cohen@example.com',
+        'username': 'monica.cohen',
         'roles': ['user', 'admin'],
         'is_dev_mode': True,
         'token_claims': {
-            'sub': 'dev-user-123',
-            'preferred_username': 'developer',
-            'email': 'developer@example.com',
+            'sub': 'u-001',
+            'preferred_username': 'monica.cohen',
+            'email': 'monica.cohen@example.com',
             'realm_access': {'roles': ['user', 'admin']},
         },
     }

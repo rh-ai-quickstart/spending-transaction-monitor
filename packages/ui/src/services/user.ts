@@ -121,39 +121,24 @@ export const currentUserService = {
 
   // Initialize demo user (temporary until proper auth is implemented)
   async initializeDemoUser(): Promise<CurrentUser> {
-    let user = this.getCurrentUser();
+    let user: CurrentUser | null = null;
 
-    if (!user) {
-      // Try to get the current user from the API (returns first user as demo)
-      try {
-        const apiUser = await userService.getCurrentUser();
-        if (apiUser) {
-          user = {
-            id: apiUser.id,
-            firstName: apiUser.first_name,
-            lastName: apiUser.last_name,
-            email: apiUser.email,
-            phone: apiUser.phone_number,
-            fullName: `${apiUser.first_name} ${apiUser.last_name}`,
-          };
-          this.setCurrentUser(user);
-        } else {
-          // Fallback demo user if no users in API
-          user = {
-            id: 'u-merchant-high-001',
-            firstName: 'Alex',
-            lastName: 'Thompson',
-            email: 'alex.thompson@example.com',
-            fullName: 'Alex Thompson',
-          };
-          this.setCurrentUser(user);
-        }
-      } catch (error) {
-        console.warn(
-          'Failed to fetch current user from API, using fallback demo user:',
-          error,
-        );
-        // Fallback demo user
+    // ALWAYS fetch the current user from the API to ensure consistency with backend auth
+    // This prevents stale user data from localStorage when user changes on backend
+    try {
+      const apiUser = await userService.getCurrentUser();
+      if (apiUser) {
+        user = {
+          id: apiUser.id,
+          firstName: apiUser.first_name,
+          lastName: apiUser.last_name,
+          email: apiUser.email,
+          phone: apiUser.phone_number,
+          fullName: `${apiUser.first_name} ${apiUser.last_name}`,
+        };
+        this.setCurrentUser(user);
+      } else {
+        // Fallback demo user if no users in API
         user = {
           id: 'u-merchant-high-001',
           firstName: 'Alex',
@@ -163,6 +148,20 @@ export const currentUserService = {
         };
         this.setCurrentUser(user);
       }
+    } catch (error) {
+      console.warn(
+        'Failed to fetch current user from API, using fallback demo user:',
+        error,
+      );
+      // Fallback demo user
+      user = {
+        id: 'u-merchant-high-001',
+        firstName: 'Alex',
+        lastName: 'Thompson',
+        email: 'alex.thompson@example.com',
+        fullName: 'Alex Thompson',
+      };
+      this.setCurrentUser(user);
     }
 
     return user;

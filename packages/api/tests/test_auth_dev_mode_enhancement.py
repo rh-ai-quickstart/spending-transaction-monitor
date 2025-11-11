@@ -73,8 +73,8 @@ class TestHeaderBasedUserSelection:
         ):
             mock_settings.BYPASS_AUTH = True
             expected_user = {
-                'id': 'dev-user-123',
-                'email': 'developer@example.com',
+                'id': 'u-001',
+                'email': 'monica.cohen@example.com',
                 'is_dev_mode': True,
             }
             mock_fallback.return_value = expected_user
@@ -326,9 +326,9 @@ class TestGetDevFallbackUser:
             result = await get_dev_fallback_user(self.mock_session)
 
             # Assert
-            assert result['id'] == 'dev-user-123'
-            assert result['email'] == 'developer@example.com'
-            assert result['username'] == 'developer'
+            assert result['id'] == 'u-001'
+            assert result['email'] == 'monica.cohen@example.com'
+            assert result['username'] == 'monica.cohen'
             assert result['is_dev_mode'] is True
 
     @pytest.mark.asyncio
@@ -338,9 +338,9 @@ class TestGetDevFallbackUser:
         result = await get_dev_fallback_user(None)
 
         # Assert
-        assert result['id'] == 'dev-user-123'
-        assert result['email'] == 'developer@example.com'
-        assert result['username'] == 'developer'
+        assert result['id'] == 'u-001'
+        assert result['email'] == 'monica.cohen@example.com'
+        assert result['username'] == 'monica.cohen'
         assert result['is_dev_mode'] is True
 
     @pytest.mark.asyncio
@@ -354,8 +354,8 @@ class TestGetDevFallbackUser:
             result = await get_dev_fallback_user(self.mock_session)
 
             # Assert
-            assert result['id'] == 'dev-user-123'
-            assert result['email'] == 'developer@example.com'
+            assert result['id'] == 'u-001'
+            assert result['email'] == 'monica.cohen@example.com'
             assert result['is_dev_mode'] is True
 
 

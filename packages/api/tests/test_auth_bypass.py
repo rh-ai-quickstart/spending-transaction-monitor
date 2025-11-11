@@ -77,9 +77,9 @@ class TestAuthBypass:
             user = await require_authentication(credentials=None)
 
             assert user is not None
-            assert user['id'] == 'dev-user-123'
-            assert user['email'] == 'developer@example.com'
-            assert user['username'] == 'developer'
+            assert user['id'] == 'u-001'
+            assert user['email'] == 'monica.cohen@example.com'
+            assert user['username'] == 'monica.cohen'
             assert user['roles'] == ['user', 'admin']
             assert user['is_dev_mode'] is True
 
@@ -92,7 +92,7 @@ class TestAuthBypass:
             user = await get_current_user(credentials=None)
 
             assert user is not None
-            assert user['id'] == 'dev-user-123'
+            assert user['id'] == 'u-001'
             assert user['is_dev_mode'] is True
 
     @pytest.mark.asyncio

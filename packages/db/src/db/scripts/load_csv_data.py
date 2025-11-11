@@ -16,12 +16,18 @@ from db.models import AlertNotification, AlertRule, CreditCard, Transaction, Use
 async def parse_datetime(date_str: str) -> datetime:
     """Parse datetime string in ISO format and ensure it's timezone-aware"""
     try:
+        # Handle both formats: with 'Z' and without timezone info
         dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
     except ValueError:
         # Fallback for different formats
-        dt = datetime.fromisoformat(date_str)
+        try:
+            dt = datetime.fromisoformat(date_str)
+        except ValueError:
+            # Last resort: try parsing as basic datetime
+            dt = datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S')
 
-    # Ensure the datetime is timezone-aware (assume UTC if naive)
+    # CRITICAL: Ensure the datetime is timezone-aware (assume UTC if naive)
+    # This prevents "can't subtract offset-naive and offset-aware datetimes" errors
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
 
