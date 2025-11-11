@@ -289,10 +289,10 @@ async def get_test_user(email: str, session: AsyncSession) -> dict:
 
 async def get_dev_fallback_user(session: AsyncSession) -> dict:
     """Get fallback dev user (first user or mock) - current behavior"""
-    # Try to get first user from database
+    # Try to get first user from database (ordered by ID for consistency)
     if session and User:
         try:
-            result = await session.execute(select(User).limit(1))
+            result = await session.execute(select(User).order_by(User.id).limit(1))
             db_user = result.scalar_one_or_none()
 
             if db_user:
