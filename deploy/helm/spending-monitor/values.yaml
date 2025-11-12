@@ -24,6 +24,7 @@ secrets:
   BYPASS_AUTH: "false"
   CORS_ALLOWED_ORIGINS: '["*"]'
   ALLOWED_ORIGINS: '["*"]'
+  ALLOWED_HOSTS: '["*"]'
   SMTP_HOST: "changeme"
   SMTP_PORT: "587"
   SMTP_FROM_EMAIL: "changeme"
