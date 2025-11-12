@@ -93,7 +93,9 @@ export function useWebSocket({
       // Use relative URL that works with Vite proxy
       // In development, this will be proxied to the API server
       // In production, this will be served from the same domain
-      const wsUrl = `ws://${window.location.host}/ws/recommendations/${userId}`;
+      // Use wss:// for HTTPS pages, ws:// for HTTP pages
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/recommendations/${userId}`;
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {

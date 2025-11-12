@@ -36,6 +36,9 @@ RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
 # Install db package WITH ML dependencies for embeddings generation
 RUN uv pip install -e "./packages/db[ml]"
 
+# Install Keycloak sync dependencies (used by startup.sh for user sync)
+RUN uv pip install psycopg2-binary requests urllib3
+
 # Copy and setup startup script
 COPY packages/db/startup.sh /app/startup.sh
 RUN chmod +x /app/startup.sh

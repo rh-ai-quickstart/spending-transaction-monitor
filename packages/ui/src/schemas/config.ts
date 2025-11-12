@@ -9,6 +9,7 @@ export const RuntimeEnvSchema = z.object({
   API_BASE_URL: z.string(),
   ENVIRONMENT: z.enum(['development', 'staging', 'production']),
   KEYCLOAK_URL: z.string(),
+  KEYCLOAK_REALM: z.string(),
   KEYCLOAK_CLIENT_ID: z.string(),
 });
 

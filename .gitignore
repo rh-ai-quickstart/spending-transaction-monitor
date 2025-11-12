@@ -227,4 +227,8 @@ packages/api/debug_output.txt
 packages/api/test_output.txt
 packages/api/test_start.txt
 
+# Helm dependencies
+deploy/helm/*/charts/
+deploy/helm/*/Chart.lock
+
 PR_DESCRIPTION.md

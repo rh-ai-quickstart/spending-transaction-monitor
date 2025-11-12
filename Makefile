@@ -47,6 +47,12 @@ define HELM_SECRET_PARAMS
 --set secrets.KEYCLOAK_URL="$$KEYCLOAK_URL" \
 --set secrets.KEYCLOAK_REALM="$$KEYCLOAK_REALM" \
 --set secrets.KEYCLOAK_CLIENT_ID="$$KEYCLOAK_CLIENT_ID" \
+--set secrets.KEYCLOAK_DB_USER="$$KEYCLOAK_DB_USER" \
+--set secrets.KEYCLOAK_DB_PASSWORD="$$KEYCLOAK_DB_PASSWORD" \
+--set secrets.KEYCLOAK_ADMIN_PASSWORD="$$KEYCLOAK_ADMIN_PASSWORD" \
+--set keycloak.admin.password="$$KEYCLOAK_ADMIN_PASSWORD" \
+--set keycloak.pgvector.secret.password="$$KEYCLOAK_DB_PASSWORD" \
+--set keycloak.config.hostname="$$(echo "$$KEYCLOAK_URL" | sed 's|http://||' | sed 's|https://||' | sed 's|/.*||')" \
 --set secrets.VITE_API_BASE_URL="$$VITE_API_BASE_URL" \
 --set secrets.VITE_BYPASS_AUTH="$$VITE_BYPASS_AUTH" \
 --set secrets.VITE_ENVIRONMENT="$$VITE_ENVIRONMENT"
@@ -106,6 +112,29 @@ check-env-prod:
 		exit 1; \
 	fi
 	@echo "✅ Production environment file found at $(ENV_FILE_PROD)"
+
+# Check if required Keycloak environment variables are set
+.PHONY: check-keycloak-vars
+check-keycloak-vars: check-env-prod
+	@echo "Checking Keycloak environment variables..."
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	if [ -z "$$KEYCLOAK_ADMIN_PASSWORD" ]; then \
+		echo "❌ Error: KEYCLOAK_ADMIN_PASSWORD is not set in $(ENV_FILE_PROD)"; \
+		echo ""; \
+		echo "Please add the following to your $(ENV_FILE_PROD):"; \
+		echo "  KEYCLOAK_ADMIN_PASSWORD=your-secure-admin-password"; \
+		echo ""; \
+		exit 1; \
+	fi; \
+	if [ -z "$$KEYCLOAK_DB_PASSWORD" ]; then \
+		echo "❌ Error: KEYCLOAK_DB_PASSWORD is not set in $(ENV_FILE_PROD)"; \
+		echo ""; \
+		echo "Please add the following to your $(ENV_FILE_PROD):"; \
+		echo "  KEYCLOAK_DB_PASSWORD=your-secure-db-password"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@echo "✅ Keycloak environment variables are set"
 
 # Set up environment file for local development
 .PHONY: setup-dev-env
@@ -242,9 +271,12 @@ help:
 	@echo "    setup-local        Complete local setup (pull, run, migrate, seed)"
 	@echo ""
 	@echo "  Helm:"
-	@echo "    helm-lint          Lint Helm chart"
-	@echo "    helm-template      Render Helm templates"
-	@echo "    helm-debug         Debug Helm deployment"
+	@echo "    helm-dep-update    Update Helm chart dependencies"
+	@echo "    helm-dep-build     Build Helm chart dependencies"
+	@echo "    helm-dep-list      List Helm chart dependencies"
+	@echo "    helm-lint          Lint Helm chart (includes dependency update)"
+	@echo "    helm-template      Render Helm templates (includes dependency update)"
+	@echo "    helm-debug         Debug Helm deployment (includes dependency update)"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    test-alert-rules   Interactive menu to test alert rules"
@@ -254,16 +286,25 @@ help:
 	@echo "    setup-data         Complete data setup (migrations + seed all)"
 	@echo ""
 	@echo "  Seeding:"
-	@echo "    seed-db            Seed database with sample data"
-	@echo "    seed-keycloak      Set up Keycloak realm (without DB user sync)"
-	@echo "    seed-keycloak-with-users  Set up Keycloak and sync DB users"
-	@echo "    seed-all           Seed both database and Keycloak with users"
+	@echo "    seed-db            Seed database (local only, for OpenShift use migration job)"
+	@echo "    seed-keycloak      Set up Keycloak realm only"
+	@echo "    seed-keycloak-with-users  Set up Keycloak and manually sync DB users"
+	@echo "    seed-all           Set up Keycloak + seed database"
+	@echo "    Note: OpenShift deployments automatically sync users in migration job if BYPASS_AUTH=false"
+	@echo ""
+	@echo "  Keycloak Management:"
+	@echo "    keycloak-setup              Set up Keycloak realm and create test users"
+	@echo "    keycloak-setup-with-users   Set up realm and sync database users"
+	@echo "    keycloak-users              List database-synced users (excludes test users)"
+	@echo "    keycloak-users-all          List all users including test users (adminuser, testuser)"
+	@echo "    keycloak-sync-users         Sync database users to Keycloak"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "    login              Login to OpenShift registry"
 	@echo "    create-project     Create OpenShift project"
 	@echo "    status             Show deployment status"
 	@echo "    clean-all          Clean up all resources"
+	@echo "    clean-migration    Clean up stuck migration jobs/pods"
 	@echo "    clean-images       Remove local Podman images"
 	@echo "    clean-local-images Remove local development images (tagged as 'local')"
 	@echo "    check-env-file     Check if environment file exists"
@@ -341,13 +382,14 @@ push-all: push-ui push-api push-db
 
 # Deploy targets
 .PHONY: deploy
-deploy: create-project check-env-prod
+deploy: create-project helm-dep-update check-keycloak-vars
 	@echo "Deploying application using Helm with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
+		--timeout 15m \
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
@@ -355,14 +397,15 @@ deploy: create-project check-env-prod
 		$(HELM_SECRET_PARAMS)
 
 .PHONY: deploy-dev
-deploy-dev: create-project check-env-prod
+deploy-dev: create-project helm-dep-update check-keycloak-vars
 	@echo "Deploying application in development mode with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@echo "Note: This is still a production deployment with reduced resources for development/testing"
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
+		--timeout 15m \
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
@@ -380,11 +423,23 @@ deploy-all: build-all push-all deploy
 undeploy:
 	@echo "Undeploying application..."
 	helm uninstall $(PROJECT_NAME) --namespace $(NAMESPACE) || echo "Release $(PROJECT_NAME) not found"
+	@echo "Cleaning up migration jobs and pods..."
+	@oc delete job -l app.kubernetes.io/component=migration -n $(NAMESPACE) 2>/dev/null || true
+	@oc delete pod -l app.kubernetes.io/component=migration -n $(NAMESPACE) 2>/dev/null || true
+	@echo "Cleanup complete"
 
 .PHONY: undeploy-all
 undeploy-all: undeploy
 	@echo "Cleaning up namespace..."
 	oc delete project $(NAMESPACE) || echo "Project $(NAMESPACE) not found or cannot be deleted"
+
+.PHONY: clean-migration
+clean-migration:
+	@echo "Cleaning up migration jobs and pods..."
+	@oc delete job -l app.kubernetes.io/component=migration -n $(NAMESPACE) 2>/dev/null || echo "No migration jobs found"
+	@oc delete pod -l app.kubernetes.io/component=migration -n $(NAMESPACE) 2>/dev/null || echo "No migration pods found"
+	@echo "Migration cleanup complete"
+
 
 # Full deployment pipeline
 .PHONY: full-deploy
@@ -408,17 +463,34 @@ port-forward-db:
 	oc port-forward service/spending-monitor-db 5432:5432 --namespace $(NAMESPACE)
 
 # Helm helpers
+.PHONY: helm-dep-update
+helm-dep-update:
+	@echo "Updating Helm chart dependencies..."
+	@helm dependency update ./deploy/helm/spending-monitor
+	@echo "✅ Helm dependencies updated successfully"
+
+.PHONY: helm-dep-build
+helm-dep-build:
+	@echo "Building Helm chart dependencies..."
+	@helm dependency build ./deploy/helm/spending-monitor
+	@echo "✅ Helm dependencies built successfully"
+
+.PHONY: helm-dep-list
+helm-dep-list:
+	@echo "Listing Helm chart dependencies..."
+	@helm dependency list ./deploy/helm/spending-monitor
+
 .PHONY: helm-lint
-helm-lint:
+helm-lint: helm-dep-update
 	@echo "Linting Helm chart..."
 	helm lint ./deploy/helm/spending-monitor
 
 .PHONY: helm-template
-helm-template: check-env-prod
+helm-template: helm-dep-update check-env-prod
 	@echo "Rendering Helm templates with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
 	helm template $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
@@ -426,11 +498,11 @@ helm-template: check-env-prod
 		$(HELM_SECRET_PARAMS)
 
 .PHONY: helm-debug
-helm-debug: check-env-prod
+helm-debug: helm-dep-update check-env-prod
 	@echo "Debugging Helm deployment with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@set -a; source $(ENV_FILE_PROD); set +a; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH CORS_ALLOWED_ORIGINS ALLOWED_ORIGINS ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
 		--set global.imageRegistry=$(REGISTRY_URL) \
@@ -599,6 +671,10 @@ seed-db:
 	@echo "Running seed script inside API container..."
 	podman exec spending-monitor-api python -m db.scripts.seed
 	@echo "✅ Database seeded successfully"
+	@echo ""
+	@echo "ℹ️  Note: For OpenShift deployments, user sync happens automatically in the migration job"
+	@echo "ℹ️  For local development, run 'make keycloak-sync-users' if needed"
+	@echo ""
 
 .PHONY: seed-keycloak
 seed-keycloak:
@@ -611,8 +687,67 @@ seed-keycloak-with-users:
 	pnpm seed:keycloak-with-users
 
 .PHONY: seed-all
-seed-all: seed-keycloak-with-users seed-db
-	@echo "✅ All data seeded successfully (database + Keycloak)"
+seed-all: seed-keycloak seed-db
+	@echo "✅ All data seeded successfully!"
+	@echo "   • Database populated with sample data"
+	@echo "   • Keycloak realm configured"
+	@echo "   • Users automatically synced to Keycloak (if auth enabled)"
+
+# Keycloak management targets (using Python package)
+# These targets load environment from .env.production and run the Python CLI
+
+.PHONY: keycloak-setup
+keycloak-setup:
+	@echo "🔐 Setting up Keycloak realm..."
+	@if [ -f .env.production ]; then \
+		set -a && . ./.env.production && set +a && \
+		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli setup; \
+	else \
+		echo "❌ Error: .env.production not found"; \
+		exit 1; \
+	fi
+
+.PHONY: keycloak-setup-with-users
+keycloak-setup-with-users:
+	@echo "🔐 Setting up Keycloak realm and syncing users..."
+	@if [ -f .env.production ]; then \
+		set -a && . ./.env.production && set +a && \
+		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli setup --sync-users; \
+	else \
+		echo "❌ Error: .env.production not found"; \
+		exit 1; \
+	fi
+
+.PHONY: keycloak-users
+keycloak-users:
+	@if [ -f .env.production ]; then \
+		set -a && . ./.env.production && set +a && \
+		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli list-users; \
+	else \
+		echo "❌ Error: .env.production not found"; \
+		exit 1; \
+	fi
+
+.PHONY: keycloak-users-all
+keycloak-users-all:
+	@if [ -f .env.production ]; then \
+		set -a && . ./.env.production && set +a && \
+		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli list-users --include-test-users; \
+	else \
+		echo "❌ Error: .env.production not found"; \
+		exit 1; \
+	fi
+
+.PHONY: keycloak-sync-users
+keycloak-sync-users:
+	@echo "🔄 Syncing database users to Keycloak..."
+	@if [ -f .env.production ]; then \
+		set -a && . ./.env.production && set +a && \
+		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli sync-users; \
+	else \
+		echo "❌ Error: .env.production not found"; \
+		exit 1; \
+	fi
 
 .PHONY: setup-data
 setup-data:

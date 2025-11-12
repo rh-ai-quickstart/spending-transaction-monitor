@@ -39,39 +39,14 @@ services:
     ports:
       - "8080:8080"
     command: start-dev
-    # Disable healthcheck - Keycloak works fine, keycloak-setup handles waiting
     healthcheck:
-      test: "NONE"
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     networks:
       - spending-monitor
-
-  keycloak-setup:
-    image: python:3.12-slim
-    platform: linux/amd64
-    container_name: spending-monitor-keycloak-setup
-    working_dir: /app
-    env_file:
-      - .env.development
-    volumes:
-      - ./packages/auth/scripts:/app/scripts
-      - ./data:/app/data
-    command: >
-      sh -c "
-        echo 'Waiting for Keycloak to be ready...' &&
-        for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-          python3 -c 'import socket; s=socket.socket(); s.settimeout(1); s.connect((\"keycloak\", 8080)); s.close()' 2>/dev/null && break || (echo 'Waiting...' && sleep 10);
-        done &&
-        echo 'Keycloak port is open, waiting 20 more seconds for full startup...' &&
-        sleep 20 &&
-        pip install --quiet requests sqlalchemy asyncpg psycopg2-binary pyyaml &&
-        python /app/scripts/setup_keycloak_with_db_users.py
-      "
-    depends_on:
-      - keycloak
-      - postgres
-    networks:
-      - spending-monitor
-    restart: "no"
 
   migrations:
     image: quay.io/rh-ai-quickstart/spending-monitor-db:${IMAGE_TAG:-latest}
@@ -79,8 +54,16 @@ services:
     container_name: spending-monitor-migrations
     env_file:
       - .env.development
+    environment:
+      # Override KEYCLOAK_URL to use internal container name
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=spending-monitor
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KEYCLOAK_DEFAULT_PASSWORD=password123
     depends_on:
       postgres:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     networks:
       - spending-monitor
@@ -108,8 +91,6 @@ services:
     container_name: spending-monitor-api
     env_file:
       - .env.development
-
-
     ports:
       - "8000:8000"
     depends_on:
