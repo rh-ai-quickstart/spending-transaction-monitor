@@ -35,16 +35,16 @@ vi.mock('react-oidc-context', () => ({
 vi.stubGlobal(
   'fetch',
   vi.fn((url: string) => {
-    // Match the actual API endpoint
+    // Match the actual API endpoint - returns first user from test data (John Doe)
     if (url.includes('/api/users/profile')) {
       return Promise.resolve({
         ok: true,
         json: () =>
           Promise.resolve({
-            id: 'u-merchant-high-001',
-            email: 'alex.thompson@example.com',
-            first_name: 'Alex',
-            last_name: 'Thompson',
+            id: 'test-user-id-1',
+            email: 'johndoe@example.com',
+            first_name: 'John',
+            last_name: 'Doe',
             is_active: true,
             credit_cards_count: 0,
             transactions_count: 0,
@@ -75,10 +75,10 @@ describe('useAuth', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // After loading, should have the dev user
+    // After loading, should have the dev user (first user from test data)
     expect(result.current.isAuthenticated).toBe(true);
-    expect(result.current.user?.name).toBe('Alex Thompson');
-    expect(result.current.user?.email).toBe('alex.thompson@example.com');
+    expect(result.current.user?.name).toBe('John Doe');
+    expect(result.current.user?.email).toBe('johndoe@example.com');
     expect(result.current.user?.isDevMode).toBe(true);
     expect(result.current.user?.roles).toEqual(['user', 'admin']);
   });
