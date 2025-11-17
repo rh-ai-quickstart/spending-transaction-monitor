@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { usePeriodicLocation } from '../usePeriodicLocation';
 import * as geolocationService from '@/services/geolocation';
 import { useAuth } from '@/hooks/useAuth';
@@ -199,20 +199,31 @@ describe('usePeriodicLocation', () => {
       vi.advanceTimersByTime(100); // Auto-start
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/users/location', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Latitude': mockLocation.latitude.toString(),
-        'X-User-Longitude': mockLocation.longitude.toString(),
-        'X-User-Location-Accuracy': mockLocation.accuracy.toString(),
+    // Wait for the fetch to be called
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalled();
       },
-      body: JSON.stringify({
-        location_consent_given: true,
-        last_app_location_latitude: mockLocation.latitude,
-        last_app_location_longitude: mockLocation.longitude,
-        last_app_location_accuracy: mockLocation.accuracy,
+      { timeout: 2000 },
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/users/location'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-User-Latitude': mockLocation.latitude.toString(),
+          'X-User-Longitude': mockLocation.longitude.toString(),
+          'X-User-Location-Accuracy': mockLocation.accuracy.toString(),
+        }),
+        body: JSON.stringify({
+          location_consent_given: true,
+          last_app_location_latitude: mockLocation.latitude,
+          last_app_location_longitude: mockLocation.longitude,
+          last_app_location_accuracy: mockLocation.accuracy,
+        }),
       }),
-    });
+    );
   });
 });

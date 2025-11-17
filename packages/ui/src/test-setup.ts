@@ -13,6 +13,20 @@ Object.defineProperty(window, 'location', {
   writable: true,
 });
 
+// Polyfill localStorage.clear() for jsdom environment
+if (typeof window !== 'undefined' && window.localStorage && !window.localStorage.clear) {
+  window.localStorage.clear = function () {
+    const keys: string[] = [];
+    for (let i = 0; i < this.length; i++) {
+      const key = this.key(i);
+      if (key !== null) {
+        keys.push(key);
+      }
+    }
+    keys.forEach((key) => this.removeItem(key));
+  };
+}
+
 // Mock console methods to reduce noise in tests
 globalThis.console = {
   ...console,
