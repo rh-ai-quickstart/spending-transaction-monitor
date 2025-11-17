@@ -3,8 +3,12 @@ global:
   imageRegistry: quay.io
   imageRepository: rh-ai-quickstart
   imageTag: latest
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   storageClass: ""
+  
+  # Security settings for Bitnami charts
+  security:
+    allowInsecureImages: true  # Allow Bitnami images from quay.io
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
@@ -33,6 +37,11 @@ secrets:
   KEYCLOAK_URL: "changeme"
   KEYCLOAK_REALM: "changeme"
   KEYCLOAK_CLIENT_ID: "changeme"
+  
+  # Keycloak database secrets (for external database connection)
+  KEYCLOAK_DB_USER: "keycloak"
+  KEYCLOAK_DB_PASSWORD: "keycloak"  # Change in production!
+  KEYCLOAK_ADMIN_PASSWORD: "keycloak"  # Change in production!
 
   # UI secrets
   VITE_API_BASE_URL: "http://localhost:8000"
@@ -67,7 +76,7 @@ migration:
     repository: spending-monitor-db
     tag: latest
   restartPolicy: Never
-  backoffLimit: 3
+  backoffLimit: 1  # Only retry once - if it fails, it's likely a config issue
   ttlSecondsAfterFinished: 86400  # 24 hours
   resources:
     requests:
@@ -211,3 +220,47 @@ tolerations: []
 
 # Affinity
 affinity: {}
+
+# Keycloak configuration (subchart)
+# This references the keycloak subchart in deploy/helm/keycloak
+# Keycloak now uses its own dedicated pgvector PostgreSQL instance
+keycloak:
+  enabled: true
+  
+  # Admin configuration
+  # Password comes from environment variables passed via Makefile
+  admin:
+    username: admin
+    # Password will be passed via --set flag from Makefile
+  
+  # Database configuration
+  database:
+    vendor: postgres
+  
+  # pgvector PostgreSQL configuration
+  # This deploys a dedicated PostgreSQL instance for Keycloak
+  # All database connection details are configured here
+  pgvector:
+    enabled: true
+    secret:
+      host: pgvector  # Database host (for external DB, set to external hostname)
+      port: "5432"  # Database port
+      user: keycloak  # Database username
+      password: keycloak  # Will be overridden by KEYCLOAK_DB_PASSWORD from Makefile
+      dbname: keycloak  # Database name
+  
+  # Configuration
+  config:
+    proxy: edge
+    proxyHeaders: xforwarded
+    production: true
+    healthEnabled: true
+    metricsEnabled: true
+    hostnameStrict: false
+  
+  # Route for OpenShift
+  route:
+    enabled: true
+  
+  # For additional customization, see: deploy/helm/keycloak/values.yaml
+  # You can override any value from the keycloak chart here

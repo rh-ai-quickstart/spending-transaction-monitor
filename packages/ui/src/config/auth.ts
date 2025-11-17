@@ -25,14 +25,33 @@ const bypassAuth =
   import.meta.env.VITE_BYPASS_AUTH === 'true' ||
   (typeof window !== 'undefined' && window.ENV?.BYPASS_AUTH === true);
 
+// Helper function to construct the full Keycloak authority URL
+// KEYCLOAK_URL may be just the base URL or include the realm path
+const getKeycloakAuthority = (): string => {
+  const keycloakUrl =
+    import.meta.env.VITE_KEYCLOAK_URL ||
+    (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_URL) ||
+    'http://localhost:8080';
+
+  const realm =
+    import.meta.env.VITE_KEYCLOAK_REALM ||
+    (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_REALM) ||
+    'spending-monitor';
+
+  // If the URL already includes /realms/, use it as-is
+  if (keycloakUrl.includes('/realms/')) {
+    return keycloakUrl;
+  }
+
+  // Otherwise, construct the full URL with realm
+  return `${keycloakUrl}/realms/${realm}`;
+};
+
 export const authConfig: AuthConfig = {
   environment,
   bypassAuth,
   keycloak: {
-    authority:
-      import.meta.env.VITE_KEYCLOAK_URL ||
-      (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_URL) ||
-      'http://localhost:8080/realms/spending-monitor',
+    authority: getKeycloakAuthority(),
     clientId:
       import.meta.env.VITE_KEYCLOAK_CLIENT_ID ||
       (typeof window !== 'undefined' && window.ENV?.KEYCLOAK_CLIENT_ID) ||

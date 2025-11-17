@@ -44,6 +44,21 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: VITE_ENVIRONMENT
+            - name: VITE_KEYCLOAK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_URL
+            - name: VITE_KEYCLOAK_REALM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_REALM
+            - name: VITE_KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_CLIENT_ID
           {{- if .Values.ui.healthCheck.enabled }}
           livenessProbe:
             httpGet:

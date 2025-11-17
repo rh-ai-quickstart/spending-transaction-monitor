@@ -14,3 +14,9 @@ sources:
 maintainers:
   - name: Development Team
     email: dev@example.com
+
+dependencies:
+  - name: keycloak
+    version: "1.0.0"
+    repository: "file://../keycloak"
+    condition: keycloak.enabled
