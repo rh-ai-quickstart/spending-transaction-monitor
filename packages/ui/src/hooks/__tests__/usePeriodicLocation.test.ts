@@ -33,7 +33,7 @@ vi.mock('@/config/location', () => ({
 
 // Mock fetch
 const mockFetch = vi.fn();
-globalThis.fetch = mockFetch;
+vi.stubGlobal('fetch', mockFetch);
 
 // Mock timers
 vi.useFakeTimers();
@@ -193,18 +193,17 @@ describe('usePeriodicLocation', () => {
   });
 
   it('should send correct headers to backend', async () => {
-    renderHook(() => usePeriodicLocation());
+    // Temporarily use real timers for this test to avoid conflicts with waitFor
+    vi.useRealTimers();
 
-    await act(async () => {
-      vi.advanceTimersByTime(100); // Auto-start
-    });
+    renderHook(() => usePeriodicLocation());
 
     // Wait for the fetch to be called
     await waitFor(
       () => {
         expect(mockFetch).toHaveBeenCalled();
       },
-      { timeout: 2000 },
+      { timeout: 1000 },
     );
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -225,5 +224,8 @@ describe('usePeriodicLocation', () => {
         }),
       }),
     );
+
+    // Restore fake timers for other tests
+    vi.useFakeTimers();
   });
 });
