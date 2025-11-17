@@ -32,31 +32,30 @@ vi.mock('react-oidc-context', () => ({
 }));
 
 // Mock fetch for DevAuthProvider API call
-vi.stubGlobal(
-  'fetch',
-  vi.fn((url: string) => {
-    // Match the actual API endpoint - returns first user from test data (John Doe)
-    if (url.includes('/api/users/profile')) {
-      return Promise.resolve({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            id: 'test-user-id-1',
-            email: 'johndoe@example.com',
-            first_name: 'John',
-            last_name: 'Doe',
-            is_active: true,
-            credit_cards_count: 0,
-            transactions_count: 0,
-          }),
-      });
-    }
+const mockFetch = vi.fn((url: string | Request | URL) => {
+  const urlString = typeof url === 'string' ? url : url.toString();
+  // Match the actual API endpoint - returns first user from test data (John Doe)
+  if (urlString.includes('/api/users/profile') || urlString.includes('users/profile')) {
     return Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({}),
-    });
-  }),
-);
+      json: async () => ({
+        id: 'test-user-id-1',
+        email: 'johndoe@example.com',
+        first_name: 'John',
+        last_name: 'Doe',
+        is_active: true,
+        credit_cards_count: 0,
+        transactions_count: 0,
+      }),
+    } as Response);
+  }
+  return Promise.resolve({
+    ok: true,
+    json: async () => ({}),
+  } as Response);
+});
+
+vi.stubGlobal('fetch', mockFetch);
 
 describe('useAuth', () => {
   it('should return dev user in development mode', async () => {
