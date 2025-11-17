@@ -13,23 +13,92 @@ Object.defineProperty(window, 'location', {
   writable: true,
 });
 
-// Polyfill localStorage.clear() for jsdom environment
+/**
+ * localStorage polyfill for jsdom v26+
+ *
+ * jsdom 26.x has a broken localStorage implementation that doesn't provide
+ * the standard Storage API methods. This polyfill provides a complete
+ * localStorage implementation for tests.
+ *
+ * IMPORTANT: This implementation makes storage keys enumerable via Object.keys()
+ * to match real browser behavior and support code that iterates localStorage keys.
+ */
 if (
   typeof window !== 'undefined' &&
-  window.localStorage &&
-  typeof window.localStorage.clear !== 'function'
+  (!window.localStorage || typeof window.localStorage.setItem !== 'function')
 ) {
-  Object.defineProperty(window.localStorage, 'clear', {
-    value: function () {
-      const keys: string[] = [];
-      for (let i = 0; i < this.length; i++) {
-        const key = this.key(i);
-        if (key !== null) {
-          keys.push(key);
+  class LocalStorageMock implements Storage {
+    // Index signature for stored values - allows dynamic property access
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+
+    getItem(key: string): string | null {
+      return this[key] ?? null;
+    }
+
+    setItem(key: string, value: string): void {
+      this[key] = String(value);
+    }
+
+    removeItem(key: string): void {
+      delete this[key];
+    }
+
+    clear(): void {
+      // Get all keys except the Storage API methods
+      const keys = Object.keys(this);
+      keys.forEach((key) => {
+        if (
+          key !== 'getItem' &&
+          key !== 'setItem' &&
+          key !== 'removeItem' &&
+          key !== 'clear' &&
+          key !== 'key' &&
+          key !== 'length'
+        ) {
+          delete this[key];
         }
-      }
-      keys.forEach((key) => this.removeItem(key));
-    },
+      });
+    }
+
+    key(index: number): string | null {
+      const keys = Object.keys(this).filter(
+        (k) =>
+          k !== 'getItem' &&
+          k !== 'setItem' &&
+          k !== 'removeItem' &&
+          k !== 'clear' &&
+          k !== 'key' &&
+          k !== 'length',
+      );
+      return keys[index] ?? null;
+    }
+
+    get length(): number {
+      return Object.keys(this).filter(
+        (k) =>
+          k !== 'getItem' &&
+          k !== 'setItem' &&
+          k !== 'removeItem' &&
+          k !== 'clear' &&
+          k !== 'key' &&
+          k !== 'length',
+      ).length;
+    }
+  }
+
+  const localStorageMock = new LocalStorageMock();
+
+  // Replace localStorage with working implementation
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock,
+    writable: true,
+    configurable: true,
+  });
+
+  // Also set on globalThis for tests that access it directly
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: localStorageMock,
     writable: true,
     configurable: true,
   });

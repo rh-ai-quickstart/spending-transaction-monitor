@@ -11,6 +11,14 @@ export default defineConfig({
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     exclude: ['node_modules', 'dist', '.turbo'],
+    // Configure jsdom environment options
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost:3000',
+        // Explicitly enable localStorage for jsdom
+        storageQuota: 10000000,
+      },
+    },
   },
   resolve: {
     alias: {
