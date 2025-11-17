@@ -466,18 +466,29 @@ port-forward-db:
 .PHONY: helm-dep-update
 helm-dep-update:
 	@echo "Updating Helm chart dependencies..."
+	@echo "📦 Updating keycloak chart dependencies (pgvector)..."
+	@helm dependency update ./deploy/helm/keycloak
+	@echo "📦 Updating spending-monitor chart dependencies (keycloak)..."
 	@helm dependency update ./deploy/helm/spending-monitor
 	@echo "✅ Helm dependencies updated successfully"
 
 .PHONY: helm-dep-build
 helm-dep-build:
 	@echo "Building Helm chart dependencies..."
+	@echo "📦 Building keycloak chart dependencies (pgvector)..."
+	@helm dependency build ./deploy/helm/keycloak
+	@echo "📦 Building spending-monitor chart dependencies (keycloak)..."
 	@helm dependency build ./deploy/helm/spending-monitor
 	@echo "✅ Helm dependencies built successfully"
 
 .PHONY: helm-dep-list
 helm-dep-list:
 	@echo "Listing Helm chart dependencies..."
+	@echo ""
+	@echo "📦 Keycloak chart dependencies:"
+	@helm dependency list ./deploy/helm/keycloak
+	@echo ""
+	@echo "📦 Spending-monitor chart dependencies:"
 	@helm dependency list ./deploy/helm/spending-monitor
 
 .PHONY: helm-lint
