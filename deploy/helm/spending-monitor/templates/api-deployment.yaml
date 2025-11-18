@@ -124,6 +124,16 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: KEYCLOAK_CLIENT_ID
+            - name: LLAMASTACK_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: LLAMASTACK_BASE_URL
+            - name: LLAMASTACK_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: LLAMASTACK_MODEL
           {{- if .Values.api.healthCheck.enabled }}
           livenessProbe:
             httpGet:

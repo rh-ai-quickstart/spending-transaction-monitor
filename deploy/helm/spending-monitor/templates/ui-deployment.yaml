@@ -29,6 +29,16 @@ spec:
               containerPort: 8080
               protocol: TCP
           env:
+            - name: BYPASS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: BYPASS_AUTH
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ENVIRONMENT
             - name: VITE_API_BASE_URL
               valueFrom:
                 secretKeyRef:
