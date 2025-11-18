@@ -78,136 +78,22 @@ else
     echo "Skipping sample data loading"
 fi
 
-# Sync users to Keycloak if auth is enabled
+# Setup Keycloak realm and sync users if auth is enabled
 echo ""
-echo "🔍 Checking if Keycloak user sync is needed..."
+echo "🔍 Checking if Keycloak setup is needed..."
 if [ "${BYPASS_AUTH:-true}" = "false" ] && [ -n "${KEYCLOAK_URL}" ]; then
-    echo "✅ Authentication enabled - will sync users to Keycloak..."
+    echo "✅ Authentication enabled - will setup Keycloak realm and sync users..."
     echo "   Keycloak URL: ${KEYCLOAK_URL}"
+    echo "   Realm: ${KEYCLOAK_REALM:-spending-monitor}"
     echo "   Default password: ${KEYCLOAK_DEFAULT_PASSWORD:-password123}"
     
-    # Run sync (with built-in timeouts to prevent blocking)
-    echo "   Starting sync (non-blocking)..."
-    # Use 'set +e' to ensure any Python errors don't fail the script
+    # Use 'set +e' to ensure any errors don't fail the script
     set +e
-    python3 << 'EOFPYTHON'
-import os, re, requests, psycopg2, urllib3, sys
-urllib3.disable_warnings()
-
-try:
-    # Use internal service URL from inside the cluster
-    # External URL is for browser/API access, internal service is for pod-to-pod
-    external_url = os.getenv("KEYCLOAK_URL", "").rstrip("/")
     
-    # Check if we're running inside the cluster (has KUBERNETES_SERVICE_HOST)
-    if os.getenv("KUBERNETES_SERVICE_HOST"):
-        # Use internal service (faster and more reliable)
-        base_url = "http://spending-monitor-keycloak:8080"
-        print(f"   Using internal service: {base_url}")
-    else:
-        # Use external URL (for local development)
-        base_url = external_url
-        print(f"   Using external URL: {base_url}")
-    
-    admin_password = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "")
-    realm = os.getenv("KEYCLOAK_REALM", "spending-monitor")
-    
-    # Quick health check first (fail fast if Keycloak isn't ready)
-    print("   Checking Keycloak availability...")
-    try:
-        health_response = requests.get(f"{base_url}/health/ready", verify=False, timeout=10)
-        if health_response.status_code not in [200, 404]:  # 404 is OK, might not have /health endpoint
-            print(f"   ⚠️  Keycloak health check returned {health_response.status_code}")
-    except requests.exceptions.RequestException as e:
-        print(f"   ⚠️  Keycloak not responding: {e}")
-        print("   Keycloak may still be starting up. Skipping sync for now.")
-        sys.exit(0)  # Exit gracefully
-    
-    # Get admin token
-    print("   Getting admin token...")
-    r = requests.post(
-        f"{base_url}/realms/master/protocol/openid-connect/token",
-        data={"username": "admin", "password": admin_password, "grant_type": "password", "client_id": "admin-cli"},
-        verify=False,
-        timeout=15
-    )
-    r.raise_for_status()
-    token = r.json()["access_token"]
-    print("   ✅ Admin token obtained")
-    
-    # Connect to database
-    db_url = os.getenv("DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
-    m = re.match(r"postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", db_url)
-    if not m:
-        print("   ❌ Could not parse DATABASE_URL")
-        sys.exit(0)  # Don't fail the migration
-    
-    user, pwd, host, port, db = m.groups()
-    conn = psycopg2.connect(host=host, port=port, user=user, password=pwd, dbname=db)
-    cur = conn.cursor()
-    cur.execute("SELECT id, email, first_name, last_name FROM users")
-    users = cur.fetchall()
-    print(f"   📊 Found {len(users)} users in database")
-    
-    # Sync users
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    synced = 0
-    default_password = os.getenv("KEYCLOAK_DEFAULT_PASSWORD", "password123")
-    
-    for uid, email, fname, lname in users:
-        # Check if exists
-        try:
-            r = requests.get(f"{base_url}/admin/realms/{realm}/users?username={uid}", headers=headers, verify=False, timeout=10)
-            if r.status_code == 200 and r.json():
-                continue
-        except requests.exceptions.RequestException:
-            print(f"   ⚠️  Failed to check user {uid}, skipping...")
-            continue
-        
-        # Create user
-        data = {
-            "username": uid,
-            "email": email or f"{uid}@example.com",
-            "firstName": fname or "",
-            "lastName": lname or "",
-            "enabled": True,
-            "emailVerified": True,
-            "credentials": [{"type": "password", "value": default_password, "temporary": False}]
-        }
-        
-        try:
-            r = requests.post(f"{base_url}/admin/realms/{realm}/users", json=data, headers=headers, verify=False, timeout=10)
-            if r.status_code == 201:
-                synced += 1
-                # Assign user role
-                r2 = requests.get(f"{base_url}/admin/realms/{realm}/users?username={uid}", headers=headers, verify=False, timeout=10)
-                if r2.status_code == 200 and r2.json():
-                    user_id = r2.json()[0]["id"]
-                    r3 = requests.get(f"{base_url}/admin/realms/{realm}/roles", headers=headers, verify=False, timeout=10)
-                    if r3.status_code == 200:
-                        for role in r3.json():
-                            if role["name"] == "user":
-                                requests.post(
-                                    f"{base_url}/admin/realms/{realm}/users/{user_id}/role-mappings/realm",
-                                    json=[role],
-                                    headers=headers,
-                                    verify=False,
-                                    timeout=10
-                                )
-                                break
-        except requests.exceptions.RequestException as e:
-            print(f"   ⚠️  Failed to create user {uid}: {e}")
-            continue
-    
-    print(f"   ✅ Synced {synced} users to Keycloak")
-    cur.close()
-    conn.close()
-    
-except Exception as e:
-    print(f"   ⚠️  Keycloak sync failed: {e}")
-    print("   Note: This is non-critical, migration will continue")
-    sys.exit(0)  # Exit with 0 to not fail the migration
-EOFPYTHON
+    # Setup realm and sync users using auth package CLI
+    echo ""
+    cd /app/packages/auth
+    python3 -m keycloak.cli setup --sync-users
     
     # Re-enable error checking
     set -e
