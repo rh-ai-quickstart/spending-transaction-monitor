@@ -10,7 +10,17 @@ class KeycloakClient:
     """Base client for Keycloak API operations."""
 
     def __init__(self):
-        self.base_url = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+        # Determine Keycloak URL based on environment
+        # If running inside Kubernetes, use internal service for better reliability
+        if os.getenv('KUBERNETES_SERVICE_HOST'):
+            # Use internal service URL (pod-to-pod communication)
+            self.base_url = os.getenv(
+                'KEYCLOAK_INTERNAL_URL', 'http://spending-monitor-keycloak:8080'
+            )
+        else:
+            # Use external URL (for local development or browser access)
+            self.base_url = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+
         self.admin_username = os.getenv('KEYCLOAK_ADMIN_USER', 'admin')
         self.admin_password = os.getenv('KEYCLOAK_ADMIN_PASSWORD', 'admin')
         self.master_realm = 'master'
