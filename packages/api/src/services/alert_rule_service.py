@@ -236,6 +236,7 @@ class AlertRuleService:
 
         except Exception as e:
             import traceback
+
             print(f'Error in rule validation: {e}')
             print(f'Full traceback: {traceback.format_exc()}')
             return {
