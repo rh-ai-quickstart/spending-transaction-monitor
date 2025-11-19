@@ -25,13 +25,11 @@ graph.add_node(
     RunnableLambda(
         lambda state: {
             **state,
-            'sql_query': parse_alert_to_sql_with_context(
-                {
-                    'transaction': state['transaction'],
-                    'alert_text': state['alert_text'],
-                    'alert_rule': state['alert_rule'],
-                    'user': state.get('user'),
-                }
+            'sql_query': parse_alert_to_sql_with_context.func(
+                state['transaction'],
+                state['alert_text'],
+                state['alert_rule'],
+                state.get('user'),  # Pass user for location context
             ),
         }
     ),

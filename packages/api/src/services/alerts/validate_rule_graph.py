@@ -39,16 +39,14 @@ def create_alert_rule_node(state):
 
 
 def parse_alert_node(state):
-    """Parse alert text to SQL query"""
+    """Parse alert text to SQL query with user location context"""
     return {
         **state,
-        'sql_query': parse_alert_to_sql_with_context(
-            {
-                'transaction': state['transaction'],
-                'alert_text': state['alert_text'],
-                'alert_rule': state['alert_rule'],
-                'user': state.get('user'),
-            }
+        'sql_query': parse_alert_to_sql_with_context.func(
+            state['transaction'],
+            state['alert_text'],
+            state['alert_rule'],
+            state.get('user'),  # Pass user for location context
         ),
     }
 

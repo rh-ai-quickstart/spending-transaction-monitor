@@ -212,7 +212,7 @@ class AlertRuleService:
                     'transaction': transaction_dict,
                     'alert_text': rule,
                     'user_id': user_id,
-                    'user': user_dict,
+                    'user': user_dict,  # Pass user for location context
                     'existing_rules': existing_rules_dict,
                 }
             )
@@ -235,7 +235,9 @@ class AlertRuleService:
             return result
 
         except Exception as e:
+            import traceback
             print(f'Error in rule validation: {e}')
+            print(f'Full traceback: {traceback.format_exc()}')
             return {
                 'status': 'error',
                 'message': f'Validation failed: {str(e)}',
