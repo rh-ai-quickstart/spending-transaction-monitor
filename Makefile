@@ -192,6 +192,31 @@ list-alert-samples:
 		fi; \
 	done
 
+# Non-interactive alert rule testing - run specific test by file name
+# Usage: make test-alert-rule FILE=alert_charged_significantly_more_same_merchant.json
+.PHONY: test-alert-rule
+test-alert-rule:
+	@if [ -z "$(FILE)" ]; then \
+		echo "❌ Error: FILE parameter is required"; \
+		echo ""; \
+		echo "Usage: make test-alert-rule FILE=<filename>"; \
+		echo ""; \
+		echo "Example: make test-alert-rule FILE=alert_charged_significantly_more_same_merchant.json"; \
+		echo ""; \
+		echo "To see available files, run: make list-alert-samples"; \
+		exit 1; \
+	fi
+	@echo "🚀 Running test for: $(FILE)"
+	@echo "============================================"
+	@cd packages/db/src/db/scripts && ./test_alert_rules.sh "$(FILE)"
+
+# Run all alert rule tests non-interactively
+.PHONY: test-all-alert-rules
+test-all-alert-rules:
+	@echo "🚀 Running all alert rule tests..."
+	@echo "============================================"
+	@cd packages/db/src/db/scripts && ./test_alert_rules.sh
+
 # Interactive alert rule testing menu
 .PHONY: test-alert-rules
 test-alert-rules:
@@ -297,8 +322,10 @@ help:
 	@echo "    helm-debug         Debug Helm deployment (includes dependency update)"
 	@echo ""
 	@echo "  Testing:"
-	@echo "    test-alert-rules   Interactive menu to test alert rules"
-	@echo "    list-alert-samples List available sample alert rule files"
+	@echo "    test-alert-rules       Interactive menu to test alert rules"
+	@echo "    test-alert-rule        Run specific test non-interactively (requires FILE=<name>)"
+	@echo "    test-all-alert-rules   Run all alert rule tests non-interactively"
+	@echo "    list-alert-samples     List available sample alert rule files"
 	@echo ""
 	@echo "  Setup:"
 	@echo "    setup-data         Complete data setup (migrations + seed all)"
@@ -343,6 +370,8 @@ help:
 	@echo "  make run-local                      # Start all services (pulls latest from quay.io)"
 	@echo "  make build-run-local                # Build and run with local images (tagged as 'local')"
 	@echo "  make test-alert-rules               # Interactive alert rule testing"
+	@echo "  make test-alert-rule FILE=alert_charged_significantly_more_same_merchant.json  # Run specific test"
+	@echo "  make test-all-alert-rules           # Run all alert tests non-interactively"
 	@echo "  make list-alert-samples             # List available alert samples"
 	@echo "  make NAMESPACE=my-app deploy        # Deploy to custom namespace"
 

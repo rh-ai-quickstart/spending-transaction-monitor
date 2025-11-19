@@ -10,6 +10,7 @@ from .agents.sql_executor import execute_sql
 class AppState(dict):
     transaction: dict
     alert_text: str
+    user: dict  # User profile data including location (optional)
     sql_query: str
     query_result: str
     valid_sql: bool
@@ -28,6 +29,7 @@ graph.add_node(
                 state['transaction'],
                 state['alert_text'],
                 state['alert_rule'],
+                state.get('user'),  # Pass user for location context
             ),
         }
     ),
