@@ -14,6 +14,10 @@ dependencies:
   - name: llama-stack
     version: 0.2.18
     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+  - name: keycloak
+    version: "1.0.0"
+    repository: "file://../keycloak"
+    condition: keycloak.enabled
 keywords:
   - monitoring
   - transactions
@@ -24,9 +28,3 @@ sources:
 maintainers:
   - name: Development Team
     email: dev@example.com
-
-dependencies:
-  - name: keycloak
-    version: "1.0.0"
-    repository: "file://../keycloak"
-    condition: keycloak.enabled
