@@ -17,6 +17,7 @@ COPY packages/configs/ ./packages/configs/
 WORKDIR /app/packages/ui
 
 # Install dependencies using workspace
+ENV NODE_OPTIONS="--max_old_space_size=4096"
 RUN pnpm install --no-frozen-lockfile
 
 # Build the application with environment variables
