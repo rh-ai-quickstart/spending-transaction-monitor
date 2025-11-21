@@ -12,9 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy db package
+# Copy db package and auth package (needed for Keycloak setup in startup.sh)
 WORKDIR /app
 COPY packages/db /app/packages/db
+COPY packages/auth /app/packages/auth
 
 # Copy sample data files
 COPY data/ /app/data/
@@ -36,8 +37,8 @@ RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
 # Install db package WITH ML dependencies for embeddings generation
 RUN uv pip install -e "./packages/db[ml]"
 
-# Install Keycloak sync dependencies (used by startup.sh for user sync)
-RUN uv pip install psycopg2-binary requests urllib3
+# Install auth package for Keycloak realm setup (used by startup.sh)
+RUN uv pip install -e "./packages/auth"
 
 # Copy and setup startup script
 COPY packages/db/startup.sh /app/startup.sh

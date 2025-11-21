@@ -4,7 +4,7 @@ node_modules/
 **/node_modules/
 
 # Exclude non-essential packages to avoid symlink issues
-packages/auth/
+# Note: packages/auth is needed by DB migration container for Keycloak setup
 packages/evaluation/
 packages/ingestion-service/
 
