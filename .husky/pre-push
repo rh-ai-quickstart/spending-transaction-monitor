@@ -19,7 +19,7 @@ if git rev-parse --abbrev-ref --symbolic-full-name @{upstream} >/dev/null 2>&1; 
   BASE=$(git merge-base HEAD @{upstream})
   COMMITS=$(git rev-list --no-merges --author="$AUTHOR_EMAIL" "$BASE"..HEAD)
   for c in $COMMITS; do
-    git show -s --format=%B "$c" | pnpm commitlint || exit 1
+    git show -s --format=%B "$c" | pnpm exec commitlint || exit 1
   done
 else
   # Ensure we know the default branch on origin
@@ -52,7 +52,7 @@ else
 
   COMMITS=$(git rev-list --no-merges --author="$AUTHOR_EMAIL" "$BASE"..HEAD)
   for c in $COMMITS; do
-    git show -s --format=%B "$c" | pnpm commitlint || exit 1
+    git show -s --format=%B "$c" | pnpm exec commitlint || exit 1
   done
 fi
 

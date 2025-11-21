@@ -5,15 +5,14 @@ type: application
 version: 0.1.0
 appVersion: "latest"
 dependencies:
-  - name: pgvector
-    version: 0.1.0
-    repository: https://rhecosystemappeng.github.io/ai-architecture-charts
   - name: llm-service
-    version: 0.1.0
+    version: 0.5.2
     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    condition: llm-service.enabled
   - name: llama-stack
-    version: 0.2.18
+    version: 0.5.2
     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    condition: llama-stack.enabled
   - name: keycloak
     version: "1.0.0"
     repository: "file://../keycloak"
