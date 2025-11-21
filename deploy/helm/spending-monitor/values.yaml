@@ -10,6 +10,15 @@ global:
   security:
     allowInsecureImages: true  # Allow Bitnami images from quay.io
 
+# LLM Service Configuration
+# Enable/disable LLM service providers
+llm-service:
+  enabled: false  # vLLM-based model serving (for larger models like 70B)
+
+llama-stack:
+  enabled: false  # Meta's Llama Stack distribution (for smaller models like 1B-3B)
+  # Set to true if using LLM_PROVIDER=llamastack
+
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
   # Database secrets
@@ -37,6 +46,8 @@ secrets:
   KEYCLOAK_URL: "changeme"
   KEYCLOAK_REALM: "changeme"
   KEYCLOAK_CLIENT_ID: "changeme"
+  KEYCLOAK_REDIRECT_URIS: "http://localhost:3000/*,http://localhost:3000"
+  KEYCLOAK_WEB_ORIGINS: "http://localhost:3000"
   
   # Keycloak database secrets (for external database connection)
   KEYCLOAK_DB_USER: "keycloak"
@@ -80,7 +91,6 @@ migration:
     tag: latest
   restartPolicy: Never
   backoffLimit: 1  # Only retry once - if it fails, it's likely a config issue
-  ttlSecondsAfterFinished: 86400  # 24 hours
   resources:
     requests:
       memory: "1Gi"
