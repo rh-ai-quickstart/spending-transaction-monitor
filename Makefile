@@ -176,6 +176,28 @@ check-keycloak-vars: check-env-prod
 	fi
 	@echo "✅ Keycloak environment variables are set"
 
+# Check if required Image environment variables are set (production)
+.PHONY: check-image-vars
+check-image-vars: check-env-prod
+	@echo "Checking Image Variables from $(ENV_FILE_PROD)..."
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	echo "IMAGE_REGISTRY: $$IMAGE_REGISTRY"; \
+	echo "IMAGE_REPOSITORY: $$IMAGE_REPOSITORY"; \
+	echo "IMAGE_REPOSITORY_TAG: $$IMAGE_REPOSITORY_TAG"; \
+	echo "IMAGE_REPOSITORY_PULL_POLICY: $$IMAGE_REPOSITORY_PULL_POLICY"; \
+	echo "IMAGE_STORAGE_CLASS: $$IMAGE_STORAGE_CLASS"
+
+# Check if required Image environment variables are set (development)
+.PHONY: check-image-vars-dev
+check-image-vars-dev: check-env-dev
+	@echo "Checking Image Variables from $(ENV_FILE_DEV)..."
+	@set -a; source $(ENV_FILE_DEV); set +a; \
+	echo "IMAGE_REGISTRY: $$IMAGE_REGISTRY"; \
+	echo "IMAGE_REPOSITORY: $$IMAGE_REPOSITORY"; \
+	echo "IMAGE_REPOSITORY_TAG: $$IMAGE_REPOSITORY_TAG"; \
+	echo "IMAGE_REPOSITORY_PULL_POLICY: $$IMAGE_REPOSITORY_PULL_POLICY"; \
+	echo "IMAGE_STORAGE_CLASS: $$IMAGE_STORAGE_CLASS"
+
 # Set up environment file for local development
 .PHONY: setup-dev-env
 setup-dev-env: check-env-dev
