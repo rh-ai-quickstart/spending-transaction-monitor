@@ -133,13 +133,24 @@ class KeycloakJWTBearer:
 
         logger.info(f'Original JWKS URI: {jwks_uri}')
 
-        # Only replace localhost with keycloak when KEYCLOAK_URL uses the container hostname
-        # This allows pnpm dev (localhost) and containerized deployments (keycloak) to both work
-        if 'localhost:8080' in jwks_uri and 'keycloak' in KEYCLOAK_URL:
-            jwks_uri = jwks_uri.replace('localhost:8080', 'keycloak:8080')
-            logger.info(
-                '🔄 Replaced localhost:8080 with keycloak:8080 in JWKS URI (containerized mode)'
-            )
+        # Replace external/localhost URLs with internal service URL when running in cluster
+        # This avoids SSL certificate issues and DNS resolution problems
+        if 'keycloak' in KEYCLOAK_URL or 'localhost' in KEYCLOAK_URL:
+            # Extract the host from KEYCLOAK_URL (e.g., "http://spending-monitor-keycloak:8080" -> "spending-monitor-keycloak:8080")
+            keycloak_host = KEYCLOAK_URL.replace('http://', '').replace('https://', '')
+
+            # Replace any external hostname with our internal service hostname
+            if keycloak_host not in jwks_uri:
+                # Extract path from jwks_uri (e.g., "/realms/spending-monitor/protocol/openid-connect/certs")
+                path_start = jwks_uri.find('/realms/')
+                if path_start > 0:
+                    path = jwks_uri[path_start:]
+                    jwks_uri = f'http://{keycloak_host}{path}'
+                    logger.info(
+                        f'🔄 Replaced external hostname with internal service URL: {jwks_uri}'
+                    )
+            else:
+                logger.info('📍 JWKS URI already uses internal service URL')
         else:
             logger.info('📍 Using JWKS URI as-is (development/host mode)')
 
