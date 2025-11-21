@@ -9,6 +9,18 @@ global:
   # Security settings for Bitnami charts
   security:
     allowInsecureImages: true  # Allow Bitnami images from quay.io
+  
+  # Model configuration for llama-stack and llm-service subcharts
+  # Format: models.<MODEL_NAME>.enabled=true
+  # Example: models.llama-3-3-70b-instruct-w8a8.enabled=true
+  # When using Llama models, set llama-stack.enabled=true and configure the model here
+  models: {}
+  # Example configuration:
+  # models:
+  #   llama-3-3-70b-instruct-w8a8:
+  #     enabled: true
+  #     id: "llama-3-3-70b-instruct-w8a8"
+  #     url: "http://llamastack:8321"
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
@@ -22,7 +34,7 @@ secrets:
   API_KEY: "changeme"
   BASE_URL: "http://localhost:8000"
   LLM_PROVIDER: "openai"
-  MODEL: "llama-3-3-70b-instruct-w8a8"
+  MODEL: "gpt-3.5-turbo"
   ENVIRONMENT: "production"
   DEBUG: "false"
   BYPASS_AUTH: "false"
@@ -267,3 +279,17 @@ keycloak:
   
   # For additional customization, see: deploy/helm/keycloak/values.yaml
   # You can override any value from the keycloak chart here
+
+# LlamaStack configuration (subchart)
+# Enable this when using LLM_PROVIDER=llamastack
+# When enabled, you must also set global.models.<MODEL_NAME>.enabled=true
+# NOTE: If LLM_PROVIDER=openai, keep this disabled (enabled: false)
+llama-stack:
+  enabled: false  # Set to true when using Llama models
+  # Additional llama-stack configuration can be added here
+
+# LLM Service configuration (subchart)
+# Enable this when using external LLM services
+llm-service:
+  enabled: false  # Set to true when using llm-service
+  # Additional llm-service configuration can be added here

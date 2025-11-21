@@ -72,16 +72,37 @@ $$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVI
 endef
 
 define HELM_LLAMASTACK_PARAMS
-$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.enabled=true"; fi) \
-$$(if [ -n "$$MODEL_ID" ]; then echo "--set global.models.$$MODEL.id=$$MODEL_ID"; fi) \
-$$(if [ -n "$$MODEL_URL" ]; then echo "--set global.models.$$MODEL.url=$$MODEL_URL"; fi) \
-$$(if [ -n "$$MODEL_API_KEY" ]; then echo "--set global.models.$$MODEL.apiToken=$$MODEL_API_KEY"; fi) \
-$$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi)
+$$(if [ "$$LLM_PROVIDER" = "llamastack" ]; then \
+  $$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.enabled=true"; fi) \
+  $$(if [ -n "$$MODEL_ID" ]; then echo "--set global.models.$$MODEL.id=$$MODEL_ID"; fi) \
+  $$(if [ -n "$$MODEL_URL" ]; then echo "--set global.models.$$MODEL.url=$$MODEL_URL"; fi) \
+  $$(if [ -n "$$MODEL_API_KEY" ]; then echo "--set global.models.$$MODEL.apiToken=$$MODEL_API_KEY"; fi) \
+  $$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi) \
+  echo "--set llama-stack.enabled=true"; \
+fi)
 endef
 
 define HELM_LLM_SERVICE_PARAMS
-$$(if [ -n "$$HF_TOKEN" ]; then echo "--set llm-service.secret.hf_token=$$HF_TOKEN"; fi) \
-$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$MODEL.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi)
+$$(if [ "$$LLM_PROVIDER" = "llm-service" ]; then \
+  $$(if [ -n "$$HF_TOKEN" ]; then echo "--set llm-service.secret.hf_token=$$HF_TOKEN"; fi) \
+  $$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$MODEL.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi) \
+  echo "--set llm-service.enabled=true"; \
+fi)
+endef
+
+# Helper to automatically disable llama-stack and llm-service when not needed
+# Only disables services when LLM_PROVIDER is not set or is openai/vertexai
+define HELM_DISABLE_LLM_SERVICES
+$$(if [ -z "$$LLM_PROVIDER" ]; then \
+  echo "--set llama-stack.enabled=false"; \
+  echo "--set llm-service.enabled=false"; \
+elif [ "$$LLM_PROVIDER" = "openai" ]; then \
+  echo "--set llama-stack.enabled=false"; \
+  echo "--set llm-service.enabled=false"; \
+elif [ "$$LLM_PROVIDER" = "vertexai" ]; then \
+  echo "--set llama-stack.enabled=false"; \
+  echo "--set llm-service.enabled=false"; \
+fi)
 endef
 
 # Default target when running 'make' without arguments
@@ -459,6 +480,7 @@ deploy: create-project helm-dep-update check-keycloak-vars
 		--set global.imageTag=$(IMAGE_TAG) \
 		--set routes.sharedHost="$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)" \
 		$(HELM_SECRET_PARAMS) \
+		$(HELM_DISABLE_LLM_SERVICES) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
 
@@ -488,6 +510,7 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 		--set api.replicas=1 \
 		--set ui.replicas=1 \
 		$(HELM_SECRET_PARAMS) \
+		$(HELM_DISABLE_LLM_SERVICES) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
 
