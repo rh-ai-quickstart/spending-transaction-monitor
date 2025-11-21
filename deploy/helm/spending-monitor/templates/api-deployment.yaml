@@ -109,11 +109,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: SMTP_USE_SSL
+            # Use internal service URL for API (runs inside cluster)
+            # This avoids SSL certificate issues when validating JWT tokens
             - name: KEYCLOAK_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "spending-monitor.fullname" . }}-secret
-                  key: KEYCLOAK_URL
+              value: "http://{{ .Release.Name }}-keycloak:8080"
             - name: KEYCLOAK_REALM
               valueFrom:
                 secretKeyRef:
