@@ -85,7 +85,6 @@ class RealmManager(KeycloakClient):
                 'attributes': {'pkce.code.challenge.method': 'S256'},
             }
 
-
             if existing_client:
                 # Update existing client
                 client_uuid = existing_client['id']
