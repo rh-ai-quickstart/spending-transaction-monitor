@@ -91,9 +91,10 @@ if [ "${BYPASS_AUTH:-true}" = "false" ] && [ -n "${KEYCLOAK_URL}" ]; then
     set +e
     
     # Setup realm and sync users using auth package CLI
+    # The auth package is installed in the venv, so use venv's python
     echo ""
-    cd /app/packages/auth
-    python3 -m keycloak.cli setup --sync-users
+    cd /app/packages/auth/src
+    /app/venv/bin/python3 -m keycloak.cli setup --sync-users
     
     # Re-enable error checking
     set -e
