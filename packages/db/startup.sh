@@ -87,13 +87,23 @@ if [ "${BYPASS_AUTH:-true}" = "false" ] && [ -n "${KEYCLOAK_URL}" ]; then
     echo "   Realm: ${KEYCLOAK_REALM:-spending-monitor}"
     echo "   Default password: ${KEYCLOAK_DEFAULT_PASSWORD:-password123}"
     
+    # Wait for Keycloak to be ready using the CLI
+    echo ""
+    cd /app/packages/auth/src
+    if ! /app/venv/bin/python3 -m keycloak.cli wait --max-attempts 60 --interval 2; then
+        echo "   ⚠️  Keycloak not ready, skipping setup (non-critical)"
+        echo ""
+        echo "🎉 Database initialization completed!"
+        exit 0
+    fi
+    
     # Use 'set +e' to ensure any errors don't fail the script
     set +e
     
     # Setup realm and sync users using auth package CLI
+    # The auth package is installed in the venv, so use venv's python
     echo ""
-    cd /app/packages/auth
-    python3 -m keycloak.cli setup --sync-users
+    /app/venv/bin/python3 -m keycloak.cli setup --sync-users
     
     # Re-enable error checking
     set -e

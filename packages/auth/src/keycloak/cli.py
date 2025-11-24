@@ -6,10 +6,59 @@ Consolidated interface for all Keycloak operations.
 """
 
 import argparse
+import http.client
+import os
 import sys
+import time
+from urllib.parse import urlparse
 
 from .realm import RealmManager
 from .users import UserManager
+
+
+def wait_for_keycloak(max_attempts: int = 60, interval: int = 2) -> int:
+    """Wait for Keycloak to be ready.
+
+    Args:
+        max_attempts: Maximum number of connection attempts
+        interval: Seconds to wait between attempts
+
+    Returns:
+        0 if Keycloak is ready, 1 otherwise
+    """
+    keycloak_url = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+
+    print(f'⏳ Waiting for Keycloak at {keycloak_url}...')
+
+    # Parse URL
+    parsed = urlparse(keycloak_url)
+    host = parsed.hostname or 'localhost'
+    port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # Make a simple HTTP connection without following redirects
+            conn = http.client.HTTPConnection(host, port, timeout=2)
+            conn.request('GET', '/')
+            response = conn.getresponse()
+            conn.close()
+
+            # Accept any response (200, 302, etc.) - just need to know Keycloak is responding
+            if response.status in (200, 302, 303, 307, 308):
+                print('   ✅ Keycloak is ready!')
+                return 0
+
+        except Exception:
+            pass
+
+        if attempt < max_attempts:
+            print(
+                f'   Attempt {attempt}/{max_attempts}: Keycloak not ready, waiting {interval}s...'
+            )
+            time.sleep(interval)
+
+    print(f'   ⚠️  Keycloak not ready after {max_attempts * interval} seconds')
+    return 1
 
 
 def setup_realm(sync_db_users: bool = False) -> int:
@@ -79,6 +128,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Wait for Keycloak to be ready
+  %(prog)s wait
+  
   # Set up Keycloak realm
   %(prog)s setup
 
@@ -95,7 +147,7 @@ Environment Variables (from .env.production):
   KEYCLOAK_URL              Keycloak server URL
   KEYCLOAK_REALM            Realm name (default: spending-monitor)
   KEYCLOAK_CLIENT_ID        Client ID (default: spending-monitor)
-  KEYCLOAK_ADMIN_USER       Admin username (default: admin)
+  KEYCLOAK_ADMIN            Admin username (default: admin)
   KEYCLOAK_ADMIN_PASSWORD   Admin password (required)
   KEYCLOAK_REDIRECT_URIS    Comma-separated redirect URIs (optional)
   KEYCLOAK_WEB_ORIGINS      Comma-separated web origins (optional)
@@ -125,6 +177,21 @@ Environment Variables (from .env.production):
     # Sync users command
     subparsers.add_parser('sync-users', help='Sync database users to Keycloak')
 
+    # Wait command
+    wait_parser = subparsers.add_parser('wait', help='Wait for Keycloak to be ready')
+    wait_parser.add_argument(
+        '--max-attempts',
+        type=int,
+        default=60,
+        help='Maximum number of connection attempts (default: 60)',
+    )
+    wait_parser.add_argument(
+        '--interval',
+        type=int,
+        default=2,
+        help='Seconds to wait between attempts (default: 2)',
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -138,6 +205,11 @@ Environment Variables (from .env.production):
         return list_users(include_test_users=args.include_test_users)
     elif args.command == 'sync-users':
         return sync_users()
+    elif args.command == 'wait':
+        return wait_for_keycloak(
+            max_attempts=args.max_attempts,
+            interval=args.interval,
+        )
 
     return 1
 

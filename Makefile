@@ -11,10 +11,19 @@ CLUSTER_DOMAIN ?= $(shell oc whoami --show-server 2>/dev/null | sed -E 's|https:
 # Dynamically generated URLs for production deployment
 # Note: The route format follows OpenShift's pattern: <app-name>-<namespace>.<cluster-domain>
 # These override any values set in .env.production during deployment
-KEYCLOAK_URL_DYNAMIC := https://$(PROJECT_NAME)-keycloak-$(NAMESPACE).$(CLUSTER_DOMAIN)
+
+# Internal Keycloak URL (for API to reach Keycloak via cluster network)
+KEYCLOAK_URL_DYNAMIC := http://$(PROJECT_NAME)-keycloak:8080
+
+# External Keycloak URL (for browser access and token issuer)
+KEYCLOAK_FRONTEND_URL_DYNAMIC := https://$(PROJECT_NAME)-keycloak-$(NAMESPACE).$(CLUSTER_DOMAIN)
+
+# Application URLs
 APP_URL_DYNAMIC := https://$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)
 CORS_ALLOWED_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
 ALLOWED_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
+KEYCLOAK_REDIRECT_URIS_DYNAMIC := $(APP_URL_DYNAMIC)/*,$(APP_URL_DYNAMIC)
+KEYCLOAK_WEB_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
 
 # Component image names
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
@@ -55,14 +64,17 @@ $$(if [ -n "$$SMTP_FROM_EMAIL" ]; then echo "--set secrets.SMTP_FROM_EMAIL=$$SMT
 $$(if [ -n "$$SMTP_USE_TLS" ]; then echo "--set secrets.SMTP_USE_TLS=$$SMTP_USE_TLS"; fi) \
 $$(if [ -n "$$SMTP_USE_SSL" ]; then echo "--set secrets.SMTP_USE_SSL=$$SMTP_USE_SSL"; fi) \
 $$(if [ -n "$$KEYCLOAK_URL" ]; then echo "--set secrets.KEYCLOAK_URL=$$KEYCLOAK_URL"; fi) \
+$$(if [ -n "$$KEYCLOAK_FRONTEND_URL" ]; then echo "--set secrets.KEYCLOAK_FRONTEND_URL=$$KEYCLOAK_FRONTEND_URL"; fi) \
 $$(if [ -n "$$KEYCLOAK_REALM" ]; then echo "--set secrets.KEYCLOAK_REALM=$$KEYCLOAK_REALM"; fi) \
 $$(if [ -n "$$KEYCLOAK_CLIENT_ID" ]; then echo "--set secrets.KEYCLOAK_CLIENT_ID=$$KEYCLOAK_CLIENT_ID"; fi) \
+$$(if [ -n "$$KEYCLOAK_REDIRECT_URIS" ]; then echo "--set secrets.KEYCLOAK_REDIRECT_URIS=$${KEYCLOAK_REDIRECT_URIS//,/\\,}"; fi) \
+$$(if [ -n "$$KEYCLOAK_WEB_ORIGINS" ]; then echo "--set secrets.KEYCLOAK_WEB_ORIGINS=$$KEYCLOAK_WEB_ORIGINS"; fi) \
 $$(if [ -n "$$KEYCLOAK_DB_USER" ]; then echo "--set secrets.KEYCLOAK_DB_USER=$$KEYCLOAK_DB_USER"; fi) \
 $$(if [ -n "$$KEYCLOAK_DB_PASSWORD" ]; then echo "--set secrets.KEYCLOAK_DB_PASSWORD=$$KEYCLOAK_DB_PASSWORD"; fi) \
 $$(if [ -n "$$KEYCLOAK_ADMIN_PASSWORD" ]; then echo "--set secrets.KEYCLOAK_ADMIN_PASSWORD=$$KEYCLOAK_ADMIN_PASSWORD"; fi) \
 $$(if [ -n "$$KEYCLOAK_ADMIN_PASSWORD" ]; then echo "--set keycloak.admin.password=$$KEYCLOAK_ADMIN_PASSWORD"; fi) \
 $$(if [ -n "$$KEYCLOAK_DB_PASSWORD" ]; then echo "--set keycloak.pgvector.secret.password=$$KEYCLOAK_DB_PASSWORD"; fi) \
-$$(if [ -n "$$KEYCLOAK_URL" ]; then echo "--set keycloak.config.hostname=$$(echo "$$KEYCLOAK_URL" | sed 's|http://||' | sed 's|https://||' | sed 's|/.*||' | sed 's|:[0-9]*$$||')"; fi) \
+$$(if [ -n "$$KEYCLOAK_FRONTEND_URL" ]; then echo "--set keycloak.config.hostname=$$(echo "$$KEYCLOAK_FRONTEND_URL" | sed 's|http://||' | sed 's|https://||' | sed 's|/.*||' | sed 's|:[0-9]*$$||')"; fi) \
 $$(if [ -n "$$VITE_API_BASE_URL" ]; then echo "--set secrets.VITE_API_BASE_URL=$$VITE_API_BASE_URL"; fi) \
 $$(if [ -n "$$VITE_BYPASS_AUTH" ]; then echo "--set secrets.VITE_BYPASS_AUTH=$$VITE_BYPASS_AUTH"; fi) \
 $$(if [ -n "$$VITE_ENVIRONMENT" ]; then echo "--set secrets.VITE_ENVIRONMENT=$$VITE_ENVIRONMENT"; fi) \
@@ -399,17 +411,17 @@ create-project:
 .PHONY: build-ui
 build-ui:
 	@echo "Building UI image..."
-	podman build --platform=linux/amd64 -t $(UI_IMAGE) -f ./packages/ui/Containerfile .
+	podman build --no-cache --platform=linux/amd64 -t $(UI_IMAGE) -f ./packages/ui/Containerfile .
 
 .PHONY: build-api
 build-api:
 	@echo "Building API image..."
-	podman build --platform=linux/amd64 -t $(API_IMAGE) -f ./packages/api/Containerfile .
+	podman build --no-cache --platform=linux/amd64 -t $(API_IMAGE) -f ./packages/api/Containerfile .
 
 .PHONY: build-db
 build-db:
 	@echo "Building database image..."
-	podman build --platform=linux/amd64 -t $(DB_IMAGE) -f ./packages/db/Containerfile .
+	podman build --no-cache --platform=linux/amd64 -t $(DB_IMAGE) -f ./packages/db/Containerfile .
 
 .PHONY: build-all
 build-all: build-ui build-api build-db
@@ -441,15 +453,21 @@ deploy: create-project helm-dep-update check-keycloak-vars
 	@echo "Deploying application using Helm with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@echo "Dynamically generated URLs (overriding .env.production):"
-	@echo "  KEYCLOAK_URL: $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_URL (internal): $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_FRONTEND_URL (external): $(KEYCLOAK_FRONTEND_URL_DYNAMIC)"
 	@echo "  APP_URL: $(APP_URL_DYNAMIC)"
 	@echo "  CORS_ALLOWED_ORIGINS: $(CORS_ALLOWED_ORIGINS_DYNAMIC)"
 	@echo "  ALLOWED_ORIGINS: $(ALLOWED_ORIGINS_DYNAMIC)"
+	@echo "  KEYCLOAK_REDIRECT_URIS: $(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"
+	@echo "  KEYCLOAK_WEB_ORIGINS: $(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"
 	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
 	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
+	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
 	export CORS_ALLOWED_ORIGINS="$(CORS_ALLOWED_ORIGINS_DYNAMIC)"; \
 	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
+	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
+	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
 	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
@@ -468,15 +486,21 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@echo "Note: This is still a production deployment with reduced resources for development/testing"
 	@echo "Dynamically generated URLs (overriding .env.production):"
-	@echo "  KEYCLOAK_URL: $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_URL (internal): $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_FRONTEND_URL (external): $(KEYCLOAK_FRONTEND_URL_DYNAMIC)"
 	@echo "  APP_URL: $(APP_URL_DYNAMIC)"
 	@echo "  CORS_ALLOWED_ORIGINS: $(CORS_ALLOWED_ORIGINS_DYNAMIC)"
 	@echo "  ALLOWED_ORIGINS: $(ALLOWED_ORIGINS_DYNAMIC)"
+	@echo "  KEYCLOAK_REDIRECT_URIS: $(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"
+	@echo "  KEYCLOAK_WEB_ORIGINS: $(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"
 	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
 	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
+	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
 	export CORS_ALLOWED_ORIGINS="$(CORS_ALLOWED_ORIGINS_DYNAMIC)"; \
 	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
+	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
+	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
 	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
@@ -578,14 +602,20 @@ helm-template: helm-dep-update check-env-prod
 	@echo "Rendering Helm templates with production environment variables..."
 	@echo "Using production environment file: $(ENV_FILE_PROD)"
 	@echo "Dynamically generated URLs (overriding .env.production):"
-	@echo "  KEYCLOAK_URL: $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_URL (internal): $(KEYCLOAK_URL_DYNAMIC)"
+	@echo "  KEYCLOAK_FRONTEND_URL (external): $(KEYCLOAK_FRONTEND_URL_DYNAMIC)"
 	@echo "  APP_URL: $(APP_URL_DYNAMIC)"
 	@echo "  CORS_ALLOWED_ORIGINS: $(CORS_ALLOWED_ORIGINS_DYNAMIC)"
 	@echo "  ALLOWED_ORIGINS: $(ALLOWED_ORIGINS_DYNAMIC)"
+	@echo "  KEYCLOAK_REDIRECT_URIS: $(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"
+	@echo "  KEYCLOAK_WEB_ORIGINS: $(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"
 	@set -a; source $(ENV_FILE_PROD); set +a; \
 	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
+	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
 	export CORS_ALLOWED_ORIGINS="$(CORS_ALLOWED_ORIGINS_DYNAMIC)"; \
 	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
+	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
+	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
 	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT; \
 	helm template $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--set global.imageRegistry=$(REGISTRY_URL) \
@@ -701,6 +731,9 @@ stop-local:
 	podman-compose -f podman-compose.yml down
 	@echo "Removing db data..."
 	podman volume rm --all || true
+	@echo "Cleaning up llamastack storage..."
+	@podman volume rm spending-transaction-monitor_llamastack-data 2>/dev/null || true
+	@echo "✅ All local services stopped and storage cleaned"
 
 .PHONY: build-local
 build-local:
@@ -805,6 +838,7 @@ keycloak-setup:
 	@echo "🔐 Setting up Keycloak realm..."
 	@if [ -f .env.production ]; then \
 		set -a && . ./.env.production && set +a && \
+		export KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_CLIENT_ID KEYCLOAK_REDIRECT_URIS KEYCLOAK_WEB_ORIGINS && \
 		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli setup; \
 	else \
 		echo "❌ Error: .env.production not found"; \
@@ -826,6 +860,7 @@ keycloak-setup-with-users:
 keycloak-users:
 	@if [ -f .env.production ]; then \
 		set -a && . ./.env.production && set +a && \
+		export KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_ADMIN_PASSWORD && \
 		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli list-users; \
 	else \
 		echo "❌ Error: .env.production not found"; \
@@ -847,6 +882,7 @@ keycloak-sync-users:
 	@echo "🔄 Syncing database users to Keycloak..."
 	@if [ -f .env.production ]; then \
 		set -a && . ./.env.production && set +a && \
+		export KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_ADMIN_PASSWORD DATABASE_URL && \
 		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli sync-users; \
 	else \
 		echo "❌ Error: .env.production not found"; \

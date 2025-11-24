@@ -16,6 +16,7 @@ class RealmManager(KeycloakClient):
     def _get_redirect_uris(self) -> list[str]:
         """Get redirect URIs from environment or use defaults."""
         env_uris = os.getenv('KEYCLOAK_REDIRECT_URIS', '')
+
         if env_uris:
             return [uri.strip() for uri in env_uris.split(',')]
         return ['http://localhost:3000/*']

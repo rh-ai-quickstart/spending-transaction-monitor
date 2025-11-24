@@ -58,7 +58,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
-                  key: KEYCLOAK_URL
+                  key: KEYCLOAK_FRONTEND_URL
             - name: VITE_KEYCLOAK_REALM
               valueFrom:
                 secretKeyRef:

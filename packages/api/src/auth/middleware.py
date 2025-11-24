@@ -58,7 +58,10 @@ async def _capture_user_location_safe(
 _cache_expiry: datetime | None = None
 
 # Keycloak configuration (loaded from environment variables)
-KEYCLOAK_URL = settings.KEYCLOAK_URL
+KEYCLOAK_URL = settings.KEYCLOAK_URL  # Internal URL for API to reach Keycloak
+KEYCLOAK_FRONTEND_URL = (
+    settings.KEYCLOAK_FRONTEND_URL
+)  # External URL for browser and token issuer
 REALM = settings.KEYCLOAK_REALM
 CLIENT_ID = settings.KEYCLOAK_CLIENT_ID
 
@@ -88,12 +91,21 @@ class KeycloakJWTBearer:
             response.raise_for_status()
 
             _oidc_config_cache = response.json()
+
+            # IMPORTANT: Override the issuer to use KEYCLOAK_FRONTEND_URL
+            # Keycloak returns the issuer based on the URL used to access it
+            # But tokens are issued with KEYCLOAK_FRONTEND_URL (browser access)
+            # So we need to override the issuer for validation to work
+            _oidc_config_cache['issuer'] = f'{KEYCLOAK_FRONTEND_URL}/realms/{REALM}'
+
             _cache_expiry = datetime.now() + timedelta(hours=1)
 
             logger.info(
                 '✅ Successfully loaded OIDC configuration from Keycloak discovery'
             )
-            logger.info(f'   Issuer: {_oidc_config_cache.get("issuer", "N/A")}')
+            logger.info(
+                f'   Issuer (overridden): {_oidc_config_cache.get("issuer", "N/A")}'
+            )
             logger.info(f'   JWKS URI: {_oidc_config_cache.get("jwks_uri", "N/A")}')
             return _oidc_config_cache
 
@@ -103,13 +115,15 @@ class KeycloakJWTBearer:
             logger.warning('   Falling back to hardcoded OIDC endpoints')
 
             # Fallback to hardcoded endpoints
+            # Use KEYCLOAK_FRONTEND_URL for issuer (matches token issuer)
+            # Use KEYCLOAK_URL for API endpoints (internal access)
             _oidc_config_cache = {
-                'issuer': f'{KEYCLOAK_URL}/realms/{REALM}',
+                'issuer': f'{KEYCLOAK_FRONTEND_URL}/realms/{REALM}',
                 'jwks_uri': f'{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/certs',
-                'authorization_endpoint': f'{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/auth',
-                'token_endpoint': f'{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token',
+                'authorization_endpoint': f'{KEYCLOAK_FRONTEND_URL}/realms/{REALM}/protocol/openid-connect/auth',
+                'token_endpoint': f'{KEYCLOAK_FRONTEND_URL}/realms/{REALM}/protocol/openid-connect/token',
                 'userinfo_endpoint': f'{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/userinfo',
-                'end_session_endpoint': f'{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/logout',
+                'end_session_endpoint': f'{KEYCLOAK_FRONTEND_URL}/realms/{REALM}/protocol/openid-connect/logout',
             }
             _cache_expiry = datetime.now() + timedelta(hours=1)
 
@@ -133,17 +147,19 @@ class KeycloakJWTBearer:
 
         logger.info(f'Original JWKS URI: {jwks_uri}')
 
-        # Only replace localhost with keycloak when KEYCLOAK_URL uses the container hostname
-        # This allows pnpm dev (localhost) and containerized deployments (keycloak) to both work
-        if 'localhost:8080' in jwks_uri and 'keycloak' in KEYCLOAK_URL:
-            jwks_uri = jwks_uri.replace('localhost:8080', 'keycloak:8080')
-            logger.info(
-                '🔄 Replaced localhost:8080 with keycloak:8080 in JWKS URI (containerized mode)'
-            )
-        else:
-            logger.info('📍 Using JWKS URI as-is (development/host mode)')
+        # Fix JWKS URI to use internal URL (KEYCLOAK_URL) instead of external
+        # The OIDC discovery returns URLs based on KEYCLOAK_FRONTEND_URL,
+        # but the API should fetch JWKS from the internal service
 
-        logger.info(f'Fetching JWKS from: {jwks_uri}')
+        # Parse the JWKS URI to extract just the path
+        from urllib.parse import urlparse
+
+        parsed = urlparse(jwks_uri)
+        jwks_path = parsed.path
+
+        # Reconstruct using KEYCLOAK_URL (internal)
+        jwks_uri = f'{KEYCLOAK_URL}{jwks_path}'
+        logger.info(f'🔧 Adjusted JWKS URI to use internal URL: {jwks_uri}')
 
         try:
             response = requests.get(jwks_uri, timeout=10.0)
