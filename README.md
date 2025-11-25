@@ -287,6 +287,12 @@ BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development make build-r
 | `VITE_BYPASS_AUTH` | `true`/`false` | Frontend auth bypass |
 | `VITE_ENVIRONMENT` | `development`/`staging`/`production` | Environment mode |
 | `KEYCLOAK_URL` | URL | Keycloak server URL (default: `http://localhost:8080`) |
+| `LLAMASTACK_BASE_URL` | URL | Llama Stack server URL (default: `http://llamastack:8321`) |
+| `LLAMASTACK_MODEL` | string | The name of a model in Llama Stack (from llm-service) to use |
+| `MODEL_ID` | string | The id of a model in Llama Stack to use |
+| `MODEL_URL` | URL | The URL of a model endpoint to be used with Llama Stack |
+| `MODEL_API_KEY` | string | The API key of a model service to be used with Llama Stack |
+| `HF_TOKEN` | string | Hugging Face token for use with Llama Stack |
 
 ## 💻 Local Development (pnpm)
 
