@@ -182,6 +182,8 @@ cd spending-transaction-monitor
 
 ## 🐳 Container Deployment (Recommended)
 
+**See Mac M Series [Installation Troubleshooting](./AppleSiliconPodmanSetup.md)**
+
 ### 🚀 Quick Start with Podman Compose
 
 **Start with pre-built images:**
