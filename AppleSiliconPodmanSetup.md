@@ -4,9 +4,7 @@ This tutorial walks you through installing Lima, creating an x86_64 Podman VM, c
 This is especially useful on Apple Silicon when you need x86_64 container builds (for example, if ARM builds break under QEMU).
 
 ## The Problem
-Sometimes Mac cannot translate the commands in one chip architecture so we need a layer to do this for us.
-Qemu is usual the software for the job, but in some cases when the process for building images is computationally 
-complex the M series mac will Sig fault.
+On Apple Silicon Macs, commands or binaries built for x86_64 (Intel/AMD) CPUs often cannot run natively due to the ARM architecture. To bridge this gap, a compatibility layer like QEMU is typically used to emulate x86_64. However, when building complex container images, QEMU emulation can sometimes fail, causing segmentation faults (SIGSEGV errors) on M-series Macs.
 
 ### Symptoms
 
