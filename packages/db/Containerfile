@@ -1,12 +1,21 @@
 # Containerfile
-FROM python:3.12-alpine
+FROM python:3.12-slim
+
+# Build argument to control PyTorch variant (cpu or cuda)
+ARG TORCH_VARIANT=cpu
 
 # Install deps
-RUN apk add --no-cache gcc musl-dev libpq-dev postgresql-client bash
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    postgresql-client \
+    bash \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy db package
+# Copy db package and auth package (needed for Keycloak setup in startup.sh)
 WORKDIR /app
 COPY packages/db /app/packages/db
+COPY packages/auth /app/packages/auth
 
 # Copy sample data files
 COPY data/ /app/data/
@@ -15,7 +24,21 @@ COPY data/ /app/data/
 RUN pip install uv
 RUN uv venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
-RUN uv pip install -e ./packages/db
+
+# Install PyTorch based on TORCH_VARIANT (cpu for local, cuda for production)
+RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
+        echo "Installing PyTorch CPU version (lightweight, ~176MB)..." && \
+        uv pip install --index-url https://download.pytorch.org/whl/cpu torch; \
+    else \
+        echo "Installing PyTorch CUDA version (GPU-enabled, ~800MB)..." && \
+        uv pip install torch; \
+    fi
+
+# Install db package WITH ML dependencies for embeddings generation
+RUN uv pip install -e "./packages/db[ml]"
+
+# Install auth package for Keycloak realm setup (used by startup.sh)
+RUN uv pip install -e "./packages/auth"
 
 # Copy and setup startup script
 COPY packages/db/startup.sh /app/startup.sh

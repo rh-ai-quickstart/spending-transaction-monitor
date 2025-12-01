@@ -6,7 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 // Router imports removed - not used in tests
 import { ProtectedRoute } from '../ProtectedRoute';
 import { AuthContext } from '../../../contexts/AuthContext';
-import type { AuthContextType, User } from '../../../types/auth';
+import type { AuthContextType, User } from '../../../schemas/auth';
 
 // Mock navigate function
 const mockNavigate = vi.fn();

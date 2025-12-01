@@ -3,8 +3,21 @@ global:
   imageRegistry: quay.io
   imageRepository: rh-ai-quickstart
   imageTag: latest
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   storageClass: ""
+  
+  # Security settings for Bitnami charts
+  security:
+    allowInsecureImages: true  # Allow Bitnami images from quay.io
+
+# LLM Service Configuration
+# Enable/disable LLM service providers
+llm-service:
+  enabled: false  # vLLM-based model serving (for larger models like 70B)
+
+llama-stack:
+  enabled: false  # Meta's Llama Stack distribution (for smaller models like 1B-3B)
+  # Set to true if using LLM_PROVIDER=llamastack
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
@@ -24,6 +37,7 @@ secrets:
   BYPASS_AUTH: "false"
   CORS_ALLOWED_ORIGINS: '["*"]'
   ALLOWED_ORIGINS: '["*"]'
+  ALLOWED_HOSTS: '["*"]'
   SMTP_HOST: "changeme"
   SMTP_PORT: "587"
   SMTP_FROM_EMAIL: "changeme"
@@ -32,6 +46,16 @@ secrets:
   KEYCLOAK_URL: "changeme"
   KEYCLOAK_REALM: "changeme"
   KEYCLOAK_CLIENT_ID: "changeme"
+  KEYCLOAK_REDIRECT_URIS: "http://localhost:3000/*,http://localhost:3000"
+  KEYCLOAK_WEB_ORIGINS: "http://localhost:3000"
+  
+  # Keycloak database secrets (for external database connection)
+  KEYCLOAK_DB_USER: "keycloak"
+  KEYCLOAK_DB_PASSWORD: "keycloak"  # Change in production!
+  KEYCLOAK_ADMIN_PASSWORD: "keycloak"  # Change in production!
+
+  LLAMASTACK_BASE_URL: "http://llamastack:8321"
+  LLAMASTACK_MODEL: "RedHatAI/Llama-3.2-1B-Instruct-quantized.w8a8"
 
   # UI secrets
   VITE_API_BASE_URL: "http://localhost:8000"
@@ -41,8 +65,8 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: postgres
-    tag: 16-alpine
+    repository: pgvector/pgvector
+    tag: pg16
   service:
     type: ClusterIP
     port: 5432
@@ -66,14 +90,13 @@ migration:
     repository: spending-monitor-db
     tag: latest
   restartPolicy: Never
-  backoffLimit: 3
-  ttlSecondsAfterFinished: 86400  # 24 hours
+  backoffLimit: 1  # Only retry once - if it fails, it's likely a config issue
   resources:
     requests:
-      memory: "512Mi"
+      memory: "1Gi"
       cpu: "250m"
     limits:
-      memory: "1Gi"
+      memory: "2Gi"  # Increased from 1Gi to accommodate torch/sentence-transformers
       cpu: "1000m"
 
 # API configuration
@@ -125,8 +148,11 @@ ui:
     periodSeconds: 10
 
 # Nginx reverse proxy configuration
+# NOTE: When deploying on OpenShift, it's recommended to disable nginx
+# and use native OpenShift Routes for path-based routing instead.
+# Set enabled: false to use the 2-route approach (UI + API routes)
 nginx:
-  enabled: true
+  enabled: false
   name: spending-monitor-nginx
   image:
     repository: nginx
@@ -152,22 +178,28 @@ nginx:
 routes:
   enabled: true
   annotations: {}
+  # Shared hostname for all routes (REQUIRED for nginx.enabled=false)
+  # IMPORTANT: All routes must use the same hostname for path-based routing
+  # Format: spending-monitor-<namespace>.apps.<cluster-domain>
+  # Example: spending-monitor-my-namespace.apps.my-cluster.com
+  sharedHost: ""  # Set custom hostname or leave empty (will use ui.host fallback)
   # nginx route configuration (when nginx.enabled=true)
   nginx:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Leave empty to auto-generate hostname
     tls:
       enabled: true
       termination: edge
       insecureEdgeTerminationPolicy: Redirect
-  # Legacy routes configuration (when nginx.enabled=false)
+  # Direct routes configuration (when nginx.enabled=false)
+  # NOTE: When using direct routes, set routes.sharedHost for all routes
   ui:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Used as fallback if sharedHost is empty
     tls:
       enabled: true
       termination: edge
       insecureEdgeTerminationPolicy: Redirect
   api:
-    host: ""  # Leave empty to auto-generate hostname, or specify custom hostname
+    host: ""  # Ignored - uses sharedHost or ui.host
     tls:
       enabled: true
       termination: edge
@@ -201,3 +233,47 @@ tolerations: []
 
 # Affinity
 affinity: {}
+
+# Keycloak configuration (subchart)
+# This references the keycloak subchart in deploy/helm/keycloak
+# Keycloak now uses its own dedicated pgvector PostgreSQL instance
+keycloak:
+  enabled: true
+  
+  # Admin configuration
+  # Password comes from environment variables passed via Makefile
+  admin:
+    username: admin
+    # Password will be passed via --set flag from Makefile
+  
+  # Database configuration
+  database:
+    vendor: postgres
+  
+  # pgvector PostgreSQL configuration
+  # This deploys a dedicated PostgreSQL instance for Keycloak
+  # All database connection details are configured here
+  pgvector:
+    enabled: true
+    secret:
+      host: pgvector  # Database host (for external DB, set to external hostname)
+      port: "5432"  # Database port
+      user: keycloak  # Database username
+      password: keycloak  # Will be overridden by KEYCLOAK_DB_PASSWORD from Makefile
+      dbname: keycloak  # Database name
+  
+  # Configuration
+  config:
+    proxy: edge
+    proxyHeaders: xforwarded
+    production: true
+    healthEnabled: true
+    metricsEnabled: true
+    hostnameStrict: false
+  
+  # Route for OpenShift
+  route:
+    enabled: true
+  
+  # For additional customization, see: deploy/helm/keycloak/values.yaml
+  # You can override any value from the keycloak chart here

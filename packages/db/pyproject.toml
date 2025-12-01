@@ -18,12 +18,22 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "pgvector>=0.2.0",
     "pandas>=2.3.2",
-    "openai>=1.109.1",
-    "httpx>=0.28.1",
     "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
+ml = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0; platform_machine != 'x86_64'",  # Full torch for non-x86
+    "openai>=1.109.1",
+    "httpx>=0.28.1",
+]
+ml-cpu = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",  # Will install CPU version via index-url
+    "openai>=1.109.1",
+    "httpx>=0.28.1",
+]
 embeddings = [
     "sentence-transformers>=2.2.0",
     "torch>=2.2.0",

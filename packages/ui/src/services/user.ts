@@ -1,50 +1,10 @@
-// Type definitions for API responses
-export interface ApiUserResponse {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone_number: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  created_at: string;
-}
-
-export interface ApiCreditCardResponse {
-  id: string;
-  user_id: string;
-  card_number: string;
-  card_type: string;
-  expiry_date: string;
-  credit_limit: number;
-  current_balance: number;
-  available_credit: number;
-}
-
-export interface ApiAlertRuleResponse {
-  id: string;
-  name: string;
-  natural_language_query: string;
-  sql_query: string;
-  alert_type: string;
-  is_active: boolean;
-  trigger_count: number;
-  created_at: string;
-  updated_at: string;
-  last_triggered?: string;
-}
-
-// Current user interface for session management
-export interface CurrentUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  fullName: string;
-}
+// Import type definitions from schemas
+import type {
+  ApiUserResponse,
+  ApiCreditCardResponse,
+  ApiAlertRuleResponse,
+  CurrentUser,
+} from '../schemas/user';
 
 // Storage key constant
 const CURRENT_USER_STORAGE_KEY = 'spending-monitor-current-user';

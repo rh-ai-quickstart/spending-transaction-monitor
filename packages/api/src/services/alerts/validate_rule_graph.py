@@ -14,6 +14,7 @@ class ValidationState(dict):
     transaction: dict
     alert_text: str
     user_id: str
+    user: dict  # User profile data including location
     existing_rules: list[dict]
     sql_query: str
     query_result: str
@@ -38,22 +39,21 @@ def create_alert_rule_node(state):
 
 
 def parse_alert_node(state):
-    """Parse alert text to SQL query"""
+    """Parse alert text to SQL query with user location context"""
     return {
         **state,
-        'sql_query': parse_alert_to_sql_with_context(
-            {
-                'transaction': state['transaction'],
-                'alert_text': state['alert_text'],
-                'alert_rule': state['alert_rule'],
-            }
+        'sql_query': parse_alert_to_sql_with_context.func(
+            state['transaction'],
+            state['alert_text'],
+            state['alert_rule'],
+            state.get('user'),  # Pass user for location context
         ),
     }
 
 
 def execute_sql_node(state):
     """Execute SQL query to validate it works"""
-    return {**state, 'query_result': execute_sql(state['sql_query'])}
+    return {**state, 'query_result': execute_sql.func(state['sql_query'])}
 
 
 def validate_sql_node(state):

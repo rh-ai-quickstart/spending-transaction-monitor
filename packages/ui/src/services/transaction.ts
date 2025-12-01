@@ -235,6 +235,19 @@ export class TransactionService {
     userId: string,
   ): Promise<Transaction> {
     // Transform form data to backend API format
+    // Create transaction_date: use selected date but with current time (not midnight)
+    // Parse date in local timezone to avoid timezone conversion issues
+    const [year, month, day] = formData.date.split('-').map(Number);
+    const now = new Date();
+    const selectedDate = new Date(
+      year,
+      month - 1, // JavaScript months are 0-indexed
+      day,
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    );
     const backendPayload = {
       id: globalThis.crypto.randomUUID(), // Generate client-side ID
       user_id: userId,
@@ -244,7 +257,7 @@ export class TransactionService {
       description: formData.description,
       merchant_name: formData.merchant || 'Unknown Merchant',
       merchant_category: formData.category,
-      transaction_date: new Date(formData.date).toISOString(),
+      transaction_date: selectedDate.toISOString(),
       transaction_type: formData.type === 'credit' ? 'REFUND' : 'PURCHASE',
       status: 'PENDING',
       // Optional fields

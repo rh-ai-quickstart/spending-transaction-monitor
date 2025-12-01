@@ -4,27 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-
-export interface LocationData {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  timestamp: number;
-}
-
-export interface LocationError {
-  code: number;
-  message: string;
-}
-
-export interface UseLocationResult {
-  location: LocationData | null;
-  error: LocationError | null;
-  isLoading: boolean;
-  isSupported: boolean;
-  requestLocation: () => void;
-  clearLocation: () => void;
-}
+import type { Location, LocationError, UseLocationResult } from '../schemas/location';
 
 const LOCATION_TIMEOUT = 15000; // 15 seconds
 const LOCATION_MAX_AGE = 300000; // 5 minutes
@@ -33,7 +13,7 @@ const LOCATION_MAX_AGE = 300000; // 5 minutes
  * Hook for managing user location
  */
 export function useLocation(): UseLocationResult {
-  const [location, setLocation] = useState<LocationData | null>(null);
+  const [location, setLocation] = useState<Location | null>(null);
   const [error, setError] = useState<LocationError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -64,7 +44,7 @@ export function useLocation(): UseLocationResult {
     };
 
     const handleSuccess = (position: GeolocationPosition) => {
-      const locationData: LocationData = {
+      const locationData: Location = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy,
@@ -145,26 +125,9 @@ export function useLocationOnMount(autoRequest = true): UseLocationResult {
 }
 
 /**
- * Create location headers for API requests
- */
-export function createLocationHeaders(
-  location: LocationData | null,
-): Record<string, string> {
-  if (!location) {
-    return {};
-  }
-
-  return {
-    'X-User-Latitude': location.latitude.toString(),
-    'X-User-Longitude': location.longitude.toString(),
-    'X-User-Location-Accuracy': location.accuracy.toString(),
-  };
-}
-
-/**
  * Get stored location from localStorage (for persistence across sessions)
  */
-export function getStoredLocation(): LocationData | null {
+export function getStoredLocation(): Location | null {
   try {
     const stored = localStorage.getItem('user-location');
     if (!stored) return null;
@@ -190,7 +153,7 @@ export function getStoredLocation(): LocationData | null {
 /**
  * Store location in localStorage for persistence
  */
-export function storeLocation(location: LocationData): void {
+export function storeLocation(location: Location): void {
   try {
     localStorage.setItem('user-location', JSON.stringify(location));
   } catch (error) {

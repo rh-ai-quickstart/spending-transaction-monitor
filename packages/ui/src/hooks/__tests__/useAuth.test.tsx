@@ -32,21 +32,30 @@ vi.mock('react-oidc-context', () => ({
 }));
 
 // Mock fetch for DevAuthProvider API call
-vi.stubGlobal(
-  'fetch',
-  vi.fn(() =>
-    Promise.resolve({
+const mockFetch = vi.fn((url: string | Request | URL) => {
+  const urlString = typeof url === 'string' ? url : url.toString();
+  // Match the actual API endpoint - returns first user from test data (John Doe)
+  if (urlString.includes('/api/users/profile') || urlString.includes('users/profile')) {
+    return Promise.resolve({
       ok: true,
-      json: () =>
-        Promise.resolve({
-          id: '1',
-          email: 'john.doe@example.com',
-          first_name: 'John',
-          last_name: 'Doe',
-        }),
-    }),
-  ),
-);
+      json: async () => ({
+        id: 'test-user-id-1',
+        email: 'johndoe@example.com',
+        first_name: 'John',
+        last_name: 'Doe',
+        is_active: true,
+        credit_cards_count: 0,
+        transactions_count: 0,
+      }),
+    } as Response);
+  }
+  return Promise.resolve({
+    ok: true,
+    json: async () => ({}),
+  } as Response);
+});
+
+vi.stubGlobal('fetch', mockFetch);
 
 describe('useAuth', () => {
   it('should return dev user in development mode', async () => {
@@ -65,10 +74,10 @@ describe('useAuth', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
-    // After loading, should have the dev user
+    // After loading, should have the dev user (first user from test data)
     expect(result.current.isAuthenticated).toBe(true);
     expect(result.current.user?.name).toBe('John Doe');
-    expect(result.current.user?.email).toBe('john.doe@example.com');
+    expect(result.current.user?.email).toBe('johndoe@example.com');
     expect(result.current.user?.isDevMode).toBe(true);
     expect(result.current.user?.roles).toEqual(['user', 'admin']);
   });

@@ -11,6 +11,9 @@
 
 set -e  # Exit on any error
 
+# Get script directory for path resolution
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,21 +37,70 @@ TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
 
-# Function to get auth token from Keycloak using admin credentials
+# Function to sync seeded users to Keycloak
+sync_users_to_keycloak() {
+    echo -e "${YELLOW}🔄 Syncing seeded users to Keycloak...${NC}"
+    
+    # Use localhost for database connection (running from host machine)
+    local db_url="${DATABASE_URL:-postgresql+asyncpg://user:password@localhost:5432/spending-monitor}"
+    # Replace 'postgres' hostname with 'localhost' if present
+    db_url="${db_url//postgres:5432/localhost:5432}"
+    
+    # Temporarily disable exit on error for this operation
+    set +e
+    
+    # Run Keycloak sync command and capture output (from workspace root)
+    local sync_output
+    sync_output=$(sh -c "cd '$SCRIPT_DIR/../../../../..' && DATABASE_URL='$db_url' KEYCLOAK_URL='${KEYCLOAK_URL}' pnpm seed:keycloak-with-users" 2>&1)
+    local sync_exit_code=$?
+    
+    # Re-enable exit on error
+    set -e
+    
+    if [ $sync_exit_code -eq 0 ]; then
+        echo -e "${GREEN}✅ Users synced to Keycloak successfully${NC}"
+        # Show summary if there are any conflicts (users already exist)
+        if echo "$sync_output" | grep -q "409"; then
+            echo -e "${CYAN}ℹ️  Some users already exist in Keycloak (this is normal)${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Failed to sync users to Keycloak (non-critical)${NC}"
+        # Show relevant error lines if available, otherwise show last 10 lines of output
+        local error_lines
+        error_lines=$(echo "$sync_output" | grep -E "(Error|error|ERROR|failed|Failed|FAILED|409|401|500)" | head -3)
+        if [ -n "$error_lines" ]; then
+            echo -e "${YELLOW}💡 Error details:${NC}"
+            echo "$error_lines"
+        else
+            echo -e "${YELLOW}💡 Output (last 10 lines):${NC}"
+            echo "$sync_output" | tail -10
+        fi
+    fi
+    
+    # Always return 0 since this is non-critical
+    return 0
+}
+
+# Function to get auth token from Keycloak
+# Uses testuser credentials from spending-monitor realm (not admin from master realm)
 get_auth_token() {
     if [[ -n "$AUTH_TOKEN" ]]; then
         echo "$AUTH_TOKEN"
         return 0
     fi
     
-    local token_url="${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token"
+    # Get token from spending-monitor realm, not master realm
+    # Using testuser which is created by Keycloak setup
+    local token_url="${KEYCLOAK_URL}/realms/spending-monitor/protocol/openid-connect/token"
+    local test_user="${TEST_USER:-testuser}"
+    local test_password="${TEST_PASSWORD:-password123}"
     
     local response=$(curl -s -X POST "$token_url" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "username=${KEYCLOAK_ADMIN_USER}" \
-        -d "password=${KEYCLOAK_ADMIN_PASSWORD}" \
+        -d "username=${test_user}" \
+        -d "password=${test_password}" \
         -d "grant_type=password" \
-        -d "client_id=admin-cli")
+        -d "client_id=spending-monitor")
     
     local access_token=""
     if command -v jq >/dev/null 2>&1; then
@@ -60,9 +112,10 @@ get_auth_token() {
     if [[ -z "$access_token" || "$access_token" == "null" ]]; then
         echo -e "${YELLOW}⚠️  Could not obtain auth token from Keycloak${NC}" >&2
         echo -e "${YELLOW}   Keycloak URL: $token_url${NC}" >&2
-        echo -e "${YELLOW}   Admin user: $KEYCLOAK_ADMIN_USER${NC}" >&2
+        echo -e "${YELLOW}   Test user: $test_user${NC}" >&2
         echo -e "${YELLOW}   Response: $response${NC}" >&2
-        echo -e "${YELLOW}   Continuing without authentication (BYPASS_AUTH should be enabled)${NC}" >&2
+        echo -e "${YELLOW}   Continuing without authentication${NC}" >&2
+        echo -e "${YELLOW}   Hint: Make sure Keycloak is set up with: pnpm seed:keycloak${NC}" >&2
         echo ""
         return 1
     fi
@@ -88,8 +141,8 @@ show_help() {
     echo "Environment Variables:"
     echo "  AUTH_TOKEN              Optional: Pre-obtained JWT token (bypasses Keycloak)"
     echo "  KEYCLOAK_URL            Keycloak server URL (default: http://localhost:8080)"
-    echo "  KEYCLOAK_ADMIN_USER     Admin username (default: admin)"
-    echo "  KEYCLOAK_ADMIN_PASSWORD Admin password (default: admin)"
+    echo "  TEST_USER               Test user for realm (default: testuser)"
+    echo "  TEST_PASSWORD           Test user password (default: password123)"
     echo ""
 }
 
@@ -368,10 +421,28 @@ test_alert_rule() {
     
     # Step 1: Seed the data
     echo -e "${YELLOW}🌱 Seeding data with: pnpm ${seed_command} --force${NC}"
-    if pnpm "$seed_command" --force > /dev/null 2>&1; then
+    # Run from packages/db directory where the seed commands are defined
+    # Use localhost for database connection (running from host machine)
+    local db_url="${DATABASE_URL:-postgresql+asyncpg://user:password@localhost:5432/spending-monitor}"
+    # Replace 'postgres' hostname with 'localhost' if present
+    db_url="${db_url//postgres:5432/localhost:5432}"
+    
+    # Temporarily disable exit on error for the seed command
+    set +e
+    local seed_output
+    seed_output=$(sh -c "cd '$SCRIPT_DIR/../../..' && DATABASE_URL='$db_url' pnpm '$seed_command' --force" 2>&1)
+    local seed_exit_code=$?
+    set -e  # Re-enable exit on error
+    
+    if [ $seed_exit_code -eq 0 ]; then
         echo -e "${GREEN}✅ Data seeded successfully${NC}"
+        
+        # Step 1.5: Sync users to Keycloak after seeding
+        sync_users_to_keycloak
     else
         echo -e "${RED}❌ Failed to seed data${NC}"
+        echo -e "${YELLOW}💡 Error output:${NC}"
+        echo "$seed_output" | tail -10
         FAILED_TESTS=$((FAILED_TESTS + 1))
         echo ""
         return

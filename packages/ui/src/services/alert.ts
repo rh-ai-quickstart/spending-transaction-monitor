@@ -3,16 +3,14 @@
  * Handles all alert-related API operations
  */
 
+import type { Alert, AlertRule, AlertTriggerHistory } from '../schemas/transaction';
 import type {
-  Alert,
-  AlertRule,
   ApiNotificationResponse,
   AlertRuleData,
   SimilarityResult,
-  AlertTriggerHistory,
-} from '../schemas/transaction';
+} from '../schemas/api';
+import type { ApiAlertRuleResponse } from '../schemas/user';
 import { apiClient } from './apiClient';
-import { type ApiAlertRuleResponse } from './user';
 
 export class AlertService {
   static async getAlerts(): Promise<Alert[]> {

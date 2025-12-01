@@ -78,6 +78,43 @@ else
     echo "Skipping sample data loading"
 fi
 
+# Setup Keycloak realm and sync users if auth is enabled
+echo ""
+echo "🔍 Checking if Keycloak setup is needed..."
+if [ "${BYPASS_AUTH:-true}" = "false" ] && [ -n "${KEYCLOAK_URL}" ]; then
+    echo "✅ Authentication enabled - will setup Keycloak realm and sync users..."
+    echo "   Keycloak URL: ${KEYCLOAK_URL}"
+    echo "   Realm: ${KEYCLOAK_REALM:-spending-monitor}"
+    echo "   Default password: ${KEYCLOAK_DEFAULT_PASSWORD:-password123}"
+    
+    # Use 'set +e' to ensure any errors don't fail the script
+    set +e
+    
+    # Setup realm and sync users using auth package CLI
+    # The auth package is installed in the venv, so use venv's python
+    echo ""
+    cd /app/packages/auth/src
+    /app/venv/bin/python3 -m keycloak.cli setup --sync-users
+    
+    # Re-enable error checking
+    set -e
+    
+    # Check exit code (but don't fail on non-zero)
+    SYNC_EXIT_CODE=$?
+    if [ $SYNC_EXIT_CODE -eq 0 ]; then
+        echo "   ✅ Keycloak user sync completed"
+    else
+        echo "   ⚠️  Sync exited with code $SYNC_EXIT_CODE"
+        echo "   Note: This is non-critical, migration continues"
+        echo "   Run 'make keycloak-sync-users' later if needed"
+    fi
+else
+    echo "ℹ️  Skipping Keycloak sync:"
+    [ "${BYPASS_AUTH:-true}" != "false" ] && echo "   - BYPASS_AUTH=${BYPASS_AUTH:-true} (auth disabled)"
+    [ -z "${KEYCLOAK_URL}" ] && echo "   - KEYCLOAK_URL not set"
+fi
+
+echo ""
 echo "🎉 Database initialization completed!"
 
 # Keep the container running if this is being used as a migration container

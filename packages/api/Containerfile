@@ -2,6 +2,9 @@ FROM registry.access.redhat.com/ubi9/python-312:latest
 
 USER root
 
+# Build argument to control PyTorch variant (cpu or cuda)
+ARG TORCH_VARIANT=cpu
+
 # Set working directory
 WORKDIR /app
 
@@ -21,7 +24,16 @@ COPY packages/api/ ./packages/api/
 COPY packages/db/ ./packages/db/
 
 # Install Python dependencies using uv with explicit Python binary
-# Install DB package first (dependency)  
+# Install PyTorch based on TORCH_VARIANT (cpu for local, cuda for production)
+RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \
+        echo "Installing PyTorch CPU version (lightweight, ~176MB)..." && \
+        uv pip install --python $(which python3) --system --no-cache --index-url https://download.pytorch.org/whl/cpu torch; \
+    else \
+        echo "Installing PyTorch CUDA version (GPU-enabled, ~800MB)..." && \
+        uv pip install --python $(which python3) --system --no-cache torch; \
+    fi
+
+# Install DB package first (without torch since we installed it above)
 RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/db
 # Then install API package with dev dependencies
 RUN uv pip install --python $(which python3) --system --no-cache -e ./packages/api[dev]  

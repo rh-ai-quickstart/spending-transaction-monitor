@@ -16,10 +16,10 @@ import { Alert, AlertDescription } from '../atoms/alert/alert';
 import { Badge } from '../atoms/badge/badge';
 import { MapPin, Shield, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { useUserLocation } from '../../hooks/useGeolocation';
-import type { UserLocation } from '../../services/geolocation';
+import type { Location } from '../../schemas/location';
 
 interface LocationCaptureProps {
-  onLocationCaptured?: (location: UserLocation) => void;
+  onLocationCaptured?: (location: Location) => void;
   onLocationDenied?: () => void;
   onLocationError?: (error: string) => void;
   showConsentDialog?: boolean;
@@ -220,7 +220,7 @@ export function LocationStatus({
   error,
   className,
 }: {
-  location: UserLocation | null;
+  location: Location | null;
   error: string | null;
   className?: string;
 }) {
@@ -257,7 +257,7 @@ export function LocationStatus({
 /**
  * Location debugging component (dev mode only)
  */
-export function LocationDebug({ location }: { location: UserLocation | null }) {
+export function LocationDebug({ location }: { location: Location | null }) {
   if (!import.meta.env.DEV || !location) return null;
 
   return (

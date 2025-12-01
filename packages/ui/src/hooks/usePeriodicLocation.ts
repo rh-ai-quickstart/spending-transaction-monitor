@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCurrentLocation, type UserLocation } from '@/services/geolocation';
+import { getCurrentLocation, type Location } from '@/services/geolocation';
 import { locationConfig } from '@/config/location';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/services/apiClient';
@@ -39,7 +39,7 @@ export function usePeriodicLocation(): UsePeriodicLocationResult {
   const manuallyStopped = useRef(false);
 
   // Send location to backend with retry logic
-  const sendLocationToBackend = useCallback(async (location: UserLocation) => {
+  const sendLocationToBackend = useCallback(async (location: Location) => {
     const headers: Record<string, string> = {
       'X-User-Latitude': location.latitude.toString(),
       'X-User-Longitude': location.longitude.toString(),

@@ -66,12 +66,10 @@ graph.add_node(
     RunnableLambda(
         lambda state: {
             **state,
-            'sql_query': parse_alert_to_sql_with_context(
-                {
-                    'transaction': state['transaction'],
-                    'alert_text': state['alert_text'],
-                    'alert_rule': state['alert_rule'],
-                }
+            'sql_query': parse_alert_to_sql_with_context.func(
+                state['transaction'],
+                state['alert_text'],
+                state['alert_rule'],
             ),
         }
     ),
@@ -84,7 +82,7 @@ graph.add_node('substitute_timestamp', RunnableLambda(substitute_timestamp))
 graph.add_node(
     'execute_sql',
     RunnableLambda(
-        lambda state: {**state, 'query_result': execute_sql(state['sql_query'])}
+        lambda state: {**state, 'query_result': execute_sql.func(state['sql_query'])}
     ),
 )
 
@@ -110,14 +108,12 @@ graph.add_node(
     RunnableLambda(
         lambda state: {
             **state,
-            'alert_message': generate_alert_message(
-                {
-                    'transaction': state['transaction'],
-                    'query_result': state['query_result'],
-                    'alert_text': state['alert_text'],
-                    'alert_rule': state['alert_rule'],
-                    'user': state['user'],
-                }
+            'alert_message': generate_alert_message.func(
+                state['transaction'],
+                state['query_result'],
+                state['alert_text'],
+                state['alert_rule'],
+                state['user'],
             )
             if state.get('alert_triggered')
             else '',

@@ -3,32 +3,10 @@ import { Button } from '../atoms/button/button';
 import { Badge } from '../atoms/badge/badge';
 import { cn } from '../../lib/utils';
 import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react';
+import type { ValidationResult } from '../../schemas/api';
 
-export interface AlertRule {
-  name: string;
-  description: string;
-  alert_type: string;
-  amount_threshold?: number;
-  merchant_category?: string;
-  merchant_name?: string;
-  location?: string;
-  timeframe?: string;
-}
-
-export interface ValidationResult {
-  status: 'valid' | 'warning' | 'invalid' | 'error';
-  message: string;
-  alert_rule?: AlertRule;
-  sql_query?: string;
-  sql_description?: string;
-  similarity_result?: {
-    is_similar: boolean;
-    similarity_score: number;
-    similar_rule?: string;
-    reason: string;
-  };
-  valid_sql?: boolean;
-}
+// Re-export ValidationResult for backwards compatibility
+export type { ValidationResult } from '../../schemas/api';
 
 export interface AlertRuleValidationProps {
   validationResult: ValidationResult | null;

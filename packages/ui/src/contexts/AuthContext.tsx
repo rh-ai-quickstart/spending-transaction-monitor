@@ -10,7 +10,7 @@ import {
   useAuth as useOIDCAuth,
 } from 'react-oidc-context';
 import { authConfig } from '../config/auth';
-import type { User, AuthContextType } from '../types/auth';
+import type { User, AuthContextType } from '../schemas/auth';
 import { DEV_USER } from '../constants/auth';
 import { ApiClient } from '../services/apiClient';
 import { clearStoredLocation } from '../hooks/useLocation';

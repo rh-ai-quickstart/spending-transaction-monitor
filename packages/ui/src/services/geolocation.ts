@@ -3,18 +3,16 @@
  * Based on MDN Geolocation API: https://developer.mozilla.org/en-US/docs/Web/API/Navigator/geolocation
  */
 
-export interface UserLocation {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  timestamp?: number;
-}
+import type { Location } from '../schemas/location';
+
+// Re-export Location type for convenience
+export type { Location } from '../schemas/location';
 
 /**
  * Get current location using navigator.geolocation.getCurrentPosition()
  * This will ALWAYS prompt the browser for permission if not already granted
  */
-export function getCurrentLocation(): Promise<UserLocation> {
+export function getCurrentLocation(): Promise<Location> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser.'));
@@ -50,7 +48,7 @@ export function getCurrentLocation(): Promise<UserLocation> {
  * Watch location changes continuously
  */
 export function watchLocation(
-  onSuccess: (loc: UserLocation) => void,
+  onSuccess: (loc: Location) => void,
   onError?: (err: Error) => void,
 ): number {
   if (!navigator.geolocation) {

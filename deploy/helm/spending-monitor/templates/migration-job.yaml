@@ -9,7 +9,7 @@ metadata:
     # This ensures the job runs after database is deployed
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "1"
-    "helm.sh/hook-delete-policy": before-hook-creation
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
   ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
@@ -51,6 +51,37 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: POSTGRES_PASSWORD
+        {{- if and (not (eq (.Values.secrets.BYPASS_AUTH | toString) "true")) .Values.keycloak.enabled }}
+        - name: wait-for-keycloak
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking if Keycloak is ready..."
+              echo "Using internal service: http://{{ .Release.Name }}-keycloak:8080"
+              MAX_ATTEMPTS=36
+              ATTEMPT=1
+              while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking Keycloak internal service..."
+                # Check internal service endpoint (more reliable from inside cluster)
+                if curl -s -f "http://{{ .Release.Name }}-keycloak:8080/health/ready" > /dev/null 2>&1; then
+                  echo "✅ Keycloak is ready!"
+                  exit 0
+                fi
+                # Also try just checking if the port is open
+                if nc -zv {{ .Release.Name }}-keycloak 8080 > /dev/null 2>&1; then
+                  echo "✅ Keycloak port is open!"
+                  exit 0
+                fi
+                echo "  Keycloak not ready yet, waiting 5 seconds..."
+                sleep 5
+                ATTEMPT=$((ATTEMPT + 1))
+              done
+              echo "⚠️  Keycloak not ready after 3 minutes"
+              echo "ℹ️  Continuing anyway - sync script will check availability and skip if needed"
+              exit 0
+        {{- end }}
       containers:
         - name: migration
           securityContext:
@@ -81,6 +112,50 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: DATABASE_URL
+            # Keycloak configuration for user sync
+            - name: BYPASS_AUTH
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: BYPASS_AUTH
+            - name: KEYCLOAK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_URL
+                  optional: true
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_REALM
+                  optional: true
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_ADMIN_PASSWORD
+                  optional: true
+            - name: KEYCLOAK_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_CLIENT_ID
+                  optional: true
+            - name: KEYCLOAK_REDIRECT_URIS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_REDIRECT_URIS
+                  optional: true
+            - name: KEYCLOAK_WEB_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_WEB_ORIGINS
+                  optional: true
+            - name: KEYCLOAK_DEFAULT_PASSWORD
+              value: "password123"
             # Python path for module imports
             - name: PYTHONPATH
               value: "/app/packages/db/src:/app/packages/api/src"

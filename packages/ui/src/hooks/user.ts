@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
-import { currentUserService, type CurrentUser } from '../services/user';
-
-export interface UseCurrentUserResult {
-  user: CurrentUser | null;
-  isLoading: boolean;
-  error: string | null;
-  refreshUser: () => Promise<void>;
-  logout: () => void;
-}
+import { currentUserService } from '../services/user';
+import type { CurrentUser, UseCurrentUserResult } from '../schemas/user';
 
 export function useCurrentUser(): UseCurrentUserResult {
   const [user, setUser] = useState<CurrentUser | null>(null);

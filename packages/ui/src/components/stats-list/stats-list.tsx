@@ -1,16 +1,9 @@
 import { StatCard } from '../stat-card/stat-card';
 import { cn } from '../../lib/utils';
-import { ReactNode } from 'react';
+import type { Stat } from '../../schemas/ui';
 
-export interface Stat {
-  id: string;
-  title: string;
-  value: string | number;
-  tone?: 'emerald' | 'sky' | 'violet';
-  icon?: ReactNode;
-  action?: ReactNode;
-  description?: string;
-}
+// Re-export Stat for backwards compatibility
+export type { Stat } from '../../schemas/ui';
 
 export interface StatsListProps {
   className?: string;

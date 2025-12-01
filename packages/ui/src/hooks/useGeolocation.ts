@@ -4,11 +4,11 @@ import {
   watchLocation,
   clearWatch,
   checkLocationPermission,
-  type UserLocation,
+  type Location,
 } from '../services/geolocation';
 
 interface LocationState {
-  location: UserLocation | null;
+  location: Location | null;
   error: string | null;
   loading: boolean;
   permissionState: 'granted' | 'denied' | 'prompt' | null;
@@ -26,7 +26,7 @@ export function useUserLocation(
   requestLocation: () => Promise<void>;
   clearLocation: () => void;
 } {
-  const [location, setLocation] = useState<UserLocation | null>(null);
+  const [location, setLocation] = useState<Location | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [permissionState, setPermissionState] = useState<
@@ -40,7 +40,7 @@ export function useUserLocation(
 
   // Send location to backend
   const sendLocationToBackend = useCallback(
-    async (loc: UserLocation) => {
+    async (loc: Location) => {
       if (!sendToBackend) return;
 
       try {

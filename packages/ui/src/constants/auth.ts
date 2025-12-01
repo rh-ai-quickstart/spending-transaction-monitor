@@ -1,7 +1,7 @@
 /**
  * Authentication constants
  */
-import type { User } from '../types/auth';
+import type { User } from '../schemas/auth';
 
 export const DEV_USER: User = {
   id: 'u-merchant-high-001',

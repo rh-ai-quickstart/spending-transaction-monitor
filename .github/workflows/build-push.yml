@@ -82,3 +82,5 @@ jobs:
           ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ env.PROJECT_NAME }}-${{ matrix.package }}:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          TORCH_VARIANT=cuda

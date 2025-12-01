@@ -13,12 +13,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import type { TimeRange } from '../../schemas/ui';
 
 export interface TransactionChartProps {
   className?: string;
 }
-
-type TimeRange = '7d' | '30d' | '90d' | '1y';
 
 export function TransactionChart({ className }: TransactionChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('7d');

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import type { WebSocketMessage, UseWebSocketOptions } from '../schemas/websocket';
 
 // DOM types for browser environment
 type EventTargetType = {
@@ -46,37 +47,6 @@ type WebSocketType = {
 
 declare const WebSocket: WebSocketType;
 
-interface AlertRecommendation {
-  title: string;
-  description: string;
-  natural_language_query: string;
-  category: string;
-  priority: 'high' | 'medium' | 'low';
-  reasoning: string;
-}
-
-interface AlertRecommendationsResponse {
-  user_id: string;
-  recommendation_type: 'new_user' | 'transaction_based' | 'placeholder';
-  recommendations: AlertRecommendation[];
-  generated_at: string;
-  is_placeholder?: boolean;
-  message?: string;
-}
-
-interface WebSocketMessage {
-  type: string;
-  user_id: string;
-  recommendations?: AlertRecommendationsResponse;
-  timestamp?: string;
-}
-
-interface UseWebSocketOptions {
-  userId: string;
-  onMessage?: (message: WebSocketMessage) => void;
-  onRecommendationsReady?: (recommendations: AlertRecommendationsResponse) => void;
-}
-
 export function useWebSocket({
   userId,
   onMessage,
@@ -123,7 +93,9 @@ export function useWebSocket({
       // Use relative URL that works with Vite proxy
       // In development, this will be proxied to the API server
       // In production, this will be served from the same domain
-      const wsUrl = `ws://${window.location.host}/ws/recommendations/${userId}`;
+      // Use wss:// for HTTPS pages, ws:// for HTTP pages
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/recommendations/${userId}`;
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {

@@ -4,6 +4,19 @@ description: A Helm chart for Spending Transaction Monitor application
 type: application
 version: 0.1.0
 appVersion: "latest"
+dependencies:
+  - name: llm-service
+    version: 0.5.2
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    condition: llm-service.enabled
+  - name: llama-stack
+    version: 0.5.2
+    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    condition: llama-stack.enabled
+  - name: keycloak
+    version: "1.0.0"
+    repository: "file://../keycloak"
+    condition: keycloak.enabled
 keywords:
   - monitoring
   - transactions

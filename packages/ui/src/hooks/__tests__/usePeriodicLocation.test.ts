@@ -3,11 +3,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { usePeriodicLocation } from '../usePeriodicLocation';
 import * as geolocationService from '@/services/geolocation';
 import { useAuth } from '@/hooks/useAuth';
-import type { AuthContextType } from '@/types/auth';
+import type { AuthContextType } from '@/schemas/auth';
 
 // Mock the geolocation service
 vi.mock('@/services/geolocation', () => ({
@@ -33,7 +33,7 @@ vi.mock('@/config/location', () => ({
 
 // Mock fetch
 const mockFetch = vi.fn();
-globalThis.fetch = mockFetch;
+vi.stubGlobal('fetch', mockFetch);
 
 // Mock timers
 vi.useFakeTimers();
@@ -193,26 +193,39 @@ describe('usePeriodicLocation', () => {
   });
 
   it('should send correct headers to backend', async () => {
+    // Temporarily use real timers for this test to avoid conflicts with waitFor
+    vi.useRealTimers();
+
     renderHook(() => usePeriodicLocation());
 
-    await act(async () => {
-      vi.advanceTimersByTime(100); // Auto-start
-    });
-
-    expect(mockFetch).toHaveBeenCalledWith('/api/users/location', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Latitude': mockLocation.latitude.toString(),
-        'X-User-Longitude': mockLocation.longitude.toString(),
-        'X-User-Location-Accuracy': mockLocation.accuracy.toString(),
+    // Wait for the fetch to be called
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalled();
       },
-      body: JSON.stringify({
-        location_consent_given: true,
-        last_app_location_latitude: mockLocation.latitude,
-        last_app_location_longitude: mockLocation.longitude,
-        last_app_location_accuracy: mockLocation.accuracy,
+      { timeout: 1000 },
+    );
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/users/location'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          'X-User-Latitude': mockLocation.latitude.toString(),
+          'X-User-Longitude': mockLocation.longitude.toString(),
+          'X-User-Location-Accuracy': mockLocation.accuracy.toString(),
+        }),
+        body: JSON.stringify({
+          location_consent_given: true,
+          last_app_location_latitude: mockLocation.latitude,
+          last_app_location_longitude: mockLocation.longitude,
+          last_app_location_accuracy: mockLocation.accuracy,
+        }),
       }),
-    });
+    );
+
+    // Restore fake timers for other tests
+    vi.useFakeTimers();
   });
 });

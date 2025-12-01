@@ -3,25 +3,9 @@
  * Automatically includes user location in API requests for fraud detection
  */
 
-import {
-  getStoredLocation,
-  createLocationHeaders,
-  type LocationData,
-} from '../hooks/useLocation';
-
-export interface ApiClientConfig {
-  baseUrl?: string;
-  timeout?: number;
-  includeLocation?: boolean;
-  headers?: Record<string, string>;
-}
-
-export interface ApiResponse<T = unknown> {
-  data: T;
-  status: number;
-  statusText: string;
-  headers: globalThis.Headers;
-}
+import { getStoredLocation } from '../hooks/useLocation';
+import { createLocationHeaders, type Location } from '../schemas/location';
+import type { ApiClientConfig, ApiResponse } from '../schemas/api';
 
 export class ApiClient {
   private baseUrl: string;
@@ -153,7 +137,7 @@ export class ApiClient {
   private async makeRequest<T>(
     url: string,
     options: globalThis.RequestInit = {},
-    customLocation?: LocationData | null,
+    customLocation?: Location | null,
   ): Promise<ApiResponse<T>> {
     let didTimeout = false;
     const timeoutPromise: Promise<never> = new Promise((_, reject) => {
@@ -259,7 +243,7 @@ export class ApiClient {
     url: string,
     options?: {
       headers?: Record<string, string>;
-      location?: LocationData | null;
+      location?: Location | null;
     },
   ): Promise<ApiResponse<T>> {
     return this.makeRequest<T>(
@@ -280,7 +264,7 @@ export class ApiClient {
     data?: unknown,
     options?: {
       headers?: Record<string, string>;
-      location?: LocationData | null;
+      location?: Location | null;
     },
   ): Promise<ApiResponse<T>> {
     return this.makeRequest<T>(
@@ -302,7 +286,7 @@ export class ApiClient {
     data?: unknown,
     options?: {
       headers?: Record<string, string>;
-      location?: LocationData | null;
+      location?: Location | null;
     },
   ): Promise<ApiResponse<T>> {
     return this.makeRequest<T>(
@@ -323,7 +307,7 @@ export class ApiClient {
     url: string,
     options?: {
       headers?: Record<string, string>;
-      location?: LocationData | null;
+      location?: Location | null;
     },
   ): Promise<ApiResponse<T>> {
     return this.makeRequest<T>(
@@ -392,7 +376,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
 export async function fetchWithLocation(
   url: string,
   options: globalThis.RequestInit = {},
-  customLocation?: LocationData | null,
+  customLocation?: Location | null,
 ): Promise<globalThis.Response> {
   const headers = new globalThis.Headers(options.headers);
 
@@ -416,7 +400,7 @@ export async function fetchWithLocation(
 /**
  * Hook for API client with location context
  */
-export function useApiClient(location?: LocationData | null) {
+export function useApiClient(location?: Location | null) {
   const client = new ApiClient({ includeLocation: location !== null });
 
   return {

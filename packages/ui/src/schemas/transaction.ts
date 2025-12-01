@@ -195,36 +195,6 @@ export const ApiTransactionResponseSchema = z.object({
   authorization_code: z.string().nullable().optional(),
 });
 
-export const ApiNotificationResponseSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  message: z.string(),
-  notification_method: z.string(),
-  status: z.string(),
-  created_at: z.string(),
-  read: z.boolean(),
-  transaction_id: z.string().optional(),
-  read_at: z.string().nullable().optional(),
-});
-
-export const AlertRuleDataSchema = z.object({
-  name: z.string(),
-  description: z.string(),
-  alert_type: z.string(),
-  amount_threshold: z.number().optional(),
-  merchant_category: z.string().optional(),
-  merchant_name: z.string().optional(),
-  location: z.string().optional(),
-  timeframe: z.string().optional(),
-});
-
-export const SimilarityResultSchema = z.object({
-  is_similar: z.boolean(),
-  similarity_score: z.number(),
-  similar_rule: z.string().optional(),
-  reason: z.string(),
-});
-
 export const AlertTriggerHistorySchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -247,7 +217,4 @@ export type TransactionStats = z.infer<typeof TransactionStatsSchema>;
 export type AlertRule = z.infer<typeof AlertRuleSchema>;
 export type Alert = z.infer<typeof AlertSchema>;
 export type ApiTransactionResponse = z.infer<typeof ApiTransactionResponseSchema>;
-export type ApiNotificationResponse = z.infer<typeof ApiNotificationResponseSchema>;
-export type AlertRuleData = z.infer<typeof AlertRuleDataSchema>;
-export type SimilarityResult = z.infer<typeof SimilarityResultSchema>;
 export type AlertTriggerHistory = z.infer<typeof AlertTriggerHistorySchema>;
