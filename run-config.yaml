@@ -4,18 +4,38 @@ apis:
   - inference
 providers:
   inference:
-    - provider_id: ${env.MODEL:=meta-llama/Llama-3.1-8B-Instruct}
+    - provider_id: ${env.LLM_PROVIDER_ID}
       provider_type: remote::vllm
       config:
-        url: ${env.BASE_URL:=http://localhost:8080/v1}
-        api_token: ${env.API_KEY:=fake}
+        url: ${env.BASE_URL}
+        api_token: ${env.API_KEY}
         max_tokens: 4096
         tls_verify: false
-metadata_store:
-  type: sqlite
-  db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/starter}/registry.db
-models:
-  - metadata: {}
-    model_id: ${env.LLAMASTACK_MODEL:=meta-llama/Llama-3.1-8B-Instruct}
-    provider_id: ${env.MODEL:=meta-llama/Llama-3.1-8B-Instruct}
-    model_type: llm
+storage:
+  backends:
+    kv_default:
+      type: kv_sqlite
+      db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/starter}/kvstore.db
+    sql_default:
+      type: sql_sqlite
+      db_path: ${env.SQLITE_STORE_DIR:=~/.llama/distributions/starter}/sql_store.db
+  stores:
+    metadata:
+      namespace: registry
+      backend: kv_default
+    inference:
+      table_name: inference_store
+      backend: sql_default
+      max_write_queue_size: 10000
+      num_writers: 4
+    conversations:
+      table_name: openai_conversations
+      backend: sql_default
+registered_resources:
+  models:
+    - metadata: {}
+      model_id: ${env.MODEL}
+      provider_id: ${env.LLM_PROVIDER_ID}
+      model_type: llm
+server:
+  port: 8321

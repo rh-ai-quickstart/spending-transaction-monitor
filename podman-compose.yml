@@ -25,26 +25,11 @@ services:
     image: quay.io/keycloak/keycloak:latest
     platform: linux/amd64
     container_name: spending-monitor-keycloak
-    environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KC_HTTP_PORT=8080
-      - KC_HOSTNAME_STRICT=false
-      - KC_HOSTNAME_STRICT_HTTPS=false
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
-      - KC_HOSTNAME=localhost
-      - KC_HOSTNAME_PORT=8080
-      - KC_HOSTNAME_URL=http://localhost:8080
+    env_file:
+      - .env.development
     ports:
       - "8080:8080"
     command: start-dev
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 60s
     networks:
       - spending-monitor
 
@@ -55,12 +40,6 @@ services:
     container_name: spending-monitor-migrations
     env_file:
       - .env.development
-    environment:
-      # Override KEYCLOAK_URL to use internal container name
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=spending-monitor
-      - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KEYCLOAK_DEFAULT_PASSWORD=password123
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,7 +78,7 @@ services:
       postgres:
         condition: service_healthy
       keycloak:
-        condition: service_started
+        condition: service_started  # Note: Keycloak takes ~15s to fully start
       smtp4dev:
         condition: service_started
     networks:
@@ -118,6 +97,10 @@ services:
     container_name: spending-monitor-ui
     env_file:
       - .env.development
+    environment:
+      - VITE_KEYCLOAK_URL=${KEYCLOAK_FRONTEND_URL}
+      - VITE_KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - VITE_KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
     depends_on:
       - api
     networks:
@@ -139,7 +122,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
 
   llamastack:
-    image: docker.io/llamastack/distribution-starter:latest
+    image: docker.io/llamastack/distribution-starter:0.2.23
     platform: linux/amd64
     container_name: spending-monitor-llamastack
     env_file:
@@ -149,9 +132,10 @@ services:
     networks:
       - spending-monitor
     volumes:
-      - ./run-config.yaml:/run-config.yaml
-    entrypoint: python
-    command: ["-m", "llama_stack.core.server.server", "/run-config.yaml"]
+      - ./run-config.yaml:/run-config.yaml:ro
+      - llamastack-data:/root/.llama
+    entrypoint: llama
+    command: ["stack", "run", "/run-config.yaml"]
 
   # Optional: pgAdmin for database management  
   pgadmin:
@@ -178,4 +162,5 @@ networks:
     driver: bridge
 
 volumes:
+  llamastack-data:
   postgres_data:

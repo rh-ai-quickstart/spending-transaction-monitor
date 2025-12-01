@@ -62,7 +62,10 @@ class Settings(BaseSettings):
     # Note: Using same LLAMASTACK_BASE_URL as LLM settings above
 
     # Keycloak settings
-    KEYCLOAK_URL: str = 'http://localhost:8080'
+    KEYCLOAK_URL: str = 'http://spending-monitor-keycloak:8080'  # Internal URL for API to reach Keycloak (container/cluster network)
+    KEYCLOAK_FRONTEND_URL: str = (
+        'http://localhost:8080'  # External URL for browser and token issuer
+    )
     KEYCLOAK_REALM: str = 'spending-monitor'
     KEYCLOAK_CLIENT_ID: str = 'spending-monitor'
 

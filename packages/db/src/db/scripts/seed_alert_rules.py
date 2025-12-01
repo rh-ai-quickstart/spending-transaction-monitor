@@ -29,7 +29,7 @@ except ImportError:
 # Keycloak configuration from environment
 KEYCLOAK_URL = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
 KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'spending-monitor')
-KEYCLOAK_ADMIN_USER = os.getenv('KEYCLOAK_ADMIN_USER', 'admin')
+KEYCLOAK_ADMIN = os.getenv('KEYCLOAK_ADMIN', 'admin')
 KEYCLOAK_ADMIN_PASSWORD = os.getenv('KEYCLOAK_ADMIN_PASSWORD', 'admin')
 
 
@@ -41,7 +41,7 @@ def get_keycloak_admin_token() -> str | None:
     try:
         url = f'{KEYCLOAK_URL}/realms/master/protocol/openid-connect/token'
         data = {
-            'username': KEYCLOAK_ADMIN_USER,
+            'username': KEYCLOAK_ADMIN,
             'password': KEYCLOAK_ADMIN_PASSWORD,
             'grant_type': 'password',
             'client_id': 'admin-cli',

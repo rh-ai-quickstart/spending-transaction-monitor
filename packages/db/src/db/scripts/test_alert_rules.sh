@@ -29,7 +29,7 @@ JSON_DIR="json"
 # You can provide AUTH_TOKEN directly, or we'll get one using admin credentials
 AUTH_TOKEN="${AUTH_TOKEN:-}"
 KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
-KEYCLOAK_ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
+KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-admin}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
 
 # Counter variables

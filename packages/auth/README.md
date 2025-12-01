@@ -36,7 +36,7 @@ For production deployments, configure the following environment variables before
 # Required for production
 export ENVIRONMENT=production
 export KEYCLOAK_URL=https://keycloak.your-domain.com
-export KEYCLOAK_ADMIN_USER=your-admin-username
+export KEYCLOAK_ADMIN=your-admin-username
 export KEYCLOAK_ADMIN_PASSWORD=your-secure-admin-password
 export KEYCLOAK_REDIRECT_URIS=https://app.your-domain.com/*,https://app.your-domain.com
 export KEYCLOAK_WEB_ORIGINS=https://app.your-domain.com
@@ -65,7 +65,7 @@ The setup script supports the following environment variables for flexible confi
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `KEYCLOAK_URL` | `http://localhost:8080` | Keycloak server URL |
-| `KEYCLOAK_ADMIN_USER` | `admin` | Keycloak admin username |
+| `KEYCLOAK_ADMIN` | `admin` | Keycloak admin username |
 | `KEYCLOAK_ADMIN_PASSWORD` | `admin` | Keycloak admin password |
 | `KEYCLOAK_REALM` | `spending-monitor` | Realm name to create/configure |
 | `KEYCLOAK_CLIENT_ID` | `spending-monitor` | Client ID for the application |

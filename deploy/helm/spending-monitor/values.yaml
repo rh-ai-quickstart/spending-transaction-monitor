@@ -43,22 +43,15 @@ secrets:
   SMTP_FROM_EMAIL: "changeme"
   SMTP_USE_TLS: "true"
   SMTP_USE_SSL: "false"
-  KEYCLOAK_URL: "changeme"
-  KEYCLOAK_REALM: "changeme"
-  KEYCLOAK_CLIENT_ID: "changeme"
-  KEYCLOAK_REDIRECT_URIS: "http://localhost:3000/*,http://localhost:3000"
-  KEYCLOAK_WEB_ORIGINS: "http://localhost:3000"
-  
-  # Keycloak database secrets (for external database connection)
-  KEYCLOAK_DB_USER: "keycloak"
-  KEYCLOAK_DB_PASSWORD: "keycloak"  # Change in production!
-  KEYCLOAK_ADMIN_PASSWORD: "keycloak"  # Change in production!
+  # Keycloak configuration
+  # Internal Keycloak URL (for API to reach Keycloak via cluster network)
+  KEYCLOAK_URL: "http://spending-monitor-keycloak:8080"
+  # External Keycloak URL (for browser access and token issuer)
+  KEYCLOAK_FRONTEND_URL: "https://spending-monitor-keycloak-your-namespace.apps.your-cluster.example.com"
+  KEYCLOAK_REALM: "spending-monitor"
+  KEYCLOAK_CLIENT_ID: "spending-monitor"
 
-  LLAMASTACK_BASE_URL: "http://llamastack:8321"
-  LLAMASTACK_MODEL: "RedHatAI/Llama-3.2-1B-Instruct-quantized.w8a8"
-
-  # UI secrets
-  VITE_API_BASE_URL: "http://localhost:8000"
+  # UI environment variables (Note: VITE_KEYCLOAK_* are mapped from KEYCLOAK_* in templates)
 
 # Database configuration
 database:
@@ -122,6 +115,8 @@ api:
     path: /health
     initialDelaySeconds: 30
     periodSeconds: 10
+    timeoutSeconds: 10
+    failureThreshold: 3
 
 # UI configuration
 ui:

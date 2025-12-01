@@ -57,7 +57,7 @@ make keycloak-setup
 - `KEYCLOAK_URL` - Keycloak server URL (e.g., `https://keycloak.example.com`)
 - `KEYCLOAK_REALM` - Realm name (default: `spending-monitor`)
 - `KEYCLOAK_CLIENT_ID` - Client ID (default: `spending-monitor`)
-- `KEYCLOAK_ADMIN_USER` - Admin username (default: `admin`)
+- `KEYCLOAK_ADMIN` - Admin username (default: `admin`)
 - `KEYCLOAK_ADMIN_PASSWORD` - Admin password (required)
 - `KEYCLOAK_REDIRECT_URIS` - Optional, auto-discovered from OpenShift routes
 - `KEYCLOAK_WEB_ORIGINS` - Optional, auto-discovered from OpenShift routes

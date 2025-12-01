@@ -11,17 +11,24 @@ class KeycloakClient:
 
     def __init__(self):
         # Determine Keycloak URL based on environment
-        # If running inside Kubernetes, use internal service for better reliability
-        if os.getenv('KUBERNETES_SERVICE_HOST'):
-            # Use internal service URL (pod-to-pod communication)
-            self.base_url = os.getenv(
-                'KEYCLOAK_INTERNAL_URL', 'http://spending-monitor-keycloak:8080'
-            )
-        else:
-            # Use external URL (for local development or browser access)
-            self.base_url = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
+        # Priority:
+        # 1. Always use KEYCLOAK_URL if set (internal/primary URL)
+        # 2. Fall back to KEYCLOAK_FRONTEND_URL for external access
+        #
+        # This works for:
+        # - Kubernetes: KEYCLOAK_URL = http://service:8080 (internal)
+        # - Local containers: KEYCLOAK_URL = http://spending-monitor-keycloak:8080 (internal)
+        # - Host scripts: KEYCLOAK_FRONTEND_URL = http://localhost:8080 (external)
 
-        self.admin_username = os.getenv('KEYCLOAK_ADMIN_USER', 'admin')
+        keycloak_url = os.getenv('KEYCLOAK_URL', '')
+        keycloak_frontend_url = os.getenv(
+            'KEYCLOAK_FRONTEND_URL', 'http://localhost:8080'
+        )
+
+        # Use KEYCLOAK_URL if set, otherwise use KEYCLOAK_FRONTEND_URL
+        self.base_url = keycloak_url if keycloak_url else keycloak_frontend_url
+
+        self.admin_username = os.getenv('KEYCLOAK_ADMIN', 'admin')
         self.admin_password = os.getenv('KEYCLOAK_ADMIN_PASSWORD', 'admin')
         self.master_realm = 'master'
         self.app_realm = os.getenv('KEYCLOAK_REALM', 'spending-monitor')

@@ -114,6 +114,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: KEYCLOAK_URL
+            - name: KEYCLOAK_FRONTEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: KEYCLOAK_FRONTEND_URL
             - name: KEYCLOAK_REALM
               valueFrom:
                 secretKeyRef:
@@ -141,12 +146,16 @@ spec:
               port: http
             initialDelaySeconds: {{ .Values.api.healthCheck.initialDelaySeconds }}
             periodSeconds: {{ .Values.api.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.healthCheck.failureThreshold }}
           readinessProbe:
             httpGet:
               path: {{ .Values.api.healthCheck.path }}
               port: http
             initialDelaySeconds: {{ .Values.api.healthCheck.initialDelaySeconds }}
             periodSeconds: {{ .Values.api.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.healthCheck.failureThreshold }}
           {{- end }}
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
