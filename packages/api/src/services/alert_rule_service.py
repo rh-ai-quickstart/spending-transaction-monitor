@@ -114,20 +114,44 @@ class AlertRuleService:
 
     @staticmethod
     def generate_alert_with_llm(
-        alert_text: str, transaction: dict[str, Any], user: dict[str, Any]
+        alert_text: str,
+        transaction: dict[str, Any],
+        user: dict[str, Any],
+        alert_rule: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Generate alert message using LLM."""
+        """
+        Generate alert message using LLM.
+
+        Args:
+            alert_text: Natural language alert description
+            transaction: Transaction data
+            user: User data
+            alert_rule: Optional alert rule with saved SQL query
+
+        Returns:
+            Dict with alert_triggered, alert_message, and other results
+        """
         try:
             # Import here to avoid event loop binding issues
-            from .alerts.generate_alert_graph import app as generate_alert_graph
+            from .alerts.generate_alert_graph import trigger_app
 
             print(f'DEBUG: Starting LangGraph invoke with alert_text: {alert_text}')
             print(f'DEBUG: Transaction keys: {list(transaction.keys())}')
             print(f'DEBUG: User keys: {list(user.keys())}')
 
-            # Use synchronous invoke for LangGraph to avoid event loop issues
-            result = generate_alert_graph.invoke(
-                {'transaction': transaction, 'alert_text': alert_text, 'user': user}
+            if alert_rule:
+                print(
+                    f'DEBUG: Using existing alert_rule with SQL: {alert_rule.get("sql_query") is not None}'
+                )
+
+            # Use the trigger_app which supports both saved SQL and new generation
+            result = trigger_app.invoke(
+                {
+                    'transaction': transaction,
+                    'alert_text': alert_text,
+                    'user': user,
+                    'alert_rule': alert_rule or {},
+                }
             )
 
             print(f'DEBUG: LangGraph result: {result}')
@@ -331,8 +355,32 @@ class AlertRuleService:
         transaction_id = transaction.id
         try:
             print('DEBUG: About to call generate_alert_with_llm')
+
+            # Convert rule to dict for the graph
+            alert_rule_dict = {
+                'id': rule.id,
+                'user_id': rule.user_id,
+                'name': rule.name,
+                'description': rule.description,
+                'alert_type': rule.alert_type.value
+                if hasattr(rule.alert_type, 'value')
+                else str(rule.alert_type),
+                'natural_language_query': rule.natural_language_query,
+                'sql_query': rule.sql_query,  # This is the saved SQL query
+                'merchant_name': rule.merchant_name,
+                'merchant_category': rule.merchant_category,
+                'amount_threshold': float(rule.amount_threshold)
+                if rule.amount_threshold
+                else None,
+                'location': rule.location,
+                'timeframe': rule.timeframe,
+            }
+
             alert_result = self.generate_alert_with_llm(
-                rule.natural_language_query, transaction.__dict__, user.__dict__
+                rule.natural_language_query,
+                transaction.__dict__,
+                user.__dict__,
+                alert_rule_dict,
             )
             print(f'DEBUG: generate_alert_with_llm completed, result: {alert_result}')
 

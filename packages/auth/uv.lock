@@ -890,13 +890,15 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
+    { name = "sentence-transformers", marker = "extra == 'embeddings'", specifier = ">=2.2.0" },
     { name = "sentence-transformers", marker = "extra == 'ml'", specifier = ">=2.2.0" },
     { name = "sentence-transformers", marker = "extra == 'ml-cpu'", specifier = ">=2.2.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "torch", marker = "platform_machine != 'x86_64' and extra == 'ml'", specifier = ">=2.0.0" },
+    { name = "torch", marker = "extra == 'embeddings'", specifier = ">=2.2.0" },
     { name = "torch", marker = "extra == 'ml-cpu'", specifier = ">=2.0.0" },
 ]
-provides-extras = ["ml", "ml-cpu"]
+provides-extras = ["embeddings", "ml", "ml-cpu"]
 
 [package.metadata.requires-dev]
 dev = [

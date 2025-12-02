@@ -452,10 +452,12 @@ class TestAlertRuleService:
         transaction = {'amount': 150.0, 'merchant': 'Test Store'}
         user = {'id': 'user-123', 'first_name': 'Test', 'email': 'test@example.com'}
 
-        with patch('src.services.alerts.generate_alert_graph.app') as mock_graph:
+        with patch(
+            'src.services.alerts.generate_alert_graph.trigger_app'
+        ) as mock_graph:
             mock_graph.invoke.return_value = {
-                'should_trigger': True,
-                'message': 'Large transaction detected: $150.00',
+                'alert_triggered': True,
+                'alert_message': 'Large transaction detected: $150.00',
             }
 
             # Act
@@ -464,10 +466,15 @@ class TestAlertRuleService:
             )
 
             # Assert
-            assert result['should_trigger'] is True
-            assert 'Large transaction detected' in result['message']
+            assert result['alert_triggered'] is True
+            assert 'Large transaction detected' in result['alert_message']
             mock_graph.invoke.assert_called_once_with(
-                {'transaction': transaction, 'alert_text': alert_text, 'user': user}
+                {
+                    'transaction': transaction,
+                    'alert_text': alert_text,
+                    'user': user,
+                    'alert_rule': {},
+                }
             )
 
     def test_generate_alert_with_llm_error(self):
@@ -477,7 +484,9 @@ class TestAlertRuleService:
         transaction = {'amount': 150.0}
         user = {'id': 'user-123', 'first_name': 'Test', 'email': 'test@example.com'}
 
-        with patch('src.services.alerts.generate_alert_graph.app') as mock_graph:
+        with patch(
+            'src.services.alerts.generate_alert_graph.trigger_app'
+        ) as mock_graph:
             mock_graph.invoke.side_effect = Exception('LLM generation failed')
 
             # Act & Assert
