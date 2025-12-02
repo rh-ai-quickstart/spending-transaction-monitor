@@ -5,6 +5,12 @@ global:
   imageTag: latest
   imagePullPolicy: Always
   storageClass: ""
+  models:
+    remote-llm:
+      id: custom-model-id
+      url: https://custom-server-url/v1
+      apiToken: fake-token
+      enabled: false
   
   # Security settings for Bitnami charts
   security:
@@ -16,7 +22,9 @@ llm-service:
   enabled: false  # vLLM-based model serving (for larger models like 70B)
 
 llama-stack:
-  enabled: false  # Meta's Llama Stack distribution (for smaller models like 1B-3B)
+  enabled: true  # Meta's Llama Stack distribution (for smaller models like 1B-3B)
+  pgvector:
+    enabled: false
   # Set to true if using LLM_PROVIDER=llamastack
 
 # Secrets configuration - these values should be overridden with actual secrets
@@ -30,8 +38,8 @@ secrets:
   DATABASE_URL: "postgresql+asyncpg://user:changeme@spending-monitor-db:5432/spending-monitor"
   API_KEY: "changeme"
   BASE_URL: "http://localhost:8000"
-  LLM_PROVIDER: "openai"
-  MODEL: "llama-3-3-70b-instruct-w8a8"
+  LLM_PROVIDER: "llamastack"  # Options: "openai", "vertexai", "llamastack"
+  MODEL: "llama-3-3-70b-instruct-w8a8"  # Model name (varies by provider)
   ENVIRONMENT: "production"
   DEBUG: "false"
   BYPASS_AUTH: "false"
@@ -43,6 +51,9 @@ secrets:
   SMTP_FROM_EMAIL: "changeme"
   SMTP_USE_TLS: "true"
   SMTP_USE_SSL: "false"
+  LLAMASTACK_BASE_URL: "http://localhost:8321"  # Remote LlamaStack URL (e.g., "https://llamastack.example.com:8321")
+
+  
   # Keycloak configuration
   # Internal Keycloak URL (for API to reach Keycloak via cluster network)
   KEYCLOAK_URL: "http://spending-monitor-keycloak:8080"
@@ -58,8 +69,8 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: pgvector/pgvector
-    tag: pg16
+    repository: quay.io/sclorg/postgresql-16-c9s
+    tag: latest
   service:
     type: ClusterIP
     port: 5432
@@ -248,14 +259,14 @@ keycloak:
   # pgvector PostgreSQL configuration
   # This deploys a dedicated PostgreSQL instance for Keycloak
   # All database connection details are configured here
-  pgvector:
-    enabled: true
-    secret:
-      host: pgvector  # Database host (for external DB, set to external hostname)
-      port: "5432"  # Database port
-      user: keycloak  # Database username
-      password: keycloak  # Will be overridden by KEYCLOAK_DB_PASSWORD from Makefile
-      dbname: keycloak  # Database name
+  # pgvector:
+  #   enabled: true
+  #   secret:
+  #     host: pgvector  # Database host (for external DB, set to external hostname)
+  #     port: "5432"  # Database port
+  #     user: keycloak  # Database username
+  #     password: keycloak  # Will be overridden by KEYCLOAK_DB_PASSWORD from Makefile
+  #     dbname: keycloak  # Database name
   
   # Configuration
   config:

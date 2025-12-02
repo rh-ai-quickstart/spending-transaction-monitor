@@ -29,17 +29,17 @@ spec:
               containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRES_DB
+            - name: POSTGRESQL_DATABASE
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: POSTGRES_DB
-            - name: POSTGRES_USER
+            - name: POSTGRESQL_USER
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
+            - name: POSTGRESQL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret

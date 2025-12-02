@@ -18,6 +18,8 @@ KEYCLOAK_URL_DYNAMIC := http://$(PROJECT_NAME)-keycloak:8080
 # External Keycloak URL (for browser access and token issuer)
 KEYCLOAK_FRONTEND_URL_DYNAMIC := https://$(PROJECT_NAME)-keycloak-$(NAMESPACE).$(CLUSTER_DOMAIN)
 
+LLAMASTACK_MODEL=$(LLM_PROVIDER_ID)/$(MODEL)
+
 # Application URLs
 APP_URL_DYNAMIC := https://$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)
 CORS_ALLOWED_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
@@ -83,17 +85,26 @@ $$(if [ -n "$$LLAMASTACK_MODEL" ]; then echo "--set secrets.LLAMASTACK_MODEL=$$L
 $$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi)
 endef
 
+if [ "$$LLM_PROVIDER" = "llamastack" ]; then \
+	HELM_LLAMASTACK_PARAMS="--set llama-stack.enabled=true"; \
+	HELM_LLM_SERVICE_PARAMS="--set llm-service.enabled=true"; \
+else \
+	HELM_LLAMASTACK_PARAMS="--set llama-stack.enabled=false"; \
+	HELM_LLM_SERVICE_PARAMS="--set llm-service.enabled=false"; \
+fi; \
+
+
 define HELM_LLAMASTACK_PARAMS
-$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.enabled=true"; fi) \
-$$(if [ -n "$$MODEL_ID" ]; then echo "--set global.models.$$MODEL.id=$$MODEL_ID"; fi) \
-$$(if [ -n "$$MODEL_URL" ]; then echo "--set global.models.$$MODEL.url=$$MODEL_URL"; fi) \
-$$(if [ -n "$$MODEL_API_KEY" ]; then echo "--set global.models.$$MODEL.apiToken=$$MODEL_API_KEY"; fi) \
+$$(if [ -n "$$LLM_PROVIDER_ID" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.enabled=true"; fi) \
+$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.id=$$LLM_PROVIDER_ID/$$MODEL"; fi) \
+$$(if [ -n "$$BASE_URL" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.url=$$BASE_URL"; fi) \
+$$(if [ -n "$$API_KEY" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.apiToken=$$API_KEY"; fi) \
 $$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi)
 endef
 
 define HELM_LLM_SERVICE_PARAMS
 $$(if [ -n "$$HF_TOKEN" ]; then echo "--set llm-service.secret.hf_token=$$HF_TOKEN"; fi) \
-$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$MODEL.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi)
+$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$LLM_PROVIDER_ID.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi)
 endef
 
 # Default target when running 'make' without arguments
