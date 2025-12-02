@@ -24,12 +24,8 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
+        ws: true, // Enable WebSocket proxying for /api/ws endpoints
         // Don't rewrite - API now serves routes with /api prefix
-      },
-      '/ws': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true, // Enable WebSocket proxying
       },
     },
   },

@@ -80,7 +80,7 @@ app.include_router(
     transactions_routes.router, prefix='/api/transactions', tags=['transactions']
 )
 app.include_router(alerts_routes.router, prefix='/api/alerts', tags=['alerts'])
-app.include_router(websocket.router, tags=['websocket'])
+app.include_router(websocket.router, prefix='/api', tags=['websocket'])
 
 
 @app.get('/')

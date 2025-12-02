@@ -6,6 +6,7 @@ import { RecommendationCard } from './recommendation-card';
 import { useRecommendations } from '../../hooks/recommendations';
 import type { AlertRecommendation } from '../../schemas/recommendation';
 import { useWebSocket } from '../../hooks/useWebSocket';
+import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
 export function AlertRecommendations() {
@@ -16,11 +17,13 @@ export function AlertRecommendations() {
     refetch,
   } = useRecommendations();
 
+  const { user } = useAuth();
   const [isGeneratingPersonalized, setIsGeneratingPersonalized] = useState(false);
   const [showAllRecommendations, setShowAllRecommendations] = useState(false);
 
   // WebSocket integration for real-time recommendation updates
-  const currentUserId = recommendations?.user_id || 'u-011';
+  // Use authenticated user's ID, or fallback to recommendations user_id
+  const currentUserId = user?.id || recommendations?.user_id || '';
   const { isConnected } = useWebSocket({
     userId: currentUserId,
     onRecommendationsReady: (newRecommendations) => {

@@ -94,8 +94,9 @@ export function useWebSocket({
       // In development, this will be proxied to the API server
       // In production, this will be served from the same domain
       // Use wss:// for HTTPS pages, ws:// for HTTP pages
+      // WebSocket endpoint is under /api to use the same OpenShift route
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/recommendations/${userId}`;
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/recommendations/${userId}`;
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {
