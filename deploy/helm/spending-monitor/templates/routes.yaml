@@ -64,16 +64,20 @@ spec:
 
 ---
 # API Route - serve API under /api path (when nginx is disabled)
+# This route handles both HTTP requests and WebSocket connections
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: {{ .Values.api.name }}-route
   labels:
     {{- include "spending-monitor.api.labels" . | nindent 4 }}
-  {{- with .Values.routes.annotations }}
   annotations:
+    # HAProxy annotations to support WebSocket connections
+    haproxy.router.openshift.io/timeout: 120s
+    haproxy.router.openshift.io/timeout-tunnel: 3600s
+    {{- with .Values.routes.annotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- end }}
 spec:
   {{- if .Values.routes.sharedHost }}
   host: {{ .Values.routes.sharedHost }}
