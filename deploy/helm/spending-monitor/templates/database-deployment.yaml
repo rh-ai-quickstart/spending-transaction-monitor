@@ -29,17 +29,17 @@ spec:
               containerPort: 5432
               protocol: TCP
           env:
-            - name: POSTGRESQL_DATABASE
+            - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: POSTGRES_DB
-            - name: POSTGRESQL_USER
+            - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: POSTGRES_USER
-            - name: POSTGRESQL_PASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
@@ -49,6 +49,8 @@ spec:
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
           resources:
             {{- toYaml .Values.database.resources | nindent 12 }}
           livenessProbe:
@@ -81,6 +83,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: init-scripts
+          configMap:
+            name: {{ .Values.database.name }}-init
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

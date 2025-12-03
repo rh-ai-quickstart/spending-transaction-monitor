@@ -24,8 +24,9 @@ llm-service:
 llama-stack:
   enabled: true  # Meta's Llama Stack distribution (for smaller models like 1B-3B)
   pgvector:
-    enabled: false
+    enabled: true
   # Set to true if using LLM_PROVIDER=llamastack
+
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
@@ -33,6 +34,8 @@ secrets:
   POSTGRES_DB: "spending-monitor"
   POSTGRES_USER: "user"
   POSTGRES_PASSWORD: "changeme"
+  POSTGRES_DB_HOST: "spending-monitor-db"
+  POSTGRES_DB_PORT: "5432"
 
   # API secrets
   DATABASE_URL: "postgresql+asyncpg://user:changeme@spending-monitor-db:5432/spending-monitor"
@@ -69,8 +72,8 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: quay.io/sclorg/postgresql-16-c9s
-    tag: latest
+    repository: pgvector/pgvector
+    tag: pg16
   service:
     type: ClusterIP
     port: 5432
@@ -253,20 +256,12 @@ keycloak:
     # Password will be passed via --set flag from Makefile
   
   # Database configuration
+  # Keycloak uses the spending-monitor-db PostgreSQL instance
+  # Database credentials come from the spending-monitor-secret
   database:
     vendor: postgres
-  
-  # pgvector PostgreSQL configuration
-  # This deploys a dedicated PostgreSQL instance for Keycloak
-  # All database connection details are configured here
-  # pgvector:
-  #   enabled: true
-  #   secret:
-  #     host: pgvector  # Database host (for external DB, set to external hostname)
-  #     port: "5432"  # Database port
-  #     user: keycloak  # Database username
-  #     password: keycloak  # Will be overridden by KEYCLOAK_DB_PASSWORD from Makefile
-  #     dbname: keycloak  # Database name
+    secretName: spending-monitor-secret  # Use main app secret for DB credentials
+    dbname: keycloak  # Keycloak database (created by init script)
   
   # Configuration
   config:
