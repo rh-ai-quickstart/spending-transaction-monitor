@@ -350,10 +350,17 @@ export class ApiError extends Error {
   }
 
   /**
-   * Check if error is due to authentication failure
+   * Check if error is due to authentication failure (expired/invalid token)
    */
   get isAuthError(): boolean {
-    return this.status === 401 || this.status === 403;
+    return this.status === 401;
+  }
+
+  /**
+   * Check if error is due to authorization failure (permission denied)
+   */
+  get isForbiddenError(): boolean {
+    return this.status === 403;
   }
 
   /**
