@@ -389,7 +389,7 @@ asyncio.run(get_ids())
 
 ### Logs and Monitoring
 - **API Logs**: Console output from uvicorn command shows all request/response activity
-- **Alert Processing Logs**: Look for `INFO:src.services.alert_job_queue` and background service messages
+- **Alert Processing Logs**: Look for `INFO:services.alerts.alert_job_queue` and background service messages
 - **Database Logs**: SQLAlchemy query logs (enable via configuration if needed)
 - **Health Check**: `curl http://localhost:8000/health/` - shows API and database status
 - **LLM Integration Logs**: Check for AI agent processing logs during alert rule creation

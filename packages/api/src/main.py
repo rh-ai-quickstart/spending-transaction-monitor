@@ -13,10 +13,14 @@ from .routes import alerts as alerts_routes
 from .routes import health, websocket
 from .routes import transactions as transactions_routes
 from .routes import users as users_routes
-from .services.alert_job_queue import alert_job_queue
-from .services.llm_thread_pool import llm_thread_pool
-from .services.recommendation_job_queue import recommendation_job_queue
-from .services.recommendation_scheduler import recommendation_scheduler
+from .services.alerts.alert_job_queue import alert_job_queue
+from .services.recommendations.llm_thread_pool import llm_thread_pool
+from .services.recommendations.recommendation_job_queue import (
+    recommendation_job_queue,
+)
+from .services.recommendations.recommendation_scheduler import (
+    recommendation_scheduler,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

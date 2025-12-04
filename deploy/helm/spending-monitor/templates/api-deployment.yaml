@@ -18,6 +18,53 @@ spec:
       serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-database
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for database to be ready..."
+              until pg_isready -h {{ .Values.database.name }} -p 5432; do
+                echo "Database not ready, waiting..."
+                sleep 3
+              done
+              echo "✅ Database is ready!"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+        - name: wait-for-migration
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for database migration to complete..."
+              until psql -h {{ .Values.database.name }} -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1 FROM users LIMIT 1" > /dev/null 2>&1; do
+                echo "Migration not complete (users table not ready), waiting..."
+                sleep 5
+              done
+              echo "✅ Migration complete - users table exists!"
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: POSTGRES_DB
       containers:
         - name: api
           securityContext:

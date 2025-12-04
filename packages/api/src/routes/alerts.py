@@ -11,13 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_db
 from db.models import AlertNotification, AlertRule, NotificationMethod, User
-from src.services import transaction_service
-from src.services.alert_recommendation_service import AlertRecommendationService
-from src.services.background_recommendation_service import (
+from services.recommendations.alert_recommendation_service import (
+    AlertRecommendationService,
+)
+from services.recommendations.background_recommendation_service import (
     background_recommendation_service,
 )
-from src.services.recommendation_job_queue import recommendation_job_queue
-from src.services.user_service import UserService
+from services.recommendations.recommendation_job_queue import (
+    recommendation_job_queue,
+)
+from services.transactions.transaction_service import TransactionService
+from services.users.user_service import UserService
 
 from ..auth.middleware import require_authentication
 from ..schemas.alert import (
@@ -27,7 +31,7 @@ from ..schemas.alert import (
     AlertRuleOut,
     AlertRuleUpdate,
 )
-from ..services.alert_rule_service import AlertRuleService
+from ..services.alerts.alert_rule_service import AlertRuleService
 from ..services.notifications import Context, NoopStrategy, SmtpStrategy
 
 router = APIRouter()
@@ -60,7 +64,7 @@ class AlertRuleValidationResponse(BaseModel):
 # Initialize service instances
 alert_rule_service = AlertRuleService()
 user_service = UserService()
-transaction_service = transaction_service.TransactionService()
+transaction_service = TransactionService()
 recommendation_service = AlertRecommendationService()
 
 
@@ -670,7 +674,7 @@ async def get_alert_recommendations(
             logger.info(f'Enqueued background job for user {user_id}')
 
         # Return placeholder recommendations immediately while background job processes
-        from src.services.placeholder_recommendation_service import (
+        from services.recommendations.placeholder_recommendation_service import (
             PlaceholderRecommendationService,
         )
 
@@ -897,7 +901,9 @@ async def get_recommendation_metrics(
         raise HTTPException(status_code=403, detail='Admin access required')
 
     try:
-        from src.services.recommendation_metrics import recommendation_metrics
+        from services.recommendations.recommendation_metrics import (
+            recommendation_metrics,
+        )
 
         summary = recommendation_metrics.get_performance_summary(last_n_minutes)
 
@@ -967,7 +973,7 @@ async def trigger_recommendation_generation(
         user_id = current_user['id']
 
         # Import the background service here to avoid startup issues
-        from ..services.background_recommendation_service import (
+        from ..services.recommendations.background_recommendation_service import (
             background_recommendation_service,
         )
 

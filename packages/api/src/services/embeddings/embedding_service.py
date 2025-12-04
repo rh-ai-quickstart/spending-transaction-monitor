@@ -10,7 +10,7 @@ import os
 import httpx
 from openai import OpenAI
 
-from ..core.config import settings
+from core.config import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

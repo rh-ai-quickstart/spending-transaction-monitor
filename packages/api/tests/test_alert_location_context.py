@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from db.models import AlertType, Transaction, User
-from src.services.alert_rule_service import AlertRuleService
+from services.alerts.alert_rule_service import AlertRuleService
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ async def test_validate_alert_rule_with_user_location_context(mock_session_with_
     )
 
     # Patch the validate_rule_graph to capture what gets passed to it
-    with patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph:
+    with patch('services.alerts.alert_rule_service.validate_rule_graph') as mock_graph:
         mock_graph.invoke.return_value = {
             'validation_status': 'valid',
             'validation_message': 'Alert rule validated successfully',
@@ -130,7 +130,7 @@ async def test_validate_alert_rule_with_user_location_context(mock_session_with_
 @pytest.mark.asyncio
 async def test_user_location_context_in_prompt():
     """Test that build_prompt includes user location context when user data is provided"""
-    from src.services.alerts.agents.alert_parser import build_prompt
+    from services.agents.alert_parser import build_prompt
 
     transaction = {
         'user_id': 'user-123',
@@ -176,7 +176,7 @@ async def test_user_location_context_in_prompt():
 @pytest.mark.asyncio
 async def test_build_prompt_without_user_context():
     """Test that build_prompt works without user data (backward compatibility)"""
-    from src.services.alerts.agents.alert_parser import build_prompt
+    from services.agents.alert_parser import build_prompt
 
     transaction = {
         'user_id': 'user-123',
@@ -206,7 +206,7 @@ async def test_build_prompt_without_user_context():
 @pytest.mark.asyncio
 async def test_location_context_various_phrases():
     """Test that user context helps with various location reference phrases"""
-    from src.services.alerts.agents.alert_parser import build_prompt
+    from services.agents.alert_parser import build_prompt
 
     user = {
         'id': 'user-123',
@@ -253,7 +253,7 @@ async def test_location_context_various_phrases():
 @pytest.mark.asyncio
 async def test_location_context_with_missing_gps():
     """Test that prompt handles cases where GPS location is not available"""
-    from src.services.alerts.agents.alert_parser import build_prompt
+    from services.agents.alert_parser import build_prompt
 
     user = {
         'id': 'user-123',
