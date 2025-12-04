@@ -72,7 +72,7 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: pgvector/pgvector
+    repository: quay.io/rh-ai-quickstart/pgvector
     tag: pg16
   service:
     type: ClusterIP
