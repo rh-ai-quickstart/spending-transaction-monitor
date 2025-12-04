@@ -26,7 +26,8 @@ llama-stack:
   pgvector:
     enabled: true
   # Set to true if using LLM_PROVIDER=llamastack
-
+pgvector:
+  enabled: true
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
