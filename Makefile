@@ -84,17 +84,22 @@ $$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVI
 endef
 
 define HELM_LLAMASTACK_PARAMS
-$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$MODEL.enabled=true"; fi) \
-$$(if [ -n "$$MODEL_ID" ]; then echo "--set global.models.$$MODEL.id=$$MODEL_ID"; fi) \
-$$(if [ -n "$$MODEL_URL" ]; then echo "--set global.models.$$MODEL.url=$$MODEL_URL"; fi) \
-$$(if [ -n "$$MODEL_API_KEY" ]; then echo "--set global.models.$$MODEL.apiToken=$$MODEL_API_KEY"; fi) \
-$$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi)
+$$(if [ -n "$$LLM_PROVIDER_ID" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.enabled=true"; fi) \
+$$(if [ -n "$$MODEL" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.id=$$MODEL"; fi) \
+$$(if [ -n "$$BASE_URL" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.url=$$BASE_URL"; fi) \
+$$(if [ -n "$$API_KEY" ]; then echo "--set global.models.$$LLM_PROVIDER_ID.apiToken=$$API_KEY"; fi) \
+$$(if [ -n "$$LLAMA_STACK_ENV" ]; then echo "--set-json llama-stack.secrets=$$LLAMA_STACK_ENV"; fi) \
+$$(if [ "$$LLM_PROVIDER" = "llamastack" ]; then echo "--set llama-stack.enabled=true"; else echo "--set llama-stack.enabled=false"; fi) 
 endef
 
 define HELM_LLM_SERVICE_PARAMS
 $$(if [ -n "$$HF_TOKEN" ]; then echo "--set llm-service.secret.hf_token=$$HF_TOKEN"; fi) \
-$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$MODEL.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi)
+$$(if [ -n "$$LLM_TOLERATION" ]; then echo "--set-json global.models.$$LLM_PROVIDER_ID.tolerations=[{\"key\":\"$$LLM_TOLERATION\",\"effect\":\"NoSchedule\",\"operator\":\"Exists\"}]"; fi) \
+$$(if [ "$$LLM_PROVIDER" = "llamastack" ]; then echo "--set llm-service.enabled=true"; else echo "--set llm-service.enabled=false"; fi)
 endef
+
+
+
 
 # Default target when running 'make' without arguments
 .DEFAULT_GOAL := help
@@ -468,7 +473,8 @@ deploy: create-project helm-dep-update check-keycloak-vars
 	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
 	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
 	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
+	export LLAMASTACK_MODEL="$${LLM_PROVIDER_ID}/$${MODEL}"; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL LLM_PROVIDER_ID MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
 		--timeout 15m \
@@ -501,14 +507,15 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
 	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
 	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
-	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
+	export LLAMASTACK_MODEL="$${LLM_PROVIDER_ID}/$${MODEL}"; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL LLM_PROVIDER_ID MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL; \
 	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
 		--namespace $(NAMESPACE) \
 		--timeout 15m \
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
-		--set database.persistence.enabled=false \
+		--set database.persistence.enabled=false \	
 		--set api.replicas=1 \
 		--set ui.replicas=1 \
 		$(HELM_SECRET_PARAMS) \

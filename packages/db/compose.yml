@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: quay.io/rh-ai-quickstart/pgvector:p16
     environment:
       POSTGRES_DB: spending-monitor
       POSTGRES_USER: user

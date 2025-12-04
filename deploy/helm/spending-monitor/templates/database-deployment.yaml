@@ -49,6 +49,8 @@ spec:
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
           resources:
             {{- toYaml .Values.database.resources | nindent 12 }}
           livenessProbe:
@@ -81,6 +83,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: init-scripts
+          configMap:
+            name: {{ .Values.database.name }}-init
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

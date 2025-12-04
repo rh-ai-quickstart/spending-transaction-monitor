@@ -27,6 +27,31 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "keycloak.serviceAccountName" . }}
+      # initContainers:
+      # # Wait for the keycloak database to be ready
+      # - name: wait-for-keycloak-db
+      #   image: postgres:16-alpine
+      #   command:
+      #     - /bin/sh
+      #     - -c
+      #     - |
+      #       echo "Waiting for keycloak database to be ready..."
+      #       until pg_isready -h "$DB_HOST" -p 5432 -d keycloak; do
+      #         echo "Keycloak database not ready, waiting..."
+      #         sleep 3
+      #       done
+      #       echo "✅ Keycloak database is ready!"
+      #   env:
+      #     - name: DB_HOST
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: {{ .Values.database.secretName | quote }}
+      #           key: POSTGRES_DB_HOST
+      #     - name: PGPASSWORD
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: {{ .Values.database.secretName | quote }}
+      #           key: POSTGRES_PASSWORD
       containers:
       - name: keycloak
         image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -37,24 +62,30 @@ spec:
           # This adds ~30s to first startup but is more reliable
         env:
         # Database configuration
-        # All database credentials and connection details come from pgvector.secret
-        # For pgvector subchart: use default pgvector.secret.host = "pgvector"
-        # For external database: set pgvector.secret.host to external database hostname
         - name: KC_DB
           value: {{ .Values.database.vendor }}
         - name: KC_DB_URL_HOST
-          value: {{ .Values.pgvector.secret.host | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.secretName | quote }}
+              key: POSTGRES_DB_HOST
         - name: KC_DB_URL_PORT
-          value: {{ .Values.pgvector.secret.port | quote }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.secretName | quote }}
+              key: POSTGRES_DB_PORT
         - name: KC_DB_URL_DATABASE
-          value: {{ .Values.pgvector.secret.dbname }}
+          value: {{ .Values.database.dbname }}
         - name: KC_DB_USERNAME
-          value: {{ .Values.pgvector.secret.user }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.secretName | quote }}
+              key: POSTGRES_USER
         - name: KC_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: pgvector
-              key: password
+              name: {{ .Values.database.secretName | quote }}
+              key: POSTGRES_PASSWORD
         
         # Admin credentials
         - name: KEYCLOAK_ADMIN

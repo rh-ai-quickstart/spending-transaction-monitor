@@ -4,10 +4,10 @@ description: Official Keycloak Helm chart for identity and access management
 type: application
 version: 1.0.0
 appVersion: "26.0.7"
-dependencies:
-  - name: pgvector
-    version: 0.1.0
-    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+# dependencies:
+#   - name: postgres
+#     version: 0.1.0
+#     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
 keywords:
   - keycloak
   - authentication

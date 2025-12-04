@@ -29,18 +29,9 @@ admin:
 # Database configuration
 database:
   vendor: postgres  # Database type: postgres, mysql, mariadb, etc.
+  secretName: spending-monitor-secret
+  dbname: keycloak
 
-# pgvector PostgreSQL subchart configuration
-# This deploys a dedicated PostgreSQL instance for Keycloak
-# All database connection details (host, port, user, password, dbname) are configured here
-pgvector:
-  enabled: true  # Enable pgvector subchart
-  secret:
-    host: pgvector  # Database host (for external DB, set to external hostname)
-    port: "5432"  # Database port
-    user: keycloak  # Database user for Keycloak
-    password: keycloak  # Database password (change for production!)
-    dbname: keycloak  # Database name for Keycloak
 # Keycloak configuration options
 config:
   # Proxy mode for reverse proxies/load balancers

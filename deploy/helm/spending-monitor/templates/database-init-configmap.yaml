@@ -1,0 +1,33 @@
+{{- if .Values.database.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.database.name }}-init
+  labels:
+    {{- include "spending-monitor.database.labels" . | nindent 4 }}
+data:
+  # This script runs during PostgreSQL initialization (postgres:16-alpine)
+  # Scripts in /docker-entrypoint-initdb.d/ run automatically on first startup
+  # It creates the keycloak database for Keycloak to use
+  01-create-keycloak-db.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Creating keycloak database..."
+    
+    # Create keycloak database
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+        CREATE DATABASE keycloak;
+        GRANT ALL PRIVILEGES ON DATABASE keycloak TO "$POSTGRES_USER";
+    EOSQL
+    
+    # Grant schema permissions for keycloak database
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "keycloak" <<-EOSQL
+        GRANT ALL ON SCHEMA public TO "$POSTGRES_USER";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "$POSTGRES_USER";
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "$POSTGRES_USER";
+    EOSQL
+    
+    echo "Keycloak database created successfully!"
+{{- end }}
+
