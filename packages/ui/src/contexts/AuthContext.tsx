@@ -18,6 +18,92 @@ import { clearStoredLocation } from '../hooks/useLocation';
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
+ * Check if stored OIDC data matches current configuration
+ * Returns true if there's a mismatch (stale data from different deployment)
+ */
+function hasStaleAuthData(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('oidc.user:')) {
+        // Extract the authority from the key (format: oidc.user:{authority}:{clientId})
+        const parts = key.split(':');
+        if (parts.length >= 2) {
+          const storedAuthority = parts.slice(1, -1).join(':'); // Handle : in authority URL
+          const currentAuthority = authConfig.keycloak.authority;
+
+          if (storedAuthority !== currentAuthority) {
+            if (import.meta.env.DEV) {
+              console.log('🔍 Detected stale auth data:', {
+                stored: storedAuthority,
+                current: currentAuthority,
+              });
+            }
+            return true;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error checking for stale auth data:', err);
+  }
+  return false;
+}
+
+/**
+ * Clear all authentication-related storage (localStorage and cookies)
+ * This is useful when authentication fails due to stale tokens/cookies
+ */
+function clearAuthStorage(): void {
+  if (import.meta.env.DEV) {
+    console.log('🧹 Clearing all auth storage...');
+  }
+
+  // Clear OIDC-related items from localStorage
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.includes('oidc') || key.includes('keycloak'))) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((key) => {
+    localStorage.removeItem(key);
+    if (import.meta.env.DEV) {
+      console.log(`  Removed localStorage: ${key}`);
+    }
+  });
+
+  // Clear cookies related to auth
+  const cookies = document.cookie.split(';');
+  cookies.forEach((cookie) => {
+    const cookieName = cookie.split('=')[0].trim();
+    if (
+      cookieName.includes('oidc') ||
+      cookieName.includes('keycloak') ||
+      cookieName.includes('AUTH') ||
+      cookieName.includes('session')
+    ) {
+      // Clear cookie by setting expiry to past date
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      if (import.meta.env.DEV) {
+        console.log(`  Removed cookie: ${cookieName}`);
+      }
+    }
+  });
+
+  // Clear token from ApiClient
+  ApiClient.setToken(null);
+
+  // Clear location data
+  clearStoredLocation();
+
+  if (import.meta.env.DEV) {
+    console.log('✅ Auth storage cleared');
+  }
+}
+
+/**
  * Development Auth Provider - bypasses OIDC
  */
 const DevAuthProvider = React.memo(({ children }: { children: React.ReactNode }) => {
@@ -110,6 +196,19 @@ DevAuthProvider.displayName = 'DevAuthProvider';
  */
 const ProductionAuthProvider = React.memo(
   ({ children }: { children: React.ReactNode }) => {
+    // Check for and clear stale auth data BEFORE OIDC provider initializes
+    // This must run synchronously on first render
+    const [isReady, setIsReady] = useState(() => {
+      if (hasStaleAuthData()) {
+        if (import.meta.env.DEV) {
+          console.log('🧹 Clearing stale auth data from previous deployment...');
+        }
+        clearAuthStorage();
+        return true; // Ready after clearing
+      }
+      return true;
+    });
+
     const oidcConfig = useMemo(
       () => ({
         authority: authConfig.keycloak.authority,
@@ -118,21 +217,32 @@ const ProductionAuthProvider = React.memo(
         post_logout_redirect_uri: authConfig.keycloak.postLogoutRedirectUri,
         response_type: 'code',
         scope: 'openid profile email',
-        automaticSilentRenew: false, // Disable for debugging
-        includeIdTokenInSilentRenew: false, // Disable for debugging
+        automaticSilentRenew: true, // Automatically refresh tokens before expiry
         // Ensure localStorage persistence
         storeUser: true, // Explicitly enable user storage
         userStore: undefined, // Use default WebStorageStateStore (localStorage)
         // Remove problematic config
         loadUserInfo: false,
         monitorSession: false,
+        // Token refresh settings
+        accessTokenExpiringNotificationTimeInSeconds: 60, // Notify 60 seconds before expiry
+        // Handle silent renew errors gracefully
+        onSigninCallback: () => {
+          // Clear the URL after successful signin
+          window.history.replaceState({}, document.title, window.location.pathname);
+        },
       }),
       [],
     );
 
     useEffect(() => {
       // OIDC config initialized
+      setIsReady(true);
     }, [oidcConfig]);
+
+    if (!isReady) {
+      return null; // Don't render until stale data is cleared
+    }
 
     return (
       <OIDCProvider {...oidcConfig}>
@@ -151,9 +261,118 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
   const [user, setUser] = useState<User | null>(null);
   // Note: Location is now handled by LocationCapture component on user interaction
 
+  // Update ApiClient token whenever it changes (including on refresh)
+  useEffect(() => {
+    if (oidcAuth.user?.access_token) {
+      ApiClient.setToken(oidcAuth.user.access_token);
+      if (import.meta.env.DEV) {
+        console.log('🔄 Token updated in ApiClient');
+      }
+    }
+  }, [oidcAuth.user?.access_token]);
+
+  // Handle token expiring event - manually trigger renewal if needed
+  useEffect(() => {
+    const handleAccessTokenExpiring = () => {
+      if (import.meta.env.DEV) {
+        console.log('⏰ Access token expiring soon, renewing...');
+      }
+      // The automaticSilentRenew should handle this, but we can also force it
+      oidcAuth.signinSilent().catch((err) => {
+        console.error('Failed to silently renew token:', err);
+      });
+    };
+
+    // Listen for token expiring events
+    if (oidcAuth.events) {
+      oidcAuth.events.addAccessTokenExpiring(handleAccessTokenExpiring);
+      return () => {
+        oidcAuth.events.removeAccessTokenExpiring(handleAccessTokenExpiring);
+      };
+    }
+  }, [oidcAuth]);
+
+  // Set up auth error handler to refresh token on 401 errors
+  useEffect(() => {
+    let isRefreshing = false;
+
+    ApiClient.setAuthErrorHandler(() => {
+      // Prevent multiple simultaneous refresh attempts
+      if (isRefreshing) {
+        return;
+      }
+      isRefreshing = true;
+
+      if (import.meta.env.DEV) {
+        console.log('🔄 Auth error detected, attempting silent token refresh...');
+      }
+
+      oidcAuth
+        .signinSilent()
+        .catch((err) => {
+          console.error('Failed to refresh token after auth error:', err);
+
+          // Clear all auth storage to prevent stale token issues
+          clearAuthStorage();
+
+          // If silent refresh fails, redirect to login
+          if (import.meta.env.DEV) {
+            console.log(
+              '🔒 Silent refresh failed, clearing auth storage and redirecting to login...',
+            );
+          }
+
+          // Use removeUser to properly clean up OIDC state
+          oidcAuth.removeUser().finally(() => {
+            oidcAuth.signinRedirect();
+          });
+        })
+        .finally(() => {
+          isRefreshing = false;
+        });
+    });
+
+    return () => {
+      ApiClient.setAuthErrorHandler(() => {});
+    };
+  }, [oidcAuth]);
+
   useEffect(() => {
     if (oidcAuth.error) {
       console.error('OIDC Authentication Error:', oidcAuth.error);
+
+      // Clear stale auth data on OIDC errors (e.g., invalid tokens from previous deployment)
+      const errorMessage = oidcAuth.error.message?.toLowerCase() || '';
+      if (
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('expired') ||
+        errorMessage.includes('token') ||
+        errorMessage.includes('session') ||
+        errorMessage.includes('refresh')
+      ) {
+        if (import.meta.env.DEV) {
+          console.log(
+            '🧹 OIDC error indicates stale auth data, clearing storage and redirecting to login...',
+          );
+        }
+        clearAuthStorage();
+
+        // Remove user from OIDC state and redirect to login
+        oidcAuth
+          .removeUser()
+          .then(() => {
+            // Small delay to ensure storage is cleared before redirect
+            setTimeout(() => {
+              oidcAuth.signinRedirect();
+            }, 100);
+          })
+          .catch(() => {
+            // If removeUser fails, still try to redirect
+            setTimeout(() => {
+              oidcAuth.signinRedirect();
+            }, 100);
+          });
+      }
     }
 
     if (oidcAuth.user) {
@@ -168,11 +387,6 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       };
       setUser(newUser);
 
-      // Pass token to ApiClient
-      if (oidcAuth.user.access_token) {
-        ApiClient.setToken(oidcAuth.user.access_token);
-      }
-
       if (import.meta.env.DEV) {
         console.log('🔒 User authenticated via OIDC:', {
           id: oidcAuth.user.profile.sub,
@@ -186,12 +400,16 @@ const OIDCAuthWrapper = React.memo(({ children }: { children: React.ReactNode })
       ApiClient.setToken(null);
       // Note: Location clearing also handled by backend on logout
     }
-  }, [oidcAuth.user, oidcAuth.error]);
+  }, [oidcAuth]);
 
   // Location is now handled by LocationCapture component
 
   const login = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
-  const logout = useCallback(() => oidcAuth.signoutRedirect(), [oidcAuth]);
+  const logout = useCallback(() => {
+    // Clear all auth storage before redirecting to logout
+    clearAuthStorage();
+    oidcAuth.signoutRedirect();
+  }, [oidcAuth]);
   const signinRedirect = useCallback(() => oidcAuth.signinRedirect(), [oidcAuth]);
 
   const contextValue: AuthContextType = useMemo(() => {
