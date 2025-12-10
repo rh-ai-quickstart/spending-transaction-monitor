@@ -1,5 +1,16 @@
 """
-Services package for the API
+Services package for the API grouped by domain.
 """
 
-__all__: list[str] = []
+__all__ = [
+    'alerts',
+    'agents',
+    'recommendations',
+    'notifications',
+    'location',
+    'llms',
+    'embeddings',
+    'categories',
+    'transactions',
+    'users',
+]

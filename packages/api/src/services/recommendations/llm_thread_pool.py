@@ -13,7 +13,7 @@ class LLMThreadPool:
     """Thread pool for running CPU-intensive LLM operations in parallel"""
 
     def __init__(self, max_workers: int | None = None):
-        from src.core.recommendation_config import recommendation_config
+        from core.recommendation_config import recommendation_config
 
         self.max_workers = max_workers or recommendation_config.llm_thread_pool_workers
         self.executor: ThreadPoolExecutor | None = None

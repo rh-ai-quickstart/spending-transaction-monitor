@@ -25,7 +25,7 @@ except ImportError:
 
 # Location services import
 try:
-    from ..services.location_middleware import update_user_location_on_login
+    from services.location import update_user_location_on_login
 except ImportError:
     # Location services not available
     update_user_location_on_login = None  # type: ignore

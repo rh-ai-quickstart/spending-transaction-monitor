@@ -3,7 +3,7 @@ from langchain.tools import tool
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from ....core.config import settings
+from core.config import settings
 
 # Create a synchronous engine and session for SQL execution
 # Convert async URL to sync URL for synchronous operations
@@ -23,10 +23,10 @@ def execute_sql(sql: str) -> str:
     with SyncSessionLocal() as session:
         try:
             print(f'Executing SQL: {sql}')
-            result = session.execute(text(sql))
+            result = session.execute(text(sql))  # type: ignore[call-arg]
 
             # Check if query returns rows
-            if result.returns_rows:
+            if getattr(result, 'returns_rows', False):
                 rows = result.fetchall()
                 if rows:
                     # Convert each row to a tuple and then to string

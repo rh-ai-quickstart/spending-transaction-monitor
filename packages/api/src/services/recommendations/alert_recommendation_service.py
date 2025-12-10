@@ -7,16 +7,16 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AlertRule, User
-from src.services.alerts.agents.alert_recommender import (
+from services.agents.alert_recommender import (
     analyze_transaction_patterns,
     find_similar_users,
     recommend_alerts_for_existing_user,
     recommend_alerts_for_new_user,
-)
-from src.services.alerts.agents.rule_similarity_checker import check_rule_similarity
-from src.services.llm_thread_pool import llm_thread_pool
-from src.services.transaction_service import TransactionService
-from src.services.user_service import UserService
+)  # noqa: E501
+from services.agents.rule_similarity_checker import check_rule_similarity
+from services.recommendations.llm_thread_pool import llm_thread_pool
+from services.transactions.transaction_service import TransactionService
+from services.users.user_service import UserService
 
 
 class AlertRecommendationService:

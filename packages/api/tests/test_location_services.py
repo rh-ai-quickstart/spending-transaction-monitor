@@ -7,19 +7,18 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.services.location import (
+from services.location import (
+    SQL_DISTANCE_FUNCTION,
     calculate_location_risk_score,
+    capture_user_location,
     format_distance_human_readable,
     geocode_offline,
-    haversine_distance,
-    validate_coordinates,
-)
-from src.services.location_middleware import (
-    capture_user_location,
     get_user_location,
     grant_location_consent,
+    haversine_distance,
     revoke_location_consent,
     update_user_location_on_login,
+    validate_coordinates,
 )
 
 
@@ -164,9 +163,9 @@ class TestLocationMiddleware:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.select')
-    @patch('src.services.location_middleware.update')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.select')
+    @patch('services.location.location_middleware.update')
     async def test_capture_user_location_success(
         self, mock_update, mock_select, mock_user_model
     ):
@@ -191,8 +190,8 @@ class TestLocationMiddleware:
         self.mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.select')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.select')
     async def test_capture_user_location_no_consent(self, mock_select, mock_user_model):
         """Test location capture when user has not given consent"""
         # Setup valid headers
@@ -213,8 +212,8 @@ class TestLocationMiddleware:
         assert result is False
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.update')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.update')
     async def test_grant_location_consent(self, mock_update, mock_user_model):
         """Test granting location consent"""
         result = await grant_location_consent('user-123', self.mock_session)
@@ -223,8 +222,8 @@ class TestLocationMiddleware:
         self.mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.update')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.update')
     async def test_revoke_location_consent(self, mock_update, mock_user_model):
         """Test revoking location consent"""
         result = await revoke_location_consent('user-123', self.mock_session)
@@ -233,8 +232,8 @@ class TestLocationMiddleware:
         self.mock_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.select')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.select')
     async def test_get_user_location_with_consent(self, mock_select, mock_user_model):
         """Test getting user location when consent is given"""
         # Mock database result
@@ -258,8 +257,8 @@ class TestLocationMiddleware:
         assert result['consent_given'] is True
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.User')
-    @patch('src.services.location_middleware.select')
+    @patch('services.location.location_middleware.User')
+    @patch('services.location.location_middleware.select')
     async def test_get_user_location_no_consent(self, mock_select, mock_user_model):
         """Test getting user location when consent is not given"""
         # Mock database result
@@ -275,7 +274,7 @@ class TestLocationMiddleware:
         assert result is None
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.capture_user_location')
+    @patch('services.location.location_middleware.capture_user_location')
     async def test_update_user_location_on_login(self, mock_capture):
         """Test location update on login"""
         mock_capture.return_value = True
@@ -298,7 +297,7 @@ class TestLocationMiddleware:
         )
 
     @pytest.mark.asyncio
-    @patch('src.services.location_middleware.capture_user_location')
+    @patch('services.location.location_middleware.capture_user_location')
     async def test_update_user_location_on_login_dev_mode_skip(self, mock_capture):
         """Test that dev mode mock users skip location capture"""
         current_user = {
@@ -349,8 +348,6 @@ class TestLocationIntegration:
 
     def test_sql_distance_function_template(self):
         """Test that SQL function template is valid"""
-        from src.services.location import SQL_DISTANCE_FUNCTION
-
         # Basic validation that template contains required elements
         assert 'haversine_distance_km' in SQL_DISTANCE_FUNCTION
         assert 'DOUBLE PRECISION' in SQL_DISTANCE_FUNCTION

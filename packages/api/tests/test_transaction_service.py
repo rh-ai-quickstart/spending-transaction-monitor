@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from db.models import Transaction
-from src.services.transaction_service import TransactionService
+from services.transactions.transaction_service import TransactionService
 
 
 class TestTransactionService:

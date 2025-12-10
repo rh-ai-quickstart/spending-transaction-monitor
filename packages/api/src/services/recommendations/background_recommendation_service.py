@@ -38,12 +38,11 @@ class BackgroundRecommendationService:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
+        # Convert async DATABASE_URL to sync URL for synchronous operations
+        from core.config import settings
         from db.models import (
             User as SyncUser,
         )
-
-        # Convert async DATABASE_URL to sync URL for synchronous operations
-        from src.core.config import settings
 
         sync_database_url = settings.DATABASE_URL.replace(
             'postgresql+asyncpg://', 'postgresql://'
@@ -154,8 +153,8 @@ class BackgroundRecommendationService:
             # Get transaction data synchronously
             from sqlalchemy import create_engine, text
 
-            from src.core.config import settings
-            from src.services.alerts.agents.alert_recommender import (
+            from core.config import settings
+            from services.agents.alert_recommender import (
                 analyze_transaction_patterns,
                 find_similar_users,
                 recommend_alerts_for_existing_user,
@@ -298,7 +297,7 @@ class BackgroundRecommendationService:
 
             # Notify user via WebSocket that personalized recommendations are ready
             try:
-                from src.routes.websocket import notify_recommendations_ready
+                from routes.websocket import notify_recommendations_ready
 
                 logger.info(f'Sending WebSocket notification for user {user_id}')
                 await notify_recommendations_ready(user_id, recommendations)
@@ -441,7 +440,7 @@ class BackgroundRecommendationService:
 
             from sqlalchemy import create_engine, text
 
-            from src.core.config import settings
+            from core.config import settings
 
             # Convert async DATABASE_URL to sync URL for synchronous operations
             sync_database_url = settings.DATABASE_URL.replace(
@@ -530,10 +529,9 @@ class BackgroundRecommendationService:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
-        from db.models import User as SyncUser
-
         # Convert async DATABASE_URL to sync URL for synchronous operations
-        from src.core.config import settings
+        from core.config import settings
+        from db.models import User as SyncUser
 
         sync_database_url = settings.DATABASE_URL.replace(
             'postgresql+asyncpg://', 'postgresql://'

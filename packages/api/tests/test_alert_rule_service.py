@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from db.models import AlertRule, AlertType, Transaction, User
-from src.services.alert_rule_service import AlertRuleService
+from services.alerts.alert_rule_service import AlertRuleService
 
 
 # Mock the LLM services at module level to prevent accidental real LLM calls
@@ -15,8 +15,8 @@ from src.services.alert_rule_service import AlertRuleService
 def mock_llm_services():
     """Auto-used fixture to mock LLM services for all tests in this module"""
     with (
-        patch('src.services.alerts.parse_alert_graph.app') as mock_parse_graph,
-        patch('src.services.alerts.generate_alert_graph.app') as mock_generate_graph,
+        patch('services.alerts.parse_alert_graph.app') as mock_parse_graph,
+        patch('services.alerts.generate_alert_graph.app') as mock_generate_graph,
     ):
         # Set default return values for LLM services
         mock_parse_graph.invoke.return_value = {
@@ -143,7 +143,9 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
+            patch(
+                'services.alerts.alert_rule_service.validate_rule_graph'
+            ) as mock_graph,
         ):
             mock_graph.invoke.return_value = {
                 'validation_status': 'valid',
@@ -198,7 +200,7 @@ class TestAlertRuleService:
                     return_value=dummy_transaction,
                 ),
                 patch(
-                    'src.services.alert_rule_service.validate_rule_graph'
+                    'services.alerts.alert_rule_service.validate_rule_graph'
                 ) as mock_graph,
             ):
                 mock_graph.invoke.return_value = {
@@ -236,7 +238,9 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
+            patch(
+                'services.alerts.alert_rule_service.validate_rule_graph'
+            ) as mock_graph,
         ):
             mock_graph.invoke.return_value = {
                 'validation_status': 'invalid',
@@ -277,7 +281,9 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
+            patch(
+                'services.alerts.alert_rule_service.validate_rule_graph'
+            ) as mock_graph,
         ):
             mock_graph.invoke.side_effect = Exception('LLM service unavailable')
 
@@ -415,7 +421,7 @@ class TestAlertRuleService:
         alert_text = 'Alert me when transactions exceed $100'
         transaction = {'amount': 150.0, 'merchant': 'Test Store'}
 
-        with patch('src.services.alerts.parse_alert_graph.app') as mock_graph:
+        with patch('services.alerts.parse_alert_graph.app') as mock_graph:
             mock_graph.invoke.return_value = {
                 'valid_sql': True,
                 'alert_text': alert_text,
@@ -438,7 +444,7 @@ class TestAlertRuleService:
         alert_text = 'Invalid rule'
         transaction = {'amount': 150.0}
 
-        with patch('src.services.alerts.parse_alert_graph.app') as mock_graph:
+        with patch('services.alerts.parse_alert_graph.app') as mock_graph:
             mock_graph.invoke.side_effect = Exception('LLM parsing failed')
 
             # Act & Assert
@@ -452,9 +458,7 @@ class TestAlertRuleService:
         transaction = {'amount': 150.0, 'merchant': 'Test Store'}
         user = {'id': 'user-123', 'first_name': 'Test', 'email': 'test@example.com'}
 
-        with patch(
-            'src.services.alerts.generate_alert_graph.trigger_app'
-        ) as mock_graph:
+        with patch('services.alerts.generate_alert_graph.trigger_app') as mock_graph:
             mock_graph.invoke.return_value = {
                 'alert_triggered': True,
                 'alert_message': 'Large transaction detected: $150.00',
@@ -484,9 +488,7 @@ class TestAlertRuleService:
         transaction = {'amount': 150.0}
         user = {'id': 'user-123', 'first_name': 'Test', 'email': 'test@example.com'}
 
-        with patch(
-            'src.services.alerts.generate_alert_graph.trigger_app'
-        ) as mock_graph:
+        with patch('services.alerts.generate_alert_graph.trigger_app') as mock_graph:
             mock_graph.invoke.side_effect = Exception('LLM generation failed')
 
             # Act & Assert
@@ -509,7 +511,9 @@ class TestAlertRuleService:
                 'get_latest_transaction',
                 return_value=sample_transaction_obj,
             ),
-            patch('src.services.alert_rule_service.validate_rule_graph') as mock_graph,
+            patch(
+                'services.alerts.alert_rule_service.validate_rule_graph'
+            ) as mock_graph,
         ):
             mock_graph.invoke.return_value = {
                 'validation_status': 'invalid',

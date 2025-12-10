@@ -6,8 +6,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import MerchantCategorySynonym
-
-from .embedding_service import embedding_service
+from services.embeddings.embedding_service import embedding_service
 
 logger = logging.getLogger(__name__)
 

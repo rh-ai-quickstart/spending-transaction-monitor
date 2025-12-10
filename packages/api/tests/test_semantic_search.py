@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.services.category_normalizer import CategoryNormalizer
-from src.services.embedding_service import (
+from services.categories.category_normalizer import CategoryNormalizer
+from services.embeddings.embedding_service import (
     EmbeddingService,
     SentenceTransformerEmbeddingProvider,
     get_embedding_client,
@@ -140,7 +140,7 @@ class TestCategoryNormalizer:
 
         # Mock the embedding service (async method needs AsyncMock)
         with patch(
-            'src.services.category_normalizer.embedding_service'
+            'services.categories.category_normalizer.embedding_service'
         ) as mock_embedding_service:
             # Create an async mock for get_embedding
             mock_embedding_service.get_embedding = AsyncMock(return_value=[0.1] * 384)
@@ -163,7 +163,7 @@ class TestCategoryNormalizer:
         mock_session.execute.side_effect = [mock_result, mock_result]
 
         with patch(
-            'src.services.category_normalizer.embedding_service'
+            'services.categories.category_normalizer.embedding_service'
         ) as mock_embedding_service:
             mock_embedding_service.get_embedding = AsyncMock(return_value=[0.1] * 384)
 
@@ -186,7 +186,7 @@ class TestCategoryNormalizer:
 
         # Mock embedding service throwing an error
         with patch(
-            'src.services.category_normalizer.embedding_service'
+            'services.categories.category_normalizer.embedding_service'
         ) as mock_embedding_service:
             mock_embedding_service.get_embedding = AsyncMock(
                 side_effect=Exception('Model not loaded')

@@ -1,7 +1,7 @@
 """Alert Rule Service - Business logic for alert rule operations"""
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,11 +14,11 @@ from db.models import (
     Transaction,
     User,
 )
-from src.services.notification_service import NotificationService
+from services.notifications.notification_service import NotificationService
+from services.transactions.transaction_service import TransactionService
+from services.users.user_service import UserService
 
-from .alerts.validate_rule_graph import app as validate_rule_graph
-from .transaction_service import TransactionService
-from .user_service import UserService
+from .validate_rule_graph import app as validate_rule_graph
 
 
 class AlertRuleService:
@@ -101,7 +101,7 @@ class AlertRuleService:
         """Parse natural language rule using LLM."""
         try:
             # Import here to avoid event loop binding issues
-            from .alerts.parse_alert_graph import app as parse_alert_graph
+            from .parse_alert_graph import app as parse_alert_graph
 
             # Run actual LangGraph app here
             result = parse_alert_graph.invoke(
@@ -133,7 +133,7 @@ class AlertRuleService:
         """
         try:
             # Import here to avoid event loop binding issues
-            from .alerts.generate_alert_graph import trigger_app
+            from .generate_alert_graph import trigger_app
 
             print(f'DEBUG: Starting LangGraph invoke with alert_text: {alert_text}')
             print(f'DEBUG: Transaction keys: {list(transaction.keys())}')
@@ -231,14 +231,17 @@ class AlertRuleService:
 
         try:
             # Run the validation graph
-            validation_result = validate_rule_graph.invoke(
-                {
-                    'transaction': transaction_dict,
-                    'alert_text': rule,
-                    'user_id': user_id,
-                    'user': user_dict,  # Pass user for location context
-                    'existing_rules': existing_rules_dict,
-                }
+            validation_result = cast(
+                dict[str, Any],
+                validate_rule_graph.invoke(
+                    {
+                        'transaction': transaction_dict,
+                        'alert_text': rule,
+                        'user_id': user_id,
+                        'user': user_dict,  # Pass user for location context
+                        'existing_rules': existing_rules_dict,
+                    }
+                ),
             )
 
             result = {
@@ -279,7 +282,7 @@ class AlertRuleService:
         user: User,
         session: AsyncSession,
         alert_result: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> AlertNotification:
         """Create a notification for an alert rule"""
 
         notification = AlertNotification(

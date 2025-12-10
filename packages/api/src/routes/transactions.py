@@ -20,9 +20,9 @@ from ..schemas.transaction import (
     TransactionOut,
     TransactionSummary,
 )
-from ..services.alert_job_queue import alert_job_queue
-from ..services.alert_rule_service import AlertRuleService
-from ..services.background_alert_service import background_alert_service
+from ..services.alerts.alert_job_queue import alert_job_queue
+from ..services.alerts.alert_rule_service import AlertRuleService
+from ..services.alerts.background_alert_service import background_alert_service
 
 router = APIRouter()
 alert_rule_service = AlertRuleService()

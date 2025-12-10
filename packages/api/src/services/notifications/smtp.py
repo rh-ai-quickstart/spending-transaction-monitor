@@ -9,9 +9,8 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from db.models import AlertNotification, NotificationStatus, User
-
-from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 

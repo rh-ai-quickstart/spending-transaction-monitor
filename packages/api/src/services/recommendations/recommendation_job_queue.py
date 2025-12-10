@@ -148,10 +148,10 @@ class RecommendationJobQueue:
                         and job.user_id
                     ):
                         try:
-                            from src.routes.websocket import (
+                            from routes.websocket import (
                                 notify_recommendations_ready,
                             )
-                            from src.services.background_recommendation_service import (
+                            from services.recommendations.background_recommendation_service import (
                                 background_recommendation_service,
                             )
 

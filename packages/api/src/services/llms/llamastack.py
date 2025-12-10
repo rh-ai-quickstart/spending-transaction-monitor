@@ -3,7 +3,7 @@ import logging
 import httpx
 from llama_stack_client import LlamaStackClient
 
-from ....core.config import settings
+from core.config import settings
 
 async_client = httpx.AsyncClient(verify=False)
 http_client = httpx.Client(verify=False)
