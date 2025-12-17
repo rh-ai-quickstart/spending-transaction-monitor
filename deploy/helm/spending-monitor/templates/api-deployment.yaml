@@ -186,6 +186,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: LLAMASTACK_MODEL
+            - name: USE_ML_RECOMMENDATIONS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: USE_ML_RECOMMENDATIONS
           {{- if .Values.api.healthCheck.enabled }}
           livenessProbe:
             httpGet:

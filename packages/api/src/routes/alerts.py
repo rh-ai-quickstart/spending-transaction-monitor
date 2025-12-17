@@ -218,6 +218,14 @@ async def create_alert_rule(
     await session.commit()
     await session.refresh(rule)
 
+    # Log alert creation for ML model retraining
+    try:
+        from src.ml.alert_recommender.training import log_user_alert_action
+
+        await log_user_alert_action(session, current_user['id'], rule.id, 'created')
+    except Exception as e:
+        logger.warning(f'Failed to log alert action: {e}')
+
     return AlertRuleOut(
         id=rule.id,
         user_id=rule.user_id,

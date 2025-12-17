@@ -14,6 +14,7 @@ from .routes import health, websocket
 from .routes import transactions as transactions_routes
 from .routes import users as users_routes
 from .services.alerts.alert_job_queue import alert_job_queue
+from .services.ml_startup import initialize_ml_system
 from .services.recommendations.llm_thread_pool import llm_thread_pool
 from .services.recommendations.recommendation_job_queue import (
     recommendation_job_queue,
@@ -31,6 +32,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info('Starting up application...')
+
+    # Initialize ML recommendation system (load sample data & train model)
+    await initialize_ml_system()
+    logger.info('ML recommendation system initialized')
 
     # The recommendation generation will be triggered on-demand via API calls
     await llm_thread_pool.start()

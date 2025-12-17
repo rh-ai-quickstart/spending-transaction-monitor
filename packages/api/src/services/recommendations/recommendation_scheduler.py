@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import SessionLocal
@@ -46,6 +46,9 @@ class RecommendationScheduler:
 
     async def _scheduler_loop(self):
         """Main scheduler loop"""
+        # Wait for database to be fully ready before first run
+        await self._wait_for_database_ready()
+
         while self.is_running:
             try:
                 await self._run_scheduled_generation()
@@ -55,6 +58,40 @@ class RecommendationScheduler:
             except Exception as e:
                 logger.error(f'Error in recommendation scheduler: {e}', exc_info=True)
                 await asyncio.sleep(3600)
+
+    async def _wait_for_database_ready(self, max_wait_seconds: int = 60):
+        """Wait for database to be fully ready with transaction data"""
+        logger.info('Waiting for database to be ready...')
+        start_time = asyncio.get_event_loop().time()
+
+        while asyncio.get_event_loop().time() - start_time < max_wait_seconds:
+            try:
+                session_ctx = SessionLocal()
+                session = await session_ctx.__aenter__()
+                try:
+                    # Check if we can query transactions
+                    result = await session.execute(
+                        text('SELECT COUNT(*) FROM transactions')
+                    )
+                    count = result.scalar()
+
+                    if count and count > 0:
+                        logger.info(f'Database ready with {count} transactions')
+                        return
+                    else:
+                        logger.info(
+                            'Database connected but no transactions yet, waiting...'
+                        )
+                finally:
+                    await session_ctx.__aexit__(None, None, None)
+            except Exception as e:
+                logger.warning(f'Database not ready yet: {e}')
+
+            await asyncio.sleep(5)
+
+        logger.warning(
+            f'Database readiness check timed out after {max_wait_seconds}s, proceeding anyway'
+        )
 
     async def _run_scheduled_generation(self):
         """Run scheduled recommendation generation for active users (non-blocking)"""
