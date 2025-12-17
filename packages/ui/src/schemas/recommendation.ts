@@ -11,7 +11,14 @@ export const AlertRecommendationSchema = z.object({
 
 export const AlertRecommendationsResponseSchema = z.object({
   user_id: z.string(),
-  recommendation_type: z.enum(['new_user', 'transaction_based', 'placeholder']),
+  recommendation_type: z.enum([
+    'new_user',
+    'transaction_based',
+    'placeholder',
+    'ml_default',
+    'ml_collaborative_filtering',
+    'default',
+  ]),
   recommendations: z.array(AlertRecommendationSchema),
   generated_at: z.string(),
   is_placeholder: z.boolean().optional(),

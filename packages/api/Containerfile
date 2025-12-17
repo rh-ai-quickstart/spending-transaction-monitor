@@ -23,6 +23,9 @@ COPY packages/api/ ./packages/api/
 # Copy the db package (context is root)
 COPY packages/db/ ./packages/db/
 
+# Copy sample data files for ML model initialization (context is root)
+COPY data/ ./data/
+
 # Install Python dependencies using uv with explicit Python binary
 # Install PyTorch based on TORCH_VARIANT (cpu for local, cuda for production)
 RUN if [ "$TORCH_VARIANT" = "cpu" ]; then \

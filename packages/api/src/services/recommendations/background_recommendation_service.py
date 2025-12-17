@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 import json
 import logging
+import os
 from typing import Any
 import uuid
 
@@ -13,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.database import SessionLocal
 from db.models import CachedRecommendation, User
 
+from ..ml_alert_recommendation_service import MLAlertRecommendationService
 from .alert_recommendation_service import AlertRecommendationService
 from .recommendation_metrics import recommendation_metrics
 
@@ -22,8 +24,18 @@ logger = logging.getLogger(__name__)
 class BackgroundRecommendationService:
     """Service for generating and caching alert recommendations in the background"""
 
-    def __init__(self):
-        self.recommendation_service = AlertRecommendationService()
+    def __init__(self, use_ml_model: bool = True):
+        """
+        Initialize the background recommendation service.
+
+        Args:
+            use_ml_model: If True, use ML-based recommendations. If False, use LLM-based.
+        """
+        self.use_ml_model = use_ml_model
+        if use_ml_model:
+            self.recommendation_service = MLAlertRecommendationService()
+        else:
+            self.recommendation_service = AlertRecommendationService()
         # Cache recommendations for 24 hours
         self.cache_duration_hours = 24
 
@@ -149,16 +161,105 @@ class BackgroundRecommendationService:
     ) -> dict[str, Any]:
         """Run the recommendation service synchronously"""
         try:
-            # Import the recommendation service functions
-            # Get transaction data synchronously
             from sqlalchemy import create_engine, text
 
             from core.config import settings
-            from services.agents.alert_recommender import (
-                analyze_transaction_patterns,
-                find_similar_users,
-                recommend_alerts_for_existing_user,
-                recommend_alerts_for_new_user,
+
+            if self.use_ml_model:
+                # Use ML-based recommendations
+                return self._run_ml_recommendation_sync(user_id, user_dict)
+            else:
+                # Use LLM-based recommendations (original implementation)
+                from services.agents.alert_recommender import (
+                    analyze_transaction_patterns,
+                    find_similar_users,
+                    recommend_alerts_for_existing_user,
+                    recommend_alerts_for_new_user,
+                )
+
+                sync_database_url = settings.DATABASE_URL.replace(
+                    'postgresql+asyncpg://', 'postgresql://'
+                )
+                sync_engine = create_engine(sync_database_url, echo=False)
+
+                with sync_engine.connect() as conn:
+                    # Get transaction data
+                    result = conn.execute(
+                        text("""
+                        SELECT amount, merchant_category, merchant_name, created_at,
+                               merchant_city, merchant_state, merchant_country
+                        FROM transactions
+                        WHERE user_id = :user_id
+                        ORDER BY created_at DESC
+                        LIMIT 1000
+                    """),
+                        {'user_id': user_id},
+                    )
+
+                    transactions = [dict(row._mapping) for row in result]
+
+                    if not transactions:
+                        # New user recommendations
+                        return recommend_alerts_for_new_user(user_dict)
+                    else:
+                        # Existing user recommendations
+                        transaction_analysis = analyze_transaction_patterns(
+                            transactions
+                        )
+
+                        # Get similar users data
+                        similar_users_result = conn.execute(
+                            text("""
+                            SELECT id, first_name, last_name, address_city, address_state,
+                                   address_country, credit_limit, created_at
+                            FROM users
+                            WHERE id != :user_id AND is_active = true
+                            LIMIT 100
+                        """),
+                            {'user_id': user_id},
+                        )
+
+                        similar_users_data = [
+                            dict(row._mapping) for row in similar_users_result
+                        ]
+                        similar_users = find_similar_users(
+                            user_dict, similar_users_data
+                        )
+
+                        return recommend_alerts_for_existing_user(
+                            user_dict, transaction_analysis, similar_users
+                        )
+
+        except Exception as e:
+            logger.error(f'Error in _run_recommendation_service_sync: {str(e)}')
+            return {'error': str(e)}
+
+    def _run_ml_recommendation_sync(
+        self, user_id: str, user_dict: dict
+    ) -> dict[str, Any]:
+        """
+        Run hybrid ML-based recommendations synchronously.
+
+        Combines transaction-based analysis (primary) with collaborative filtering (secondary)
+        to generate personalized recommendations similar to LLM approach.
+        """
+        try:
+            import pandas as pd
+            from sqlalchemy import create_engine, text
+
+            from src.core.config import settings
+            from src.ml.alert_recommender import AlertRecommenderModel
+            from src.ml.alert_recommender.feature_engineering import (
+                build_user_features,
+                extract_alert_types_from_rules,
+                get_alert_columns,
+            )
+            from src.ml.alert_recommender.recommendation_generator import (
+                combine_recommendations,
+                generate_transaction_based_recommendations,
+            )
+            from src.ml.alert_recommender.transaction_analyzer import (
+                analyze_user_transactions,
             )
 
             sync_database_url = settings.DATABASE_URL.replace(
@@ -167,52 +268,291 @@ class BackgroundRecommendationService:
             sync_engine = create_engine(sync_database_url, echo=False)
 
             with sync_engine.connect() as conn:
-                # Get transaction data
-                result = conn.execute(
+                # STEP 1: Get user's own transactions (Primary analysis)
+                user_transactions_result = conn.execute(
                     text("""
-                    SELECT amount, merchant_category, merchant_name, created_at, 
-                           merchant_city, merchant_state, merchant_country
-                    FROM transactions 
-                    WHERE user_id = :user_id 
-                    ORDER BY created_at DESC 
-                    LIMIT 1000
-                """),
+                        SELECT amount, merchant_name, merchant_category, merchant_state, transaction_date
+                        FROM transactions
+                        WHERE user_id = :user_id
+                        ORDER BY transaction_date DESC
+                        LIMIT 1000
+                    """),
                     {'user_id': user_id},
                 )
+                user_transactions = [
+                    dict(row._mapping) for row in user_transactions_result
+                ]
 
-                transactions = [dict(row._mapping) for row in result]
+                # Safety check: Don't generate recommendations if no transactions found
+                if not user_transactions or len(user_transactions) == 0:
+                    logger.warning(
+                        f'No transactions found for user {user_id}. '
+                        f'This may indicate database not ready or user has no transaction history. '
+                        f'Skipping recommendation generation.'
+                    )
+                    return {
+                        'status': 'skipped',
+                        'message': 'No transaction data available',
+                        'user_id': user_id,
+                    }
 
-                if not transactions:
-                    # New user recommendations
-                    return recommend_alerts_for_new_user(user_dict)
-                else:
-                    # Existing user recommendations
-                    transaction_analysis = analyze_transaction_patterns(transactions)
+                # Analyze user's transaction patterns
+                transaction_analysis = analyze_user_transactions(user_transactions)
+                logger.info(
+                    f'Analyzed {len(user_transactions)} transactions for user {user_id}'
+                )
 
-                    # Get similar users data
-                    similar_users_result = conn.execute(
+                # Generate transaction-based recommendations (Primary - 70%)
+                transaction_recs = generate_transaction_based_recommendations(
+                    user_id=user_id,
+                    user_profile=user_dict,
+                    transaction_analysis=transaction_analysis,
+                )
+                logger.info(
+                    f'Generated {len(transaction_recs)} transaction-based recommendations'
+                )
+
+                # STEP 2: Collaborative filtering recommendations (Secondary - 30%)
+                collaborative_recs = []
+                try:
+                    # Get all users for collaborative filtering
+                    users_result = conn.execute(
+                        text(
+                            'SELECT id, credit_limit, credit_balance FROM users WHERE is_active = true'
+                        )
+                    )
+                    users_data = [dict(row._mapping) for row in users_result]
+                    users_df = pd.DataFrame(users_data)
+
+                    # Get all transactions
+                    all_transactions_result = conn.execute(
                         text("""
-                        SELECT id, first_name, last_name, address_city, address_state, 
-                               address_country, credit_limit, created_at
-                        FROM users 
-                        WHERE id != :user_id AND is_active = true
-                        LIMIT 100
-                    """),
-                        {'user_id': user_id},
+                            SELECT user_id, amount, merchant_name, merchant_category, transaction_date
+                            FROM transactions
+                            ORDER BY transaction_date DESC
+                            LIMIT 50000
+                        """)
                     )
-
-                    similar_users_data = [
-                        dict(row._mapping) for row in similar_users_result
+                    transactions_data = [
+                        dict(row._mapping) for row in all_transactions_result
                     ]
-                    similar_users = find_similar_users(user_dict, similar_users_data)
+                    transactions_df = pd.DataFrame(transactions_data)
 
-                    return recommend_alerts_for_existing_user(
-                        user_dict, transaction_analysis, similar_users
+                    # Build user features
+                    user_features = build_user_features(users_df, transactions_df)
+
+                    # Add alert labels
+                    alert_rules_result = conn.execute(
+                        text("""
+                            SELECT user_id, name, natural_language_query, description
+                            FROM alert_rules
+                            WHERE is_active = true
+                        """)
                     )
+                    alert_rules_data = [
+                        dict(row._mapping) for row in alert_rules_result
+                    ]
+
+                    user_alert_rules = {}
+                    for rule in alert_rules_data:
+                        uid = rule['user_id']
+                        if uid not in user_alert_rules:
+                            user_alert_rules[uid] = []
+                        user_alert_rules[uid].append(rule)
+
+                    for alert_col in get_alert_columns():
+                        if alert_col not in user_features.columns:
+                            user_features[alert_col] = 0
+
+                    for uid, rules in user_alert_rules.items():
+                        alert_types = extract_alert_types_from_rules(rules)
+                        user_mask = user_features['user_id'] == uid
+                        for alert_type, enabled in alert_types.items():
+                            if alert_type in user_features.columns:
+                                user_features.loc[user_mask, alert_type] = enabled
+
+                    # Train/load collaborative filtering model
+                    model = AlertRecommenderModel()
+                    if not model.is_trained():
+                        logger.info('Training collaborative filtering model...')
+                        model.train(user_features, n_neighbors=5)
+                        model.save_model()
+
+                    # Get collaborative recommendations
+                    if user_id in user_features['user_id'].values:
+                        cf_result = model.recommend_for_user(
+                            user_id=user_id,
+                            user_features_df=user_features,
+                            k_neighbors=5,
+                            threshold=0.3,  # Lower threshold for secondary recs
+                        )
+                        collaborative_recs = self._format_ml_recommendations(
+                            cf_result['recommendations'], user_dict
+                        )
+                        logger.info(
+                            f'Generated {len(collaborative_recs)} collaborative filtering recommendations'
+                        )
+
+                except Exception as cf_error:
+                    logger.warning(
+                        f'Collaborative filtering failed, using transaction-based only: {cf_error}'
+                    )
+                    collaborative_recs = []
+
+                # STEP 3: Combine recommendations using ensemble approach
+                final_recommendations = combine_recommendations(
+                    transaction_based=transaction_recs,
+                    collaborative_filtering=collaborative_recs,
+                    transaction_weight=0.7,
+                    collaborative_weight=0.3,
+                )
+
+                # If no recommendations at all, fall back to defaults
+                if not final_recommendations:
+                    logger.info(
+                        f'No ML recommendations generated for user {user_id}, using defaults'
+                    )
+                    return self._get_default_ml_recommendations(user_id, user_dict)
+
+                # Determine recommendation type based on what was used
+                if transaction_recs and collaborative_recs:
+                    rec_type = 'ml_hybrid'
+                elif transaction_recs:
+                    rec_type = 'ml_transaction_based'
+                else:
+                    rec_type = 'ml_collaborative_filtering'
+
+                return {
+                    'user_id': user_id,
+                    'recommendation_type': rec_type,
+                    'recommendations': final_recommendations,
+                    'generated_at': datetime.now().isoformat(),
+                }
 
         except Exception as e:
-            logger.error(f'Error in _run_recommendation_service_sync: {str(e)}')
-            return {'error': str(e)}
+            logger.error(f'Error in ML recommendation sync: {str(e)}', exc_info=True)
+            # Fallback to default recommendations
+            return self._get_default_ml_recommendations(user_id, user_dict)
+
+    def _format_ml_recommendations(
+        self, recommendations: list[dict], user_dict: dict
+    ) -> list[dict]:
+        """Format ML recommendations for API response"""
+        credit_limit = float(user_dict.get('credit_limit', 5000))
+
+        alert_type_mapping = {
+            'high_spender': {
+                'title': 'High Spending Alert',
+                'description': 'Monitor when your total spending exceeds a threshold',
+                'category': 'spending_threshold',
+                'query': f'Notify me when my total spending exceeds ${credit_limit * 0.5:.0f}',
+            },
+            'high_tx_volume': {
+                'title': 'Frequent Transaction Alert',
+                'description': 'Get notified when you have many transactions in a short period',
+                'category': 'fraud_protection',
+                'query': 'Notify me when I have more than 10 transactions in a day',
+            },
+            'high_merchant_diversity': {
+                'title': 'New Merchant Diversity Alert',
+                'description': 'Track when you visit multiple different merchants in a day',
+                'category': 'merchant_monitoring',
+                'query': 'Notify me when I visit more than 5 different merchants in a day',
+            },
+            'near_credit_limit': {
+                'title': 'Credit Limit Alert',
+                'description': 'Get warned when approaching your credit limit',
+                'category': 'spending_threshold',
+                'query': 'Notify me when my credit utilization exceeds 70%',
+            },
+            'large_transaction': {
+                'title': 'Large Transaction Alert',
+                'description': 'Monitor unusually large purchases',
+                'category': 'fraud_protection',
+                'query': f'Notify me when a single transaction exceeds ${credit_limit * 0.2:.0f}',
+            },
+            'new_merchant': {
+                'title': 'New Merchant Alert',
+                'description': "Track purchases from merchants you haven't used before",
+                'category': 'fraud_protection',
+                'query': 'Notify me when I make a purchase from a new merchant',
+            },
+            'location_based': {
+                'title': 'Location-Based Alert',
+                'description': 'Detect transactions in unusual locations',
+                'category': 'location_based',
+                'query': 'Notify me of transactions in unusual locations',
+            },
+            'subscription_monitoring': {
+                'title': 'Subscription Monitoring',
+                'description': 'Track recurring subscription charges',
+                'category': 'subscription_monitoring',
+                'query': 'Notify me of recurring subscription charges',
+            },
+        }
+
+        # Map confidence levels to priority
+        def confidence_to_priority(confidence: str) -> str:
+            confidence_map = {
+                'high': 'high',
+                'medium': 'medium',
+                'low': 'low',
+            }
+            return confidence_map.get(confidence.lower(), 'medium')
+
+        formatted = []
+        for rec in recommendations:
+            alert_type = rec['alert_type']
+            mapping = alert_type_mapping.get(alert_type, {})
+
+            formatted.append(
+                {
+                    'title': mapping.get('title', alert_type.replace('_', ' ').title()),
+                    'description': mapping.get(
+                        'description', f'Alert for {alert_type}'
+                    ),
+                    'natural_language_query': mapping.get(
+                        'query', f'Alert for {alert_type}'
+                    ),
+                    'category': mapping.get('category', 'fraud_protection'),
+                    'priority': confidence_to_priority(rec['confidence']),
+                    'reasoning': rec['reason'],
+                }
+            )
+
+        return formatted
+
+    def _get_default_ml_recommendations(
+        self, user_id: str, user_dict: dict
+    ) -> dict[str, Any]:
+        """Provide default ML recommendations if model fails"""
+        credit_limit = float(user_dict.get('credit_limit', 5000))
+
+        default_recs = [
+            {
+                'title': 'Large Transaction Alert',
+                'description': 'Monitor unusually large purchases',
+                'natural_language_query': f'Notify me when a transaction exceeds ${credit_limit * 0.2:.0f}',
+                'category': 'fraud_protection',
+                'priority': 'medium',
+                'reasoning': 'Default recommendation for fraud protection',
+            },
+            {
+                'title': 'New Merchant Alert',
+                'description': "Track purchases from merchants you haven't used before",
+                'natural_language_query': 'Notify me when I make a purchase from a new merchant',
+                'category': 'fraud_protection',
+                'priority': 'medium',
+                'reasoning': 'Default recommendation for new merchant monitoring',
+            },
+        ]
+
+        return {
+            'user_id': user_id,
+            'recommendation_type': 'ml_default',
+            'recommendations': default_recs,
+            'generated_at': datetime.now().isoformat(),
+        }
 
     def _cache_recommendations_sync(
         self, user_id: str, recommendations: dict, sync_session
@@ -732,4 +1072,6 @@ class BackgroundRecommendationService:
 
 
 # Global instance
-background_recommendation_service = BackgroundRecommendationService()
+# Control via environment variable: USE_ML_RECOMMENDATIONS=true/false (default: true)
+use_ml = os.getenv('USE_ML_RECOMMENDATIONS', 'true').lower() in ('true', '1', 'yes')
+background_recommendation_service = BackgroundRecommendationService(use_ml_model=use_ml)

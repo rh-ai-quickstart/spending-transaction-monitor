@@ -30,6 +30,12 @@ services:
     ports:
       - "8080:8080"
     command: start-dev
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5s bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
     networks:
       - spending-monitor
 
@@ -85,6 +91,7 @@ services:
       - spending-monitor
     volumes:
       - ./data:/app/data
+      - ml_models:/tmp/ml_models
 
   # React Frontend
   ui:
@@ -164,3 +171,4 @@ networks:
 volumes:
   llamastack-data:
   postgres_data:
+  ml_models:
