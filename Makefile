@@ -80,7 +80,8 @@ $$(if [ -n "$$VITE_BYPASS_AUTH" ]; then echo "--set secrets.VITE_BYPASS_AUTH=$$V
 $$(if [ -n "$$VITE_ENVIRONMENT" ]; then echo "--set secrets.VITE_ENVIRONMENT=$$VITE_ENVIRONMENT"; fi) \
 $$(if [ -n "$$LLAMASTACK_BASE_URL" ]; then echo "--set secrets.LLAMASTACK_BASE_URL=$$LLAMASTACK_BASE_URL"; fi) \
 $$(if [ -n "$$LLAMASTACK_MODEL" ]; then echo "--set secrets.LLAMASTACK_MODEL=$$LLAMASTACK_MODEL"; fi) \
-$$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi)
+$$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi) \
+$$(if [ -n "$$USE_ML_RECOMMENDATIONS" ]; then echo "--set secrets.USE_ML_RECOMMENDATIONS=$$USE_ML_RECOMMENDATIONS"; fi)
 endef
 
 define HELM_LLAMASTACK_PARAMS

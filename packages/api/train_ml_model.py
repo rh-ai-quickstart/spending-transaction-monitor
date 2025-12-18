@@ -4,7 +4,10 @@ Train ML Alert Recommendation Model
 ------------------------------------
 
 This script trains the KNN-based collaborative filtering model
-using transaction data and user alert preferences.
+using transaction data and heuristic-based alert labels.
+
+The model uses behavioral features from user transactions to generate
+training labels automatically, without requiring pre-seeded alert data.
 
 Usage:
     python train_ml_model.py
@@ -19,15 +22,16 @@ import pandas as pd
 # Add the API package to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.ml.alert_recommender.feature_engineering import (
+from src.services.recommendations.ml.feature_engineering import (
     build_user_features,
+    generate_initial_alert_labels,
     get_alert_columns,
 )
-from src.ml.alert_recommender.recommender import AlertRecommenderModel
+from src.services.recommendations.ml.recommender import AlertRecommenderModel
 
 
 def load_data():
-    """Load users, transactions, and user alerts from CSV files"""
+    """Load users and transactions from CSV files"""
     data_dir = Path(__file__).parent.parent.parent / 'data'
 
     print(f'Loading data from {data_dir}...')
@@ -35,43 +39,11 @@ def load_data():
     # Load CSV files
     users_df = pd.read_csv(data_dir / 'sample_users.csv')
     transactions_df = pd.read_csv(data_dir / 'sample_transactions.csv')
-    user_alerts_df = pd.read_csv(data_dir / 'sample_user_alerts.csv')
 
     print(f'✅ Loaded {len(users_df)} users')
     print(f'✅ Loaded {len(transactions_df)} transactions')
-    print(f'✅ Loaded {len(user_alerts_df)} user alert preferences')
 
-    return users_df, transactions_df, user_alerts_df
-
-
-def merge_alert_labels(user_features_df, user_alerts_df):
-    """
-    Merge user alert preferences into feature dataframe.
-    Creates binary columns like alert_high_spender, alert_new_merchant, etc.
-    """
-    # Pivot alerts to create columns for each alert type
-    pivot = user_alerts_df.pivot_table(
-        index='user_id',
-        columns='alert_type',
-        values='enabled',
-        fill_value=0,
-        aggfunc='max',
-    )
-
-    pivot = pivot.reset_index()
-
-    # Merge with user features
-    merged = user_features_df.merge(pivot, on='user_id', how='left')
-
-    # Fill NaN with 0 for users without alerts
-    alert_cols = get_alert_columns()
-    for col in alert_cols:
-        if col in merged.columns:
-            merged[col] = merged[col].fillna(0).astype(int)
-        else:
-            merged[col] = 0
-
-    return merged
+    return users_df, transactions_df
 
 
 def train_model():
@@ -81,16 +53,17 @@ def train_model():
     print('=' * 60)
 
     # Load data
-    users_df, transactions_df, user_alerts_df = load_data()
+    users_df, transactions_df = load_data()
 
     # Build user behavioral features
     print('\n📊 Building user behavioral features...')
     user_features = build_user_features(users_df, transactions_df)
     print(f'✅ Built features for {len(user_features)} users')
 
-    # Merge with real alert labels
-    print('\n🏷️  Merging user alert preferences...')
-    user_features_with_alerts = merge_alert_labels(user_features, user_alerts_df)
+    # Generate heuristic-based alert labels
+    print('\n🏷️  Generating heuristic-based alert labels...')
+    user_features_with_alerts = generate_initial_alert_labels(user_features)
+    print('✅ Generated alert labels based on user behavior patterns')
 
     # Show alert distribution
     alert_cols = get_alert_columns()
@@ -98,11 +71,16 @@ def train_model():
         col for col in alert_cols if col in user_features_with_alerts.columns
     ]
 
-    print('\n📈 Alert distribution:')
+    print('\n📈 Alert distribution (heuristic-based):')
     for col in existing_alert_cols:
         count = user_features_with_alerts[col].sum()
         pct = (count / len(user_features_with_alerts)) * 100
         print(f'  {col}: {int(count)} users ({pct:.1f}%)')
+
+    # Ensure all alert columns exist
+    for alert_col in alert_cols:
+        if alert_col not in user_features_with_alerts.columns:
+            user_features_with_alerts[alert_col] = 0
 
     # Train KNN model
     print('\n🤖 Training KNN model...')
@@ -147,6 +125,8 @@ def train_model():
     print('=' * 60)
     print(f'\nModel ready at: {model_path}')
     print('You can now start the API server to use ML recommendations.')
+    print('\n💡 Note: Using heuristic-based training labels.')
+    print('   As real users create alerts, retrain to learn from actual preferences.')
 
 
 if __name__ == '__main__':

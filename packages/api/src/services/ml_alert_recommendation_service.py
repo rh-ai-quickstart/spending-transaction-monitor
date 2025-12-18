@@ -12,13 +12,13 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AlertRule, Transaction, User
-from src.ml.alert_recommender import AlertRecommenderModel
-from src.ml.alert_recommender.feature_engineering import (
+from src.services.recommendations.ml import AlertRecommenderModel
+from src.services.recommendations.ml.feature_engineering import (
     build_user_features,
     extract_alert_types_from_rules,
     get_alert_columns,
 )
-from src.ml.alert_recommender.training import retrain_model, should_retrain_model
+from src.services.recommendations.ml.training import retrain_model, should_retrain_model
 from src.services.transactions.transaction_service import TransactionService
 from src.services.users.user_service import UserService
 
@@ -59,7 +59,7 @@ class MLAlertRecommendationService:
         # If model is not trained, train it now
         if not self.model.is_trained():
             print('Model not trained, training now...')
-            from src.ml.alert_recommender.training import train_model
+            from src.services.recommendations.ml.training import train_model
 
             await train_model(session, model_path=self.model.model_path)
             self.model.load_model()

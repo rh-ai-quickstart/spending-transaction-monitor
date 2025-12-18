@@ -3,16 +3,12 @@ ML Model Startup Initialization
 --------------------------------
 
 This module initializes the ML recommendation system on application startup:
-1. Loads sample alert rules into the database (if not already present)
-2. Trains the ML model with existing alert data
+1. Checks for existing alert rules in the database
+2. Trains the ML model with existing alert data (or uses heuristic-based training)
 """
 
-from datetime import UTC, datetime
 import logging
-from pathlib import Path
-import uuid
 
-import pandas as pd
 from sqlalchemy import select
 
 from db.database import SessionLocal
@@ -47,8 +43,12 @@ async def initialize_ml_system():
 
 
 async def load_sample_alerts_if_needed():
-    """Load sample alert rules from CSV if database has no alerts"""
+    """
+    Skip loading sample alerts to avoid creating active alerts for users.
 
+    The ML model will use heuristic-based training labels instead of pre-seeded alerts.
+    As real users create real alerts, the model will learn from actual user preferences.
+    """
     async with SessionLocal() as session:
         # Check if we have any alert rules
         result = await session.execute(select(AlertRule))
@@ -58,119 +58,22 @@ async def load_sample_alerts_if_needed():
             logger.info(
                 f'📊 Found {len(existing_rules)} existing alert rules in database'
             )
-            return
-
-        logger.info('📂 No alert rules found - loading sample data...')
-
-        # Load sample alerts from CSV
-        data_dir = Path('/app/data')
-        csv_path = data_dir / 'sample_user_alerts.csv'
-
-        if not csv_path.exists():
-            logger.warning(f'⚠️  Sample alerts CSV not found: {csv_path}')
-            logger.warning('   Skipping sample data load')
-            return
-
-        alerts_df = pd.read_csv(csv_path)
-        logger.info(f'✅ Loaded {len(alerts_df)} alert preferences from CSV')
-
-        # Map alert types to natural language queries
-        # Valid enum values: AMOUNT_THRESHOLD, MERCHANT_CATEGORY, MERCHANT_NAME, LOCATION_BASED, FREQUENCY_BASED, PATTERN_BASED, CUSTOM_QUERY
-        alert_type_mapping = {
-            'alert_high_spender': {
-                'name': 'High Spending Alert',
-                'description': 'Monitor when total spending exceeds a threshold',
-                'natural_language_query': 'Notify me when my total spending exceeds $2500',
-                'alert_type': 'AMOUNT_THRESHOLD',
-            },
-            'alert_large_transaction': {
-                'name': 'Large Transaction Alert',
-                'description': 'Monitor unusually large purchases',
-                'natural_language_query': 'Notify me when a single transaction exceeds $1000',
-                'alert_type': 'AMOUNT_THRESHOLD',
-            },
-            'alert_near_credit_limit': {
-                'name': 'Credit Limit Alert',
-                'description': 'Get warned when approaching credit limit',
-                'natural_language_query': 'Notify me when my credit utilization exceeds 70%',
-                'alert_type': 'PATTERN_BASED',
-            },
-            'alert_high_tx_volume': {
-                'name': 'Frequent Transaction Alert',
-                'description': 'Get notified when you have many transactions',
-                'natural_language_query': 'Notify me when I have more than 10 transactions in a day',
-                'alert_type': 'FREQUENCY_BASED',
-            },
-            'alert_new_merchant': {
-                'name': 'New Merchant Alert',
-                'description': 'Track purchases from new merchants',
-                'natural_language_query': 'Notify me when I make a purchase from a new merchant',
-                'alert_type': 'MERCHANT_NAME',
-            },
-            'alert_high_merchant_diversity': {
-                'name': 'Merchant Diversity Alert',
-                'description': 'Track when you visit multiple different merchants',
-                'natural_language_query': 'Notify me when I visit more than 5 different merchants in a day',
-                'alert_type': 'MERCHANT_CATEGORY',
-            },
-            'alert_location_based': {
-                'name': 'Location-Based Alert',
-                'description': 'Detect transactions in unusual locations',
-                'natural_language_query': 'Notify me of transactions in unusual locations',
-                'alert_type': 'LOCATION_BASED',
-            },
-            'alert_subscription_monitoring': {
-                'name': 'Subscription Monitoring',
-                'description': 'Track recurring subscription charges',
-                'natural_language_query': 'Notify me of recurring subscription charges',
-                'alert_type': 'PATTERN_BASED',
-            },
-        }
-
-        # Create alert rules from CSV
-        created_count = 0
-
-        for _, row in alerts_df.iterrows():
-            user_id = row['user_id']
-            alert_type_key = row['alert_type']
-            enabled = row['enabled']
-
-            if not enabled:
-                continue
-
-            mapping = alert_type_mapping.get(alert_type_key)
-            if not mapping:
-                logger.warning(f'⚠️  Unknown alert type: {alert_type_key}')
-                continue
-
-            # Create new alert rule
-            rule = AlertRule(
-                id=str(uuid.uuid4()),
-                user_id=user_id,
-                name=mapping['name'],
-                description=mapping['description'],
-                is_active=True,
-                alert_type=mapping['alert_type'],
-                natural_language_query=mapping['natural_language_query'],
-                notification_methods=None,
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
+        else:
+            logger.info(
+                '📊 No alert rules found - model will use heuristic-based training'
             )
 
-            session.add(rule)
-            created_count += 1
-
-        await session.commit()
-
-        logger.info(f'✅ Created {created_count} sample alert rules in database')
+        logger.info(
+            '⏭️  Skipping sample alert creation (using heuristic training instead)'
+        )
 
 
 async def train_ml_model_if_needed():
     """Train ML model if not already trained"""
 
     try:
-        from src.ml.alert_recommender import AlertRecommenderModel
-        from src.ml.alert_recommender.training import train_model
+        from src.services.recommendations.ml import AlertRecommenderModel
+        from src.services.recommendations.ml.training import train_model
 
         # Check if model exists and is trained
         model = AlertRecommenderModel()
@@ -181,13 +84,27 @@ async def train_ml_model_if_needed():
 
         logger.info('🤖 Training ML model with database data...')
 
-        # Train model using database data
+        # Check if we have real alert data
         async with SessionLocal() as session:
+            result = await session.execute(select(AlertRule))
+            existing_rules = result.scalars().all()
+            has_real_alerts = len(existing_rules) > 0
+
+            if has_real_alerts:
+                logger.info(
+                    f'📊 Found {len(existing_rules)} alert rules - using real alert data'
+                )
+            else:
+                logger.info(
+                    '📊 No alert rules found - using heuristic-based training labels'
+                )
+
+            # Train model using database data
             trained_model = await train_model(
                 session=session,
                 model_path=model.model_path,
                 n_neighbors=5,
-                use_real_alerts=True,
+                use_real_alerts=has_real_alerts,
             )
 
         logger.info(f'✅ ML model trained and saved to {trained_model.model_path}')
