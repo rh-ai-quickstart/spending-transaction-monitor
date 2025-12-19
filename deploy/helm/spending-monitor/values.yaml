@@ -27,7 +27,7 @@ llama-stack:
     enabled: true
   # Set to true if using LLM_PROVIDER=llamastack
 pgvector:
-  enabled: true
+  enabled: false
 
 # Secrets configuration - these values should be overridden with actual secrets
 secrets:
@@ -56,8 +56,8 @@ secrets:
   SMTP_USE_TLS: "true"
   SMTP_USE_SSL: "false"
   LLAMASTACK_BASE_URL: "http://localhost:8321"  # Remote LlamaStack URL (e.g., "https://llamastack.example.com:8321")
+  USE_ML_RECOMMENDATIONS: "false"  # Use ML-based recommendations (true) or LLM-based (false)
 
-  
   # Keycloak configuration
   # Internal Keycloak URL (for API to reach Keycloak via cluster network)
   KEYCLOAK_URL: "http://spending-monitor-keycloak:8080"

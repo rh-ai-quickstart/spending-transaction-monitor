@@ -78,7 +78,7 @@ For each alert type, we:
 The model trains automatically on first use. To manually train:
 
 ```python
-from src.ml.alert_recommender.training import train_model
+from src.services.recommendations.ml.training import train_model
 from db.database import SessionLocal
 
 async with SessionLocal() as session:
@@ -105,10 +105,10 @@ Run as a cron job:
 
 ```bash
 # Retrain every week
-0 0 * * 0 cd /path/to/api && python -m src.ml.alert_recommender.scheduled_retraining
+0 0 * * 0 cd /path/to/api && python -m src.services.recommendations.ml.scheduled_retraining
 
 # Force retrain immediately
-python -m src.ml.alert_recommender.scheduled_retraining --force
+python -m src.services.recommendations.ml.scheduled_retraining --force
 ```
 
 ## Configuration
@@ -124,7 +124,7 @@ python -m src.ml.alert_recommender.scheduled_retraining --force
 
 Models are saved to:
 ```
-packages/api/src/ml/alert_recommender/models/model_knn.pkl
+packages/api/src/services/recommendations/ml/models/model_knn.pkl
 ```
 
 ## Integration
@@ -146,7 +146,7 @@ service = BackgroundRecommendationService(use_ml_model=False)
 When users create/modify alerts, the system logs the action for model improvement:
 
 ```python
-from src.ml.alert_recommender.training import log_user_alert_action
+from src.services.recommendations.ml.training import log_user_alert_action
 
 await log_user_alert_action(
     session=session,
@@ -184,7 +184,7 @@ await log_user_alert_action(
 
 ```python
 # Test feature engineering
-from src.ml.alert_recommender.feature_engineering import build_user_features
+from src.services.recommendations.ml.feature_engineering import build_user_features
 import pandas as pd
 
 users_df = pd.DataFrame([...])
@@ -192,7 +192,7 @@ transactions_df = pd.DataFrame([...])
 features = build_user_features(users_df, transactions_df)
 
 # Test recommendations
-from src.ml.alert_recommender import AlertRecommenderModel
+from src.services.recommendations.ml import AlertRecommenderModel
 
 model = AlertRecommenderModel()
 model.load_model()
@@ -212,7 +212,7 @@ recommendations = model.recommend_for_user(
 Check if model needs retraining:
 
 ```python
-from src.ml.alert_recommender.training import should_retrain_model
+from src.services.recommendations.ml.training import should_retrain_model
 
 if should_retrain_model(days_threshold=7):
     print("Model needs retraining!")
@@ -250,8 +250,8 @@ Monitor these metrics:
 **Issue**: `FileNotFoundError` when loading model
 
 **Solution**:
-- Run training manually: `python -m src.ml.alert_recommender.training`
-- Check model directory exists: `src/ml/alert_recommender/models/`
+- Run training manually: `python -m src.services.recommendations.ml.training`
+- Check model directory exists: `src/services/recommendations/ml/models/`
 
 ## Future Enhancements
 

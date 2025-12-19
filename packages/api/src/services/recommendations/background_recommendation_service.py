@@ -248,17 +248,17 @@ class BackgroundRecommendationService:
             from sqlalchemy import create_engine, text
 
             from src.core.config import settings
-            from src.ml.alert_recommender import AlertRecommenderModel
-            from src.ml.alert_recommender.feature_engineering import (
+            from src.services.recommendations.ml import AlertRecommenderModel
+            from src.services.recommendations.ml.feature_engineering import (
                 build_user_features,
                 extract_alert_types_from_rules,
                 get_alert_columns,
             )
-            from src.ml.alert_recommender.recommendation_generator import (
+            from src.services.recommendations.ml.recommendation_generator import (
                 combine_recommendations,
                 generate_transaction_based_recommendations,
             )
-            from src.ml.alert_recommender.transaction_analyzer import (
+            from src.services.recommendations.ml.transaction_analyzer import (
                 analyze_user_transactions,
             )
 

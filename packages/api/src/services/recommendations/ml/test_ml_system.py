@@ -15,12 +15,12 @@ import pandas as pd
 sys.path.insert(0, '../../../..')
 
 from db.database import SessionLocal
-from src.ml.alert_recommender.feature_engineering import (
+from src.services.recommendations.ml.feature_engineering import (
     build_user_features,
     generate_initial_alert_labels,
 )
-from src.ml.alert_recommender.recommender import AlertRecommenderModel
-from src.ml.alert_recommender.training import train_model
+from src.services.recommendations.ml.recommender import AlertRecommenderModel
+from src.services.recommendations.ml.training import train_model
 
 
 async def test_feature_engineering():

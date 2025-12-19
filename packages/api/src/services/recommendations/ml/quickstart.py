@@ -100,11 +100,11 @@ async def test_basic_functionality():
 
         import pandas as pd
 
-        from src.ml.alert_recommender.feature_engineering import (
+        from src.services.recommendations.ml.feature_engineering import (
             build_user_features,
             generate_initial_alert_labels,
         )
-        from src.ml.alert_recommender.recommender import AlertRecommenderModel
+        from src.services.recommendations.ml.recommender import AlertRecommenderModel
 
         # Create sample data
         users_df = pd.DataFrame(
@@ -181,7 +181,7 @@ async def test_database_connection():
 
     try:
         from db.database import SessionLocal
-        from src.ml.alert_recommender.training import train_model
+        from src.services.recommendations.ml.training import train_model
 
         async with SessionLocal() as session:
             print_success('Database connection successful')
