@@ -15,6 +15,11 @@
     "type-check": "tsc --noEmit",
     "check": "pnpm format:check && pnpm lint && pnpm type-check",
     "test": "vitest --run --passWithNoTests",
+    "test:unit": "vitest --run --passWithNoTests",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug",
+    "e2e:report": "playwright show-report",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -51,6 +56,7 @@
   },
   "prettier": "@spending-monitor/prettier-config",
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@spending-monitor/eslint-config": "workspace:*",
     "@spending-monitor/prettier-config": "workspace:*",
     "@storybook/addon-essentials": "^8.6.14",
