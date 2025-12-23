@@ -65,18 +65,18 @@ test.describe('Transaction Details', () => {
       '[data-testid="transaction-card"], .transaction-card, .transaction-item',
     );
 
-    if ((await transactionItem.count()) > 0) {
-      await transactionItem.first().click();
-      await page.waitForTimeout(500);
+    const itemCount = await transactionItem.count();
+    test.skip(itemCount === 0, 'No transaction items found - skipping drawer test');
 
-      // Should open drawer/modal
-      const drawer = page.locator(
-        '[data-testid="transaction-drawer"], [role="dialog"], .drawer, [data-state="open"]',
-      );
+    await transactionItem.first().click();
+    await page.waitForTimeout(500);
 
-      const drawerCount = await drawer.count();
-      expect(drawerCount).toBeGreaterThanOrEqual(0);
-    }
+    // Should open drawer/modal
+    const drawer = page.locator(
+      '[data-testid="transaction-drawer"], [role="dialog"], .drawer, [data-state="open"]',
+    );
+
+    await expect(drawer.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should display transaction details in drawer', async ({ page }) => {
@@ -86,18 +86,21 @@ test.describe('Transaction Details', () => {
       '[data-testid="transaction-card"], .transaction-card',
     );
 
-    if ((await transactionItem.count()) > 0) {
-      await transactionItem.first().click();
-      await page.waitForTimeout(500);
+    const itemCount = await transactionItem.count();
+    test.skip(
+      itemCount === 0,
+      'No transaction items found - skipping drawer details test',
+    );
 
-      const drawer = page.locator('[role="dialog"], .drawer');
+    await transactionItem.first().click();
+    await page.waitForTimeout(500);
 
-      if ((await drawer.count()) > 0) {
-        // Drawer should contain transaction info
-        const drawerContent = await drawer.first().textContent();
-        expect(drawerContent).toBeTruthy();
-      }
-    }
+    const drawer = page.locator('[role="dialog"], .drawer');
+    await expect(drawer.first()).toBeVisible({ timeout: 5000 });
+
+    // Drawer should contain transaction info
+    const drawerContent = await drawer.first().textContent();
+    expect(drawerContent).toBeTruthy();
   });
 
   test('should close drawer on escape key', async ({ page }) => {
@@ -107,23 +110,21 @@ test.describe('Transaction Details', () => {
       '[data-testid="transaction-card"], .transaction-card',
     );
 
-    if ((await transactionItem.count()) > 0) {
-      await transactionItem.first().click();
-      await page.waitForTimeout(500);
+    const itemCount = await transactionItem.count();
+    test.skip(itemCount === 0, 'No transaction items found - skipping escape key test');
 
-      const drawer = page.locator('[role="dialog"], .drawer');
+    await transactionItem.first().click();
+    await page.waitForTimeout(500);
 
-      if ((await drawer.count()) > 0) {
-        // Press escape to close
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
+    const drawer = page.locator('[role="dialog"], .drawer');
+    await expect(drawer.first()).toBeVisible({ timeout: 5000 });
 
-        // Drawer should be closed or hidden
-        const visibleDrawer = page.locator('[role="dialog"]:visible, .drawer:visible');
-        // May or may not be visible depending on animation
-        expect(await visibleDrawer.count()).toBeGreaterThanOrEqual(0);
-      }
-    }
+    // Press escape to close
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    // Drawer should be closed or hidden
+    await expect(drawer.first()).not.toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -136,32 +137,31 @@ test.describe('Add Transaction', () => {
   test('should have add transaction button', async ({ page }) => {
     await page.waitForTimeout(1000);
 
+    // Add button is core UI, must exist
     const addButton = page.locator(
       'button:has-text("Add"), button:has-text("New"), [data-testid="add-transaction-btn"]',
     );
 
-    const buttonCount = await addButton.count();
-    expect(buttonCount).toBeGreaterThanOrEqual(0);
+    await expect(addButton.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should open add transaction form', async ({ page }) => {
     await page.waitForTimeout(1000);
 
+    // Add button is core UI, must exist
     const addButton = page.locator(
       'button:has-text("Add Transaction"), button:has-text("New Transaction"), [data-testid="add-transaction-btn"]',
     );
 
-    if ((await addButton.count()) > 0) {
-      await addButton.first().click();
-      await page.waitForTimeout(500);
+    await expect(addButton.first()).toBeVisible({ timeout: 5000 });
+    await addButton.first().click();
+    await page.waitForTimeout(500);
 
-      // Should open form
-      const form = page.locator(
-        'form, [data-testid="add-transaction-form"], [role="dialog"]',
-      );
-      const formCount = await form.count();
-      expect(formCount).toBeGreaterThanOrEqual(0);
-    }
+    // Should open form
+    const form = page.locator(
+      'form, [data-testid="add-transaction-form"], [role="dialog"]',
+    );
+    await expect(form.first()).toBeVisible({ timeout: 5000 });
   });
 });
 

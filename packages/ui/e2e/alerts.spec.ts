@@ -44,14 +44,12 @@ test.describe('Alert Rules Page', () => {
   test('should have create alert button', async ({ page }) => {
     await page.waitForTimeout(1000);
 
-    // Look for a button to create new alerts
+    // Look for a button to create new alerts - this is core UI and must exist
     const createButton = page.locator(
       'button:has-text("Create"), button:has-text("Add"), button:has-text("New"), [data-testid="create-alert-btn"]',
     );
 
-    const buttonCount = await createButton.count();
-    // Button may or may not be visible depending on page state
-    expect(buttonCount).toBeGreaterThanOrEqual(0);
+    await expect(createButton.first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -64,51 +62,48 @@ test.describe('Alert Rule Creation', () => {
   test('should open alert creation form', async ({ page }) => {
     await page.waitForTimeout(1000);
 
-    // Find create button
+    // Find create button - core UI element, must exist
     const createButton = page.locator(
       'button:has-text("Create"), button:has-text("Add"), button:has-text("New Alert"), [data-testid="create-alert-btn"]',
     );
 
-    if ((await createButton.count()) > 0) {
-      await createButton.first().click();
-      await page.waitForTimeout(500);
+    await expect(createButton.first()).toBeVisible({ timeout: 5000 });
+    await createButton.first().click();
+    await page.waitForTimeout(500);
 
-      // Look for form elements
-      const form = page.locator(
-        'form, [data-testid="alert-form"], [role="dialog"], .drawer',
-      );
-      const formCount = await form.count();
-      expect(formCount).toBeGreaterThanOrEqual(0);
-    }
+    // Look for form elements
+    const form = page.locator(
+      'form, [data-testid="alert-form"], [role="dialog"], .drawer',
+    );
+    await expect(form.first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should validate required fields', async ({ page }) => {
     await page.waitForTimeout(1000);
 
+    // Create button is core UI, must exist
     const createButton = page.locator(
       'button:has-text("Create"), button:has-text("Add"), button:has-text("New Alert")',
     );
 
-    if ((await createButton.count()) > 0) {
-      await createButton.first().click();
-      await page.waitForTimeout(500);
+    await expect(createButton.first()).toBeVisible({ timeout: 5000 });
+    await createButton.first().click();
+    await page.waitForTimeout(500);
 
-      // Try to submit without filling required fields
-      const submitButton = page.locator(
-        'button[type="submit"], button:has-text("Save"), button:has-text("Submit")',
-      );
+    // Submit button in form is core UI, must exist
+    const submitButton = page.locator(
+      'button[type="submit"], button:has-text("Save"), button:has-text("Submit")',
+    );
 
-      if ((await submitButton.count()) > 0) {
-        await submitButton.first().click();
+    await expect(submitButton.first()).toBeVisible({ timeout: 5000 });
+    await submitButton.first().click();
 
-        // Should show validation errors or prevent submission
-        const errorMessage = page.locator(
-          '[role="alert"], .error, .validation-error, [data-testid="form-error"]',
-        );
-        // Error message may or may not appear depending on form implementation
-        expect(await errorMessage.count()).toBeGreaterThanOrEqual(0);
-      }
-    }
+    // Should show validation errors or prevent submission
+    const errorMessage = page.locator(
+      '[role="alert"], .error, .validation-error, [data-testid="form-error"]',
+    );
+    // Error message may or may not appear depending on form implementation
+    expect(await errorMessage.count()).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -127,15 +122,14 @@ test.describe('Alert Rule Card', () => {
     );
 
     const cardCount = await alertCard.count();
+    test.skip(cardCount === 0, 'No alert cards found - skipping details test');
 
-    if (cardCount > 0) {
-      // First card should be visible
-      await expect(alertCard.first()).toBeVisible();
+    // First card should be visible
+    await expect(alertCard.first()).toBeVisible();
 
-      // Card should have some content
-      const cardText = await alertCard.first().textContent();
-      expect(cardText).toBeTruthy();
-    }
+    // Card should have some content
+    const cardText = await alertCard.first().textContent();
+    expect(cardText).toBeTruthy();
   });
 
   test('should have action buttons on alert cards', async ({ page }) => {
@@ -145,12 +139,13 @@ test.describe('Alert Rule Card', () => {
       '[data-testid="alert-rule-card"], .alert-card, .alert-rule',
     );
 
-    if ((await alertCard.count()) > 0) {
-      // Look for action buttons (edit, delete, pause, etc.)
-      const actionButtons = alertCard.first().locator('button, [role="button"]');
-      const buttonCount = await actionButtons.count();
-      expect(buttonCount).toBeGreaterThanOrEqual(0);
-    }
+    const cardCount = await alertCard.count();
+    test.skip(cardCount === 0, 'No alert cards found - skipping action buttons test');
+
+    // Look for action buttons (edit, delete, pause, etc.)
+    const actionButtons = alertCard.first().locator('button, [role="button"]');
+    const buttonCount = await actionButtons.count();
+    expect(buttonCount).toBeGreaterThan(0);
   });
 });
 

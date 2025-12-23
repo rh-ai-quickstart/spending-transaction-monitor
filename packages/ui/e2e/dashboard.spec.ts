@@ -119,24 +119,19 @@ test.describe('Transaction Interactions', () => {
     );
 
     const transactionCount = await transaction.count();
+    test.skip(transactionCount === 0, 'No transactions found - skipping drawer test');
 
-    if (transactionCount > 0) {
-      // Click the first transaction
-      await transaction.first().click();
+    // Click the first transaction
+    await transaction.first().click();
 
-      // Should open a drawer/modal with details
-      const drawer = page.locator(
-        '[data-testid="transaction-drawer"], [role="dialog"], .drawer',
-      );
+    // Should open a drawer/modal with details
+    const drawer = page.locator(
+      '[data-testid="transaction-drawer"], [role="dialog"], .drawer',
+    );
 
-      // Give time for drawer animation
-      await page.waitForTimeout(500);
-      const drawerCount = await drawer.count();
-      expect(drawerCount).toBeGreaterThanOrEqual(0);
-    } else {
-      // No transactions available - test passes
-      expect(true).toBe(true);
-    }
+    // Give time for drawer animation
+    await page.waitForTimeout(500);
+    await expect(drawer.first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -145,33 +140,31 @@ test.describe('Dashboard Navigation', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Find and click transactions link
+    // Navigation links are core UI, must exist
     const transactionsLink = page.locator(
       'a[href*="transaction"], [data-testid="nav-transactions"]',
     );
 
-    if ((await transactionsLink.count()) > 0) {
-      await transactionsLink.first().click();
-      await page.waitForLoadState('networkidle');
+    await expect(transactionsLink.first()).toBeVisible({ timeout: 5000 });
+    await transactionsLink.first().click();
+    await page.waitForLoadState('networkidle');
 
-      // URL should include transactions
-      expect(page.url()).toContain('transaction');
-    }
+    // URL should include transactions
+    expect(page.url()).toContain('transaction');
   });
 
   test('should navigate to alerts page', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Find and click alerts link
+    // Navigation links are core UI, must exist
     const alertsLink = page.locator('a[href*="alert"], [data-testid="nav-alerts"]');
 
-    if ((await alertsLink.count()) > 0) {
-      await alertsLink.first().click();
-      await page.waitForLoadState('networkidle');
+    await expect(alertsLink.first()).toBeVisible({ timeout: 5000 });
+    await alertsLink.first().click();
+    await page.waitForLoadState('networkidle');
 
-      // URL should include alerts
-      expect(page.url()).toContain('alert');
-    }
+    // URL should include alerts
+    expect(page.url()).toContain('alert');
   });
 });
