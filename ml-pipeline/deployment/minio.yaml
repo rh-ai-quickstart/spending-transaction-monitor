@@ -1,0 +1,132 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: minio-pvc
+  namespace: spending-transaction-monitor
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  volumeMode: Filesystem
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: minio-secret
+  namespace: spending-transaction-monitor
+stringData:
+  minio_root_user: minio
+  minio_root_password: minio123
+  AWS_ACCESS_KEY_ID: minio
+  AWS_SECRET_ACCESS_KEY: minio123
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: minio
+  namespace: spending-transaction-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: minio-pvc
+      containers:
+        - name: minio
+          image: quay.io/minio/minio:RELEASE.2023-06-19T19-52-50Z
+          args:
+            - server
+            - /data
+            - --console-address
+            - :9090
+          ports:
+            - containerPort: 9000
+            - containerPort: 9090
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: minio_root_user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: minio_root_password
+          volumeMounts:
+            - name: data
+              mountPath: /data
+              subPath: minio
+          resources:
+            limits:
+              cpu: 250m
+              memory: 1Gi
+            requests:
+              cpu: 20m
+              memory: 100Mi
+          readinessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 9000
+            initialDelaySeconds: 30
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: minio-service
+  namespace: spending-transaction-monitor
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: ui
+      port: 9090
+      targetPort: 9090
+  selector:
+    app: minio
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: minio-api
+  namespace: spending-transaction-monitor
+spec:
+  to:
+    kind: Service
+    name: minio-service
+  port:
+    targetPort: api
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: minio-ui
+  namespace: spending-transaction-monitor
+spec:
+  to:
+    kind: Service
+    name: minio-service
+  port:
+    targetPort: ui
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

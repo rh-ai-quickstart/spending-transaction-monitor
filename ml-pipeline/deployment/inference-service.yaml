@@ -1,0 +1,34 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: alert-recommender
+  namespace: {{ namespace }}
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+    openshift.io/display-name: "Alert Recommendation Model"
+  labels:
+    app: alert-recommender
+    opendatahub.io/dashboard: "true"
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 3
+    model:
+      modelFormat:
+        name: sklearn
+        version: "1"
+      runtime: mlserver-sklearn
+      storage:
+        key: minio-secret
+        path: {{ model_path }}
+        parameters:
+          endpoint: http://minio-service.{{ namespace }}.svc.cluster.local:9000
+          bucket: {{ bucket }}
+          region: us-east-1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
