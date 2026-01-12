@@ -1,6 +1,6 @@
 # Spending Transaction Monitor
 
-An **AI-driven application** that enables users to define **natural language alert rules** for their credit card transactions. The system provides rule-based fraud detection and location-based security monitoring, ingesting real-time data, evaluating transactions against user-defined rules, applying AI/ML analysis for anomaly detection, and sending alerts through preferred channels such as email or SMS.
+An **AI-driven application** that enables users to define **natural language alert rules** for their credit card transactions. The system provides rule-based anomaly detection and location-based security monitoring, ingesting real-time data, evaluating transactions against user-defined rules, applying AI/ML analysis for anomaly detection, and sending alerts through preferred channels such as email or SMS.
 
 ## Table of Contents
 
@@ -44,7 +44,7 @@ An **AI-driven application** that enables users to define **natural language ale
 This quickstart guide is designed for:
 
 - **Financial technology teams** implementing AI-driven transaction monitoring solutions
-- **Solution architects** evaluating AI-powered fraud detection platforms
+- **Solution architects** evaluating AI-powered anomaly detection platforms
 - **Organizations** looking to provide personalized spending insights to customers
 
 ### The business case for AI-driven transaction monitoring
@@ -53,10 +53,10 @@ Many organizations are working to enhance customer experience through AI-powered
 
 The key value propositions for implementing AI-driven transaction monitoring include:
 
-- **Reduced fraud exposure.** Real-time alerts help customers identify unauthorized transactions quickly, reducing financial losses and improving trust.
+- **Reduced anomaly exposure.** Real-time alerts help customers identify unauthorized transactions quickly, reducing financial losses and improving trust.
 - **Enhanced customer experience.** Users define alerts in plain natural language, making the system accessible to non-technical users.
 - **Personalized insights.** Behavioral AI analysis detects anomalies based on individual spending patterns, not just static thresholds.
-- **Location-aware security.** GPS-based fraud detection adds an additional layer of protection by comparing transaction locations with user whereabouts.
+- **Location-aware security.** GPS-based anomaly detection adds an additional layer of protection by comparing transaction locations with user whereabouts.
 - **Multi-channel notifications.** Alerts are delivered via email or SMS, meeting customers where they prefer to receive information.
 
 ### Example use cases
@@ -125,11 +125,11 @@ The solution is deployed on **OpenShift** and integrates multiple components:
 
 - **Transaction Ingestion Service**: Securely receives credit card transaction data in real-time and stores it in the database.
 - **Transaction Data Store**: Stores both historical and streaming data (PostgreSQL).
-- **Customer UI**: React frontend for defining and managing alerts with location-based fraud detection.
+- **Customer UI**: React frontend for defining and managing alerts with location-based anomaly detection.
 - **NLP Module (LlamaStack + LangGraph Agent)**: Parses natural language into machine-readable rules.
 - **Rules Engine / Alerting Service**: Evaluates transactions against user rules, behavioral patterns, and location-based risk assessment.
-- **AI/ML Behavioral Analysis**: Detects anomalies, spending spikes, recurring patterns, and location-based fraud indicators.
-- **Location-based Security**: Captures user GPS coordinates for enhanced security monitoring and fraud detection.
+- **AI/ML Behavioral Analysis**: Detects anomalies, spending spikes, recurring patterns, and location-based anomaly indicators.
+- **Location-based Security**: Captures user GPS coordinates for enhanced security monitoring and anomaly detection.
 - **Notification Service**: Sends alerts via email or SMS.
 
 ```mermaid
@@ -257,7 +257,7 @@ The transaction monitoring use case is implemented by combining the following co
 **Key Features:**
 
 - Users create alert rules (amount, merchant, category, timeframe, location; notification methods: email/SMS/push/webhook)
-- Location-based fraud detection captures user GPS coordinates for enhanced security monitoring
+- Location-based anomaly detection captures user GPS coordinates for enhanced security monitoring
 - Incoming transactions are stored and evaluated against active rules, including location-based risk assessment
 - Triggered rules produce alert notifications which are delivered via configured channels
 
@@ -799,10 +799,10 @@ Now that you have the system running, you can dive deeper into specific componen
 ## Tags
 
 - **Title:** AI-Powered Transaction Monitoring with Natural Language Alert Rules
-- **Description:** Framework for AI-driven credit card transaction monitoring with NLP rule parsing, behavioral analysis, and location-based fraud detection.
+- **Description:** Framework for AI-driven credit card transaction monitoring with NLP rule parsing, behavioral analysis, and location-based anomaly detection.
 - **Industry:** Financial Services, Banking
 - **Product:** OpenShift AI
-- **Use case:** Transaction monitoring, Fraud detection, Personalized alerts
+- **Use case:** Transaction monitoring, Anomaly detection, Personalized alerts
 - **Contributor org:** Red Hat
 
 ---
