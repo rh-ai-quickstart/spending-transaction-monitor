@@ -477,8 +477,8 @@ make deploy
 **Using Quay.io instead of the OpenShift internal registry:**
 
 ```bash
-# 1) Authenticate to Quay with a Quay username/token
-podman login quay.io
+# 1) Authenticate to Quay (recommended: use a robot account token)
+make REGISTRY_URL=quay.io QUAY_USERNAME=<quay-user-or-robot> QUAY_TOKEN=<token> login
 
 # 2) Build + push to your Quay org + deploy
 make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> build-deploy

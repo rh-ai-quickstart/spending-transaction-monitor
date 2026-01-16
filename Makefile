@@ -396,8 +396,33 @@ help:
 # Login to OpenShift registry
 .PHONY: login
 login:
-	@echo "Logging into registry: $(REGISTRY_URL) (user: $(shell oc whoami))"
-	@oc whoami --show-token | podman login --username=$(shell oc whoami) --password-stdin $(REGISTRY_URL)
+	@if [ -z "$(REGISTRY_URL)" ]; then \
+		echo "❌ Error: REGISTRY_URL is not set"; \
+		exit 1; \
+	fi
+	@echo "Logging into registry: $(REGISTRY_URL)"
+	@if [ "$(REGISTRY_URL)" = "quay.io" ]; then \
+		if [ -z "$$QUAY_USERNAME" ]; then \
+			echo "❌ Error: QUAY_USERNAME is required when REGISTRY_URL=quay.io"; \
+			echo "   Provide QUAY_USERNAME + QUAY_TOKEN (or QUAY_PASSWORD), or run: podman login quay.io"; \
+			exit 1; \
+		fi; \
+		if [ -n "$$QUAY_TOKEN" ]; then \
+			echo "Using Quay credentials for user: $$QUAY_USERNAME (token)"; \
+			echo "$$QUAY_TOKEN" | podman login --username="$$QUAY_USERNAME" --password-stdin "$(REGISTRY_URL)"; \
+		elif [ -n "$$QUAY_PASSWORD" ]; then \
+			echo "Using Quay credentials for user: $$QUAY_USERNAME (password)"; \
+			echo "$$QUAY_PASSWORD" | podman login --username="$$QUAY_USERNAME" --password-stdin "$(REGISTRY_URL)"; \
+		else \
+			echo "❌ Error: QUAY_TOKEN or QUAY_PASSWORD is required when REGISTRY_URL=quay.io"; \
+			echo "   Provide QUAY_USERNAME + QUAY_TOKEN (recommended), or run: podman login quay.io"; \
+			exit 1; \
+		fi; \
+	else \
+		OC_USER=$$(oc whoami); \
+		echo "Using OpenShift token for user: $$OC_USER"; \
+		oc whoami --show-token | podman login --username="$$OC_USER" --password-stdin "$(REGISTRY_URL)"; \
+	fi
 
 # Create OpenShift project
 .PHONY: create-project
