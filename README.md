@@ -340,7 +340,7 @@ pnpm dev:containers
 make build-run-local
 
 # Build and run with auth bypass (no authentication)
-make build-run-local-noauth
+BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development make build-run-local
 
 # Run without rebuilding
 make run-local
