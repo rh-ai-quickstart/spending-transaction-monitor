@@ -9,9 +9,12 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import sys
+from pathlib import Path
 
-sys.path.append("packages/db/src")
-sys.path.append("packages/api/src")
+# Add the proper paths for imports (robust to running from any working directory)
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(REPO_ROOT / "packages" / "db" / "src"))
+sys.path.append(str(REPO_ROOT / "packages" / "api" / "src"))
 
 from db.database import SessionLocal
 from db.models import (

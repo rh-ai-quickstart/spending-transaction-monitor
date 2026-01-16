@@ -6,16 +6,18 @@ Tests both synonym lookup and semantic search with Ollama embeddings
 
 import asyncio
 import sys
-import os
+from pathlib import Path
 
-# Add the proper paths for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "packages", "db", "src"))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "packages", "api", "src"))
+# Add the proper paths for imports (robust to running from any working directory)
+# Repo root = .../scripts/category_normalization/.. /.. = repo root
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "packages" / "db" / "src"))
+sys.path.insert(0, str(REPO_ROOT / "packages" / "api" / "src"))
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
-from services.category_normalizer import CategoryNormalizer
-from services.embedding_service import embedding_service
+from services.categories.category_normalizer import CategoryNormalizer
+from services.embeddings.embedding_service import embedding_service
 
 
 async def test_synonym_lookup(session: AsyncSession):
@@ -72,7 +74,7 @@ async def main():
         await test_embedding_service()
     except Exception as e:
         print(f"❌ Embedding service test failed: {e}")
-        print("💡 Make sure Ollama is running with: ollama run all-minilm")
+        print("💡 Make sure dependencies are installed and EMBEDDING_PROVIDER is configured (see packages/api/EMBEDDING_SERVICE.md)")
         return 1
     
     # Get database session

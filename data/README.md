@@ -2,6 +2,27 @@
 
 This directory contains shared test data used across the application.
 
+## Overview
+
+- `sample_users.csv`: sample user records (used for demos/dev seeding)
+- `sample_transactions.csv`: sample transaction records (used for demos/dev seeding)
+- `test_users.yaml`: source-of-truth test users used by both Keycloak and DB seeding
+- `generate_sample_data.py`: helper to generate `sample_users.csv` / `sample_transactions.csv`
+
+## generate_sample_data.py
+
+Generates `data/sample_users.csv` and `data/sample_transactions.csv` from a large source dataset.
+
+**Input**:
+- `credit_card_transactions.csv` (expected in the repo root; not stored in this directory)
+
+**Usage**:
+
+```bash
+# Run from the repo root
+python data/generate_sample_data.py
+```
+
 ## test_users.yaml
 
 Centralized test user data used by both:
