@@ -462,7 +462,8 @@ make build-deploy
 
 ```bash
 # Login and setup
-make login
+# IMPORTANT: `make login` authenticates podman to `REGISTRY_URL`. For OpenShift's internal registry:
+make REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')" login
 make create-project
 
 # Build and push images
