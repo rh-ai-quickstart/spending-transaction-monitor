@@ -229,7 +229,6 @@ pnpm seed:keycloak    # Setup only Keycloak realm
 
 # Or using make
 make setup-data       # Complete data setup: Start DB + migrations + all data
-make seed-all         # Seed both DB and Keycloak
 ```
 
 **Note:** `pnpm setup:data` now automatically starts the database, so you don't need to run `pnpm db:start` separately.
@@ -456,7 +455,7 @@ The test process:
 **Quick Deploy:**
 
 ```bash
-make full-deploy
+make build-deploy
 ```
 
 **Step-by-step:**

@@ -6,11 +6,11 @@ This document describes the Keycloak management tools and Makefile commands avai
 
 ### Set Up Keycloak Realm
 ```bash
-make keycloak-setup
+make seed-keycloak-with-users
 ```
 
 This command:
-- Reads configuration from `.env.production`
+- Uses `.env.production` for Keycloak configuration if present (recommended for OpenShift)
 - Creates the `spending-monitor` realm
 - Creates the `spending-monitor` client with proper redirect URIs
 - Creates test users with known credentials
@@ -44,8 +44,8 @@ This command displays:
 **Usage**:
 ```bash
 ./packages/auth/scripts/setup-keycloak-realm.sh
-# Or via Makefile
-make keycloak-setup
+# Or via Makefile (recommended)
+make seed-keycloak-with-users
 ```
 
 **Requirements**:
@@ -146,13 +146,8 @@ KEYCLOAK_URL=https://keycloak.apps.example.com
 
 ## Makefile Targets
 
-### `make keycloak-setup`
-Set up Keycloak realm and create test users.
-
-**Equivalent to**:
-```bash
-./packages/auth/scripts/setup-keycloak-realm.sh
-```
+### `make seed-keycloak-with-users`
+Set up Keycloak realm, create test users, and sync database users.
 
 ### `make keycloak-users`
 List all Keycloak users with test credentials.
@@ -161,12 +156,6 @@ List all Keycloak users with test credentials.
 ```bash
 ./packages/auth/scripts/list-keycloak-users.sh
 ```
-
-### `make seed-keycloak`
-Alternative method using pnpm scripts (without DB user sync).
-
-### `make seed-keycloak-with-users`
-Set up Keycloak and sync database users.
 
 ## Troubleshooting
 
@@ -190,7 +179,7 @@ brew install uv
 ### Issue: "Realm does not exist"
 **Solution**: Run the setup script:
 ```bash
-make keycloak-setup
+make seed-keycloak-with-users
 ```
 
 ### Issue: OpenID configuration shows localhost URLs

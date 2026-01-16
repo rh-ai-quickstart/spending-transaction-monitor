@@ -527,7 +527,7 @@ make create-env-file
 #### Quick Deploy
 
 ```bash
-make full-deploy
+make build-deploy
 ```
 
 #### Step-by-step
