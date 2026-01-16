@@ -401,8 +401,8 @@ By default, the application uses **Keycloak** for secure authentication:
 - **OAuth2/OIDC Flow**: Implements OpenID Connect with PKCE for secure authentication
 - **Automatic Token Refresh**: Tokens are automatically refreshed before expiration
 - **Test Users**: 
-  - `testuser` / `password` (Regular user)
-  - `adminuser` / `password` (Admin user)
+  - `testuser@example.com` / `password123` (Regular user)
+  - `admin@example.com` / `admin123` (Admin user)
 
 **Access Points:**
 - Frontend: http://localhost:3000 (redirects to Keycloak login)
