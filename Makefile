@@ -396,7 +396,7 @@ help:
 # Login to OpenShift registry
 .PHONY: login
 login:
-	@echo "Logging into OpenShift registry..."
+	@echo "Logging into registry: $(REGISTRY_URL) (user: $(shell oc whoami))"
 	@oc whoami --show-token | podman login --username=$(shell oc whoami) --password-stdin $(REGISTRY_URL)
 
 # Create OpenShift project
