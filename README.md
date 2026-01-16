@@ -400,9 +400,13 @@ By default, the application uses **Keycloak** for secure authentication:
 - **Automatic Setup**: Keycloak realm and test users are automatically created on startup
 - **OAuth2/OIDC Flow**: Implements OpenID Connect with PKCE for secure authentication
 - **Automatic Token Refresh**: Tokens are automatically refreshed before expiration
-- **Test Users**: 
+- **Test Users** (for authentication testing, no sample data):
   - `testuser@example.com` / `password123` (Regular user)
   - `admin@example.com` / `admin123` (Admin user)
+- **Sample Users** (with transaction data - use these to explore the app):
+  - `monica.cohen@example.com` / `password123`
+  - `barbara.taylor@example.com` / `password123`
+  - Plus 48 more seeded users with realistic transaction histories
 
 **Access Points:**
 - Frontend: http://localhost:3000 (redirects to Keycloak login)
