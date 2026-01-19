@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import AlertNotification
 
+from .sms import send_sms_notification
 from .smtp import send_smtp_notification
 
 
@@ -48,3 +49,10 @@ class SmtpStrategy(NotificationStrategy):
         self, notification: AlertNotification, session: AsyncSession
     ) -> AlertNotification:
         return await send_smtp_notification(notification, session)
+
+
+class SmsStrategy(NotificationStrategy):
+    async def send_notification(
+        self, notification: AlertNotification, session: AsyncSession
+    ) -> AlertNotification:
+        return await send_sms_notification(notification, session)

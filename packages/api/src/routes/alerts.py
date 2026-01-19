@@ -42,6 +42,7 @@ class AlertRuleCreateRequest(BaseModel):
     alert_rule: dict
     sql_query: str
     natural_language_query: str
+    notification_methods: list[NotificationMethod] | None = None
 
 
 class AlertRuleValidationRequest(BaseModel):
@@ -211,7 +212,8 @@ async def create_alert_rule(
         timeframe=alert_rule_data.get('timeframe'),
         natural_language_query=payload.natural_language_query,
         sql_query=payload.sql_query,
-        notification_methods=None,
+        notification_methods=payload.notification_methods
+        or [NotificationMethod.EMAIL, NotificationMethod.SMS],
     )
 
     session.add(rule)
@@ -775,7 +777,7 @@ async def create_rule_from_recommendation(
             timeframe=alert_rule_data.get('timeframe'),
             natural_language_query=natural_language_query,
             sql_query=sql_query,
-            notification_methods=None,
+            notification_methods=[NotificationMethod.EMAIL, NotificationMethod.SMS],
         )
 
         session.add(rule)

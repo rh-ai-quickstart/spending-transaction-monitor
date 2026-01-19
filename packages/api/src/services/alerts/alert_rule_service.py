@@ -282,8 +282,9 @@ class AlertRuleService:
         user: User,
         session: AsyncSession,
         alert_result: dict[str, Any],
+        notification_method: NotificationMethod,
     ) -> AlertNotification:
-        """Create a notification for an alert rule"""
+        """Create a notification for an alert rule with a specific notification method"""
 
         notification = AlertNotification(
             id=str(uuid.uuid4()),
@@ -295,9 +296,11 @@ class AlertRuleService:
             status=NotificationStatus.PENDING,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
-            notification_method=NotificationMethod.EMAIL,
+            notification_method=notification_method,
         )
-        print(f'DEBUG: Creating notification: {notification}')
+        print(
+            f'DEBUG: Creating notification with method {notification_method}: {notification}'
+        )
         session.add(notification)
         await session.flush()  # writes to DB, no commit
         return notification
@@ -391,11 +394,29 @@ class AlertRuleService:
                 print('DEBUG: Alert was triggered - using working simplified version')
                 trigger_count = rule.trigger_count
 
-                # For now, use the simplified version that works
+                # Get notification methods from rule, default to EMAIL and SMS if not set
+                notification_methods = rule.notification_methods or [
+                    NotificationMethod.EMAIL,
+                    NotificationMethod.SMS,
+                ]
+                print(f'DEBUG: Notification methods for alert: {notification_methods}')
+
+                # Create and send notifications for each method
+                notifications = []
+                notification_statuses = []
                 try:
-                    notification = await self.create_notification(
-                        rule, transaction, user, session, alert_result
-                    )
+                    for method in notification_methods:
+                        notification = await self.create_notification(
+                            rule, transaction, user, session, alert_result, method
+                        )
+                        await session.refresh(notification)
+                        sent_notification = await self.send_notification(
+                            notification, session
+                        )
+                        notifications.append(sent_notification)
+                        notification_statuses.append(sent_notification.status)
+
+                    # Update rule trigger count and last triggered time
                     await session.refresh(rule)
                     rule.trigger_count = trigger_count + 1
                     rule.last_triggered = datetime.now(UTC)
@@ -403,11 +424,8 @@ class AlertRuleService:
                     await session.commit()
                     await session.refresh(rule)
                 except Exception as e:
-                    print(f'DEBUG: Error creating notification: {e}')
+                    print(f'DEBUG: Error creating/sending notifications: {e}')
                     raise e
-
-                await session.refresh(notification)
-                notification = await self.send_notification(notification, session)
 
                 return {
                     'status': 'triggered',
@@ -415,8 +433,12 @@ class AlertRuleService:
                     'trigger_count': trigger_count,
                     'rule_evaluation': alert_result,
                     'transaction_id': transaction_id,
-                    'notification_status': notification.status,
-                    'notification_id': str(uuid.uuid4()),  # Generate a fake ID for now
+                    'notification_status': notification_statuses[0]
+                    if notification_statuses
+                    else NotificationStatus.FAILED,
+                    'notification_id': notifications[0].id
+                    if notifications
+                    else str(uuid.uuid4()),
                 }
             else:
                 return {
