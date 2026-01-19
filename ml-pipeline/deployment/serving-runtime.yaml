@@ -1,0 +1,45 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: mlserver-sklearn
+  namespace: {{ namespace }}
+  labels:
+    app: alert-recommender
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  multiModel: false
+  protocolVersions:
+    - v2
+    - grpc-v2
+  containers:
+    - name: kserve-container
+      image: docker.io/seldonio/mlserver:1.6.0-sklearn
+      env:
+        - name: MLSERVER_MODEL_IMPLEMENTATION
+          value: mlserver_sklearn.SKLearnModel
+        - name: MLSERVER_HTTP_PORT
+          value: "8080"
+        - name: MLSERVER_GRPC_PORT
+          value: "8081"
+        - name: PYTHONPATH
+          value: "/mnt/models:$PYTHONPATH"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_SECRET_ACCESS_KEY
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi

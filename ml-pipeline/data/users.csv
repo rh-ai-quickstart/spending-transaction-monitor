@@ -1,0 +1,51 @@
+id,email,keycloak_id,first_name,last_name,phone_number,created_at,updated_at,is_active,address_street,address_city,address_state,address_zipcode,address_country,credit_limit,credit_balance
+u-001,monica.cohen@example.com,3ec44437-4cea-4cea-8069-340d4d849f65,Monica,Cohen,555-00001,2025-01-01T00:00:00,2025-10-06T12:05:39.273168,True,864 Reynolds Plains,Uledi,PA,15484,US,5000,2868.53
+u-002,barbara.taylor@example.com,e3ca1951-ae89-4d9f-b354-df3378ef4a6a,Barbara,Taylor,555-00002,2025-01-01T00:00:00,2025-10-06T12:05:39.278800,True,0069 Robin Brooks Apt. 695,Elberta,MI,49628,US,15000,11918.03
+u-003,jessica.perez@example.com,831e7a4d-5afb-47f2-b016-b2e37cc50605,Jessica,Perez,555-00003,2025-01-01T00:00:00,2025-10-06T12:05:39.283991,True,8172 Robertson Parkways Suite 072,Superior,AZ,85173,US,10000,8.05
+u-004,ana.howell@example.com,ea035640-0512-4c87-bbe4-75f886ffd4cf,Ana,Howell,555-00004,2025-01-01T00:00:00,2025-10-06T12:05:39.288927,True,4664 Sanchez Common Suite 930,Bradley,SC,29819,US,15000,14368.37
+u-005,keith.sanders@example.com,65f32ff5-0f63-4a03-9e2c-8a1aafe9fac5,Keith,Sanders,555-00005,2025-01-01T00:00:00,2025-10-06T12:05:39.293669,True,8030 Beck Motorway,Moorhead,MS,38761,US,10000,914.97
+u-006,christine.harris@example.com,7acdaade-57b4-4d17-aead-66ff8b040d83,Christine,Harris,555-00006,2025-01-01T00:00:00,2025-10-06T12:05:39.298124,True,29606 Martinez Views Suite 653,Hinesburg,VT,5461,US,5000,3214.11
+u-007,tammy.ayers@example.com,4048bc9d-ebc8-42f3-871a-16f897eb35bd,Tammy,Ayers,555-00007,2025-01-01T00:00:00,2025-10-06T12:05:39.302338,True,1652 James Mews,Hinckley,OH,44233,US,10000,6436.73
+u-008,mark.wood@example.com,8122e1c6-bd57-4a91-b20d-58bede6f6274,Mark,Wood,555-00008,2025-01-01T00:00:00,2025-10-06T12:05:39.306437,True,854 Walker Dale Suite 488,Bowdoin,ME,4287,US,12000,8002.26
+u-009,allison.allen@example.com,719b87b0-0ce2-4855-9dc9-83ee1a00a6ae,Allison,Allen,555-00009,2025-01-01T00:00:00,2025-10-06T12:05:39.310276,True,40624 Rebecca Spurs,De Witt,AR,72042,US,5000,4013.5
+u-010,rebecca.erickson@example.com,68d81364-d501-4cc4-96e9-e83d03d987c9,Rebecca,Erickson,555-00010,2025-01-01T00:00:00,2025-10-06T12:05:39.314135,True,594 Berry Lights Apt. 392,Wilmington,NC,28405,US,15000,8139.27
+u-011,jennifer.black@example.com,6bb6de7b-3b62-493b-a7ef-399daa7d1b8a,Jennifer,Black,555-00011,2025-01-01T00:00:00,2025-10-06T12:05:39.317685,True,2870 Bean Terrace Apt. 756,Thomas,WV,26292,US,5000,4584.45
+u-012,lisa.lowe@example.com,d891ca6f-082a-40b7-b4b6-b1a5e55f0b68,Lisa,Lowe,555-00012,2025-01-01T00:00:00,2025-10-06T12:05:39.321171,True,574 David Locks Suite 207,Cottekill,NY,12419,US,10000,8563.56
+u-013,erin.chavez@example.com,69c70eef-a7e0-49a5-a8d1-cd07d28c0ab3,Erin,Chavez,555-00013,2025-01-01T00:00:00,2025-10-06T12:05:39.324846,True,3379 Williams Common,Littleton,CO,80120,US,10000,8325.97
+u-014,kayla.jones@example.com,6b3f0f91-fd14-45e4-97ef-b657b5310b66,Kayla,Jones,555-00014,2025-01-01T00:00:00,2025-10-06T12:05:39.328273,True,6033 Young Track Suite 804,East Canaan,CT,6024,US,10000,4162.8
+u-015,sharon.johnson@example.com,9364df65-e840-454a-8635-603b9f4faa75,Sharon,Johnson,555-00015,2025-01-01T00:00:00,2025-10-06T12:05:39.331423,True,7202 Jeffrey Mills,Conway,WA,98238,US,7000,68.03
+u-016,lindsay.wilson@example.com,cd840588-ff53-4761-b910-0a88b54cc169,Lindsay,Wilson,555-00016,2025-01-01T00:00:00,2025-10-06T12:05:39.334479,True,7618 Gonzales Mission,Centerview,MO,64019,US,7000,2763.42
+u-017,ashley.whitney@example.com,b3ec3996-aba7-4ad0-9a39-c246ae4b4983,Ashley,Whitney,555-00017,2025-01-01T00:00:00,2025-10-06T12:05:39.337496,True,4038 Smith Avenue,Jones,AL,36749,US,7000,4741.18
+u-018,margaret.mendez@example.com,fd846baf-cf66-424c-9f0e-ef9a99ed0737,Margaret,Mendez,555-00018,2025-01-01T00:00:00,2025-10-06T12:05:39.340441,True,7952 Karen Pike,De Soto,KS,66018,US,10000,8.37
+u-019,kimberly.gonzalez@example.com,11e98406-5eda-4081-8428-2056347093b1,Kimberly,Gonzalez,555-00019,2025-01-01T00:00:00,2025-10-06T12:05:39.343431,True,72966 Shannon Pass Apt. 391,Bauxite,AR,72011,US,15000,3162.27
+u-020,mary.wall@example.com,ab7c91b2-abfa-48ca-9cae-8e8fdf538d41,Mary,Wall,555-00020,2025-01-01T00:00:00,2025-10-06T12:05:39.346150,True,2481 Mills Lock,Plainfield,NJ,7060,US,5000,4019.88
+u-021,carol.dillon@example.com,b9dbdf9a-1977-413e-b91b-a4b71272ee46,Carol,Dillon,555-00021,2025-01-01T00:00:00,2025-10-06T12:05:39.348857,True,27479 Reeves Dale,Whaleyville,MD,21872,US,10000,1391.83
+u-022,lauren.anderson@example.com,f80a3664-a300-4411-8abc-62a584e7a552,Lauren,Anderson,555-00022,2025-01-01T00:00:00,2025-10-06T12:05:39.351516,True,11014 Chad Lake Apt. 573,Heart Butte,MT,59448,US,10000,8245.1
+u-023,rachel.daniels@example.com,bdc8befc-1c6d-4389-9550-7cfc42e766e4,Rachel,Daniels,555-00023,2025-01-01T00:00:00,2025-10-06T12:05:39.354122,True,561 Little Plain Apt. 738,Wetmore,MI,49895,US,10000,975.99
+u-024,jodi.rodriguez@example.com,7b268f97-2488-42d9-a850-22d6dd980faf,Jodi,Rodriguez,555-00024,2025-01-01T00:00:00,2025-10-06T12:05:39.356940,True,5796 Lee Coves Apt. 286,Walnut Ridge,AR,72476,US,7000,3099.47
+u-025,danielle.yu@example.com,00404fd3-0355-403b-bf07-0624ab8277d5,Danielle,Yu,555-00025,2025-01-01T00:00:00,2025-10-06T12:05:39.359756,True,5395 Colon Burgs Suite 037,Thrall,TX,76578,US,12000,1032.61
+u-026,jenna.brooks@example.com,1267a9b1-1c16-4b3a-91f2-941f9ea8f5bc,Jenna,Brooks,555-00026,2025-01-01T00:00:00,2025-10-06T12:05:39.362473,True,50872 Alex Plain Suite 088,Baton Rouge,LA,70808,US,7000,4085.65
+u-027,rachel.lowe@example.com,af6bca7a-ed73-4099-b02e-187a8f705b91,Rachel,Lowe,555-00027,2025-01-01T00:00:00,2025-10-06T12:05:39.365070,True,372 Jeffrey Course,Sutherland,NE,69165,US,12000,1807.22
+u-028,janet.turner@example.com,90536403-b35c-47d0-956f-3b40fcb969b2,Janet,Turner,555-00028,2025-01-01T00:00:00,2025-10-06T12:05:39.367773,True,0925 Lang Extensions,Shields,ND,58569,US,7000,2000.95
+u-029,sara.harris@example.com,8e317b59-58d8-41af-bed8-26578ad8baed,Sara,Harris,555-00029,2025-01-01T00:00:00,2025-10-06T12:05:39.370335,True,597 Jenny Ford Apt. 543,Tupper Lake,NY,12986,US,10000,4989.34
+u-030,kristen.hanson@example.com,973036ab-1e62-4e99-b56f-3460de3f7d68,Kristen,Hanson,555-00030,2025-01-01T00:00:00,2025-10-06T12:05:39.372810,True,26544 Andrea Glen,Goodrich,MI,48438,US,7000,2889.68
+u-031,sara.ramirez@example.com,c21537de-cdf3-4cda-a4f2-4c8d2c539d5a,Sara,Ramirez,555-00031,2025-01-01T00:00:00,2025-10-06T12:05:39.375172,True,23843 Scott Island,Birmingham,IA,52535,US,12000,3914.73
+u-032,margaret.curtis@example.com,5c3ebf2a-f89e-4f1a-aa88-9a131d6111bc,Margaret,Curtis,555-00032,2025-01-01T00:00:00,2025-10-06T12:05:39.377414,True,742 Oneill Shore,Florence,MS,39073,US,7000,5661.15
+u-033,kathryn.smith@example.com,8e3372a5-df0d-44dd-82b5-6717dcdb45b2,Kathryn,Smith,555-00033,2025-01-01T00:00:00,2025-10-06T12:05:39.379595,True,19838 Tonya Prairie Apt. 947,Rocky Mount,MO,65072,US,7000,2856.34
+u-034,sabrina.johnson@example.com,fa9174bf-35c5-416e-aeb2-595b8a20e353,Sabrina,Johnson,555-00034,2025-01-01T00:00:00,2025-10-06T12:05:39.381752,True,320 Nicholson Orchard,Thompson,UT,84540,US,7000,2672.82
+u-035,lauren.torres@example.com,583c9ecc-0c4f-4781-9276-3505cfae42fc,Lauren,Torres,555-00035,2025-01-01T00:00:00,2025-10-06T12:05:39.383890,True,03030 White Lakes,Grandview,TX,76050,US,10000,478.49
+u-036,michelle.johnston@example.com,b349a6d9-4803-4c23-b929-2850f0e946ee,Michelle,Johnston,555-00036,2025-01-01T00:00:00,2025-10-06T12:05:39.386098,True,3531 Hamilton Highway,Roma,TX,78584,US,7000,6282.59
+u-037,kristina.stewart@example.com,bdf4c202-aedf-4aec-943a-f987bfd2fe5c,Kristina,Stewart,555-00037,2025-01-01T00:00:00,2025-10-06T12:05:39.388261,True,47029 Jimmy Tunnel Apt. 106,Newhall,CA,91321,US,10000,2468.9
+u-038,angela.hodges@example.com,065db35b-0bc4-4094-9594-d53856e601fb,Angela,Hodges,555-00038,2025-01-01T00:00:00,2025-10-06T12:05:39.390299,True,08236 Kim Hill,Indianapolis,IN,46254,US,7000,4698.48
+u-039,stephanie.gill@example.com,b6bcee44-a3cd-4117-8237-df206834606a,Stephanie,Gill,555-00039,2025-01-01T00:00:00,2025-10-06T12:05:39.392388,True,43039 Riley Greens Suite 393,Orient,WA,99160,US,7000,2466.44
+u-040,susan.hardy@example.com,f01a7819-7098-40ab-9eb9-386c7a396fe3,Susan,Hardy,555-00040,2025-01-01T00:00:00,2025-10-06T12:05:39.394461,True,516 Brown Parks,Manistique,MI,49854,US,5000,930.63
+u-041,joanna.hudson@example.com,ff8c5c21-9817-49f5-bd44-9b0cc7f4d42f,Joanna,Hudson,555-00041,2025-01-01T00:00:00,2025-10-06T12:05:39.396570,True,2924 Bobby Trafficway,Sebring,FL,33872,US,5000,3723.12
+u-042,crystal.gamble@example.com,2a4ad4f5-1b14-4004-974c-6fddb7607134,Crystal,Gamble,555-00042,2025-01-01T00:00:00,2025-10-06T12:05:39.398604,True,899 Michele View Suite 960,Philadelphia,PA,19149,US,12000,2042.99
+u-043,sharon.smith@example.com,e9821dee-9ebd-4f1c-9540-9e6444cd6467,Sharon,Smith,555-00043,2025-01-01T00:00:00,2025-10-06T12:05:39.400605,True,17666 David Valleys,Sun City,CA,92585,US,12000,8866.42
+u-044,jessica.ward@example.com,c1b2ca4f-017a-4600-93ec-3dee032f390d,Jessica,Ward,555-00044,2025-01-01T00:00:00,2025-10-06T12:05:39.402682,True,72269 Elizabeth Field Apt. 132,Phoenix,AZ,85020,US,5000,1768.11
+u-045,gary.martinez@example.com,e4086907-139a-4d84-a26d-35f077b2b640,Gary,Martinez,555-00045,2025-01-01T00:00:00,2025-10-06T12:05:39.404583,True,03512 Jackson Ports,Reno,NV,89512,US,12000,10060.63
+u-046,lisa.lin@example.com,a51496a6-d994-477c-88ee-013ab36bc570,Lisa,Lin,555-00046,2025-01-01T00:00:00,2025-10-06T12:05:39.406473,True,908 Brooks Brook,Lomax,IL,61454,US,12000,8394.46
+u-047,lori.ramirez@example.com,f2abc803-5117-4453-b099-0baf52472bd2,Lori,Ramirez,555-00047,2025-01-01T00:00:00,2025-10-06T12:05:39.408263,True,4293 Ramirez Squares,Ranier,MN,56668,US,5000,1808.75
+u-048,andrew.patterson@example.com,9f8d15e3-3525-45c7-a91b-d6a66938b7a4,Andrew,Patterson,555-00048,2025-01-01T00:00:00,2025-10-06T12:05:39.410081,True,06959 Stephen Branch Suite 246,Thida,AR,72165,US,7000,4442.24
+u-049,samuel.jenkins@example.com,60f26008-99e8-4d98-8865-94b831c16974,Samuel,Jenkins,555-00049,2025-01-01T00:00:00,2025-10-06T12:05:39.411882,True,43235 Mckenzie Views Apt. 837,Westport,KY,40077,US,12000,5016.52
+u-050,carrie.washington@example.com,99506eb0-f77a-43ab-90cb-92f736bbde44,Carrie,Washington,555-00050,2025-01-01T00:00:00,2025-10-06T12:05:39.413591,True,6114 Adams Harbor Suite 096,Kingsford Heights,IN,46346,US,5000,41.75

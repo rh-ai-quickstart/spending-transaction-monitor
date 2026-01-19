@@ -4,10 +4,12 @@ ML Model Startup Initialization
 
 This module initializes the ML recommendation system on application startup:
 1. Checks for existing alert rules in the database
-2. Trains the ML model with existing alert data (or uses heuristic-based training)
+2. If using inference service: verifies connectivity to OpenShift AI
+3. If using local model: trains the ML model with existing alert data (or uses heuristic-based training)
 """
 
 import logging
+import os
 
 from sqlalchemy import select
 
@@ -23,17 +25,29 @@ async def initialize_ml_system():
 
     This function:
     1. Checks if sample alerts are loaded in the database
-    2. If not, loads them from CSV
-    3. Trains the ML model with the alert data
+    2. If using inference service, verifies connectivity
+    3. If using local model, trains the ML model with the alert data
     """
     logger.info('🤖 Initializing ML recommendation system...')
 
     try:
-        # Step 1: Load sample alerts if database is empty
-        await load_sample_alerts_if_needed()
+        # Check if using external inference service
+        use_inference_service = (
+            os.getenv('USE_ML_INFERENCE_SERVICE', 'false').lower() == 'true'
+        )
 
-        # Step 2: Train or verify ML model
-        await train_ml_model_if_needed()
+        if use_inference_service:
+            logger.info(
+                '📡 Using OpenShift AI inference service - skipping local model training'
+            )
+            await verify_inference_service()
+        else:
+            logger.info('💻 Using local ML model')
+            # Step 1: Load sample alerts if database is empty
+            await load_sample_alerts_if_needed()
+
+            # Step 2: Train or verify ML model
+            await train_ml_model_if_needed()
 
         logger.info('✅ ML recommendation system initialized successfully')
 
@@ -68,8 +82,53 @@ async def load_sample_alerts_if_needed():
         )
 
 
+async def verify_inference_service():
+    """Verify connectivity to external inference service"""
+    try:
+        from src.services.recommendations.ml_inference_client import (
+            get_inference_client,
+        )
+
+        inference_client = get_inference_client()
+
+        logger.info(
+            f'🔍 Checking inference service at {inference_client.endpoint_url}...'
+        )
+
+        # Run health check
+        import asyncio
+
+        is_healthy = await asyncio.wait_for(
+            inference_client.health_check(), timeout=10.0
+        )
+
+        if is_healthy:
+            logger.info('✅ Inference service is healthy and ready')
+
+            # Get model metadata
+            try:
+                metadata = await asyncio.wait_for(
+                    inference_client.get_model_metadata(), timeout=10.0
+                )
+                logger.info(
+                    f'📊 Model metadata: {metadata.get("name")} v{metadata.get("version")}'
+                )
+            except Exception as e:
+                logger.warning(f'Could not fetch model metadata: {e}')
+        else:
+            logger.warning('⚠️  Inference service is not healthy')
+            logger.warning('   Recommendations will fall back to local model if needed')
+
+    except Exception as e:
+        logger.error(f'❌ Failed to verify inference service: {e}')
+        logger.warning('⚠️  Continuing without inference service verification')
+        logger.warning(
+            '   Make sure USE_ML_INFERENCE_SERVICE=false if service is unavailable'
+        )
+
+
 async def train_ml_model_if_needed():
-    """Train ML model if not already trained"""
+    """Train ML model if not already trained (only for local model mode)"""
 
     try:
         from src.services.recommendations.ml import AlertRecommenderModel

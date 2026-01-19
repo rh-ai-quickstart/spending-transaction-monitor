@@ -371,24 +371,100 @@ class BackgroundRecommendationService:
                             if alert_type in user_features.columns:
                                 user_features.loc[user_mask, alert_type] = enabled
 
-                    # Train/load collaborative filtering model
-                    model = AlertRecommenderModel()
-                    if not model.is_trained():
-                        logger.info('Training collaborative filtering model...')
-                        model.train(user_features, n_neighbors=5)
-                        model.save_model()
+                    # Get collaborative recommendations from inference service or local model
+                    use_inference_service = (
+                        os.getenv('USE_ML_INFERENCE_SERVICE', 'false').lower() == 'true'
+                    )
 
-                    # Get collaborative recommendations
-                    if user_id in user_features['user_id'].values:
-                        cf_result = model.recommend_for_user(
-                            user_id=user_id,
-                            user_features_df=user_features,
-                            k_neighbors=5,
-                            threshold=0.3,  # Lower threshold for secondary recs
+                    if use_inference_service:
+                        # Use OpenShift AI inference endpoint
+                        from src.services.recommendations.ml_inference_client import (
+                            get_inference_client,
                         )
-                        collaborative_recs = self._format_ml_recommendations(
-                            cf_result['recommendations'], user_dict
-                        )
+
+                        try:
+                            logger.info(
+                                'Using ML inference service for collaborative filtering'
+                            )
+                            inference_client = get_inference_client()
+
+                            # Get user features for the current user
+                            user_row = user_features[
+                                user_features['user_id'] == user_id
+                            ]
+                            if not user_row.empty:
+                                # Build feature dictionary
+                                feature_columns = [
+                                    'amount_mean',
+                                    'amount_std',
+                                    'amount_max',
+                                    'amount_sum',
+                                    'amount_count',
+                                    'merchant_name_nunique',
+                                    'merchant_category_nunique',
+                                    'credit_limit',
+                                    'credit_balance',
+                                    'credit_utilization',
+                                ]
+                                user_features_dict = {
+                                    col: float(user_row[col].iloc[0])
+                                    for col in feature_columns
+                                    if col in user_row.columns
+                                }
+
+                                # Call inference service (run async function in sync context)
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                try:
+                                    cf_result = loop.run_until_complete(
+                                        inference_client.get_recommendations(
+                                            user_features=user_features_dict,
+                                            user_id=user_id,
+                                            k_neighbors=5,
+                                            threshold=0.3,
+                                        )
+                                    )
+                                finally:
+                                    loop.close()
+
+                                collaborative_recs = self._format_ml_recommendations(
+                                    cf_result.get('recommendations', [])
+                                )
+                                logger.info(
+                                    f'Got {len(collaborative_recs)} collaborative filtering recommendations from inference service'
+                                )
+                            else:
+                                logger.warning(
+                                    f'User {user_id} not found in feature matrix'
+                                )
+                                collaborative_recs = []
+
+                        except Exception as e:
+                            logger.error(
+                                f'Failed to get recommendations from inference service: {e}'
+                            )
+                            logger.info('Falling back to local model')
+                            use_inference_service = False
+
+                    if not use_inference_service:
+                        # Fallback: Use local model
+                        model = AlertRecommenderModel()
+                        if not model.is_trained():
+                            logger.info('Training collaborative filtering model...')
+                            model.train(user_features, n_neighbors=5)
+                            model.save_model()
+
+                        # Get collaborative recommendations
+                        if user_id in user_features['user_id'].values:
+                            cf_result = model.recommend_for_user(
+                                user_id=user_id,
+                                user_features_df=user_features,
+                                k_neighbors=5,
+                                threshold=0.3,  # Lower threshold for secondary recs
+                            )
+                            collaborative_recs = self._format_ml_recommendations(
+                                cf_result['recommendations'], user_dict
+                            )
                         logger.info(
                             f'Generated {len(collaborative_recs)} collaborative filtering recommendations'
                         )

@@ -191,6 +191,16 @@ spec:
                 secretKeyRef:
                   name: {{ include "spending-monitor.fullname" . }}-secret
                   key: USE_ML_RECOMMENDATIONS
+            - name: USE_ML_INFERENCE_SERVICE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: USE_ML_INFERENCE_SERVICE
+            - name: ML_INFERENCE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spending-monitor.fullname" . }}-secret
+                  key: ML_INFERENCE_ENDPOINT
           {{- if .Values.api.healthCheck.enabled }}
           livenessProbe:
             httpGet:
