@@ -455,15 +455,17 @@ The test process:
 **Quick Deploy:**
 
 ```bash
-make build-deploy
+# OpenShift internal registry quick deploy:
+make REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')" build-deploy
 ```
 
 **Step-by-step:**
 
 ```bash
 # Login and setup
-# IMPORTANT: `make login` authenticates podman to `REGISTRY_URL`. For OpenShift's internal registry:
-make REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')" login
+# IMPORTANT: For OpenShift's internal registry, set REGISTRY_URL once and reuse it.
+export REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')"
+make login
 make create-project
 
 # Build and push images

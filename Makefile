@@ -8,6 +8,22 @@ NAMESPACE ?= spending-transaction-monitor
 IMAGE_TAG ?= latest
 CLUSTER_DOMAIN ?= $(shell oc whoami --show-server 2>/dev/null | sed -E 's|https://api\.([^:]+).*|apps.\1|')
 
+# OpenShift internal registry nuance:
+# - OpenShift's internal registry uses the project/namespace as the repository path:
+#     <registry>/<namespace>/<image>:<tag>
+# - Quay and other registries typically use an org/repo namespace (e.g. quay.io/<org>/...)
+#
+# To reduce friction for OpenShift deployments, if the user sets REGISTRY_URL to an OpenShift
+# image-registry host and does NOT explicitly set REPOSITORY, default REPOSITORY to NAMESPACE.
+ifeq ($(origin REPOSITORY), default)
+  ifneq (,$(findstring openshift-image-registry,$(REGISTRY_URL)))
+    REPOSITORY := $(NAMESPACE)
+  endif
+  ifneq (,$(findstring image-registry.openshift-image-registry,$(REGISTRY_URL)))
+    REPOSITORY := $(NAMESPACE)
+  endif
+endif
+
 # Dynamically generated URLs for production deployment
 # Note: The route format follows OpenShift's pattern: <app-name>-<namespace>.<cluster-domain>
 # These override any values set in .env.production during deployment
