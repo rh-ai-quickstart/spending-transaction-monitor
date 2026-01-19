@@ -8,6 +8,7 @@ An **AI-driven application** that enables users to define **natural language ale
   - [Who is this for?](#who-is-this-for)
   - [The business case for AI-driven transaction monitoring](#the-business-case-for-ai-driven-transaction-monitoring)
   - [Example use cases](#example-use-cases)
+  - [Sample data](#sample-data)
   - [What this quickstart provides](#what-this-quickstart-provides)
   - [What you'll build](#what-youll-build)
   - [Key technologies you'll learn](#key-technologies-youll-learn)
@@ -63,12 +64,16 @@ The key value propositions for implementing AI-driven transaction monitoring inc
 
 Transaction monitoring scenarios suitable for this system include:
 
-| Category              | Example Trigger                                                                  |
-|-----------------------|----------------------------------------------------------------------------------|
-| **Spending Pattern**  | "Your dining expense of $98 is 45% higher than your average of $67 over 30 days."|
-| **Recurring Payment** | "Netflix charged $18.99 this month vs. your usual $15.49 — a 22% increase."      |
-| **Location-Based**    | "Transaction in Boston detected. Your last known location was Los Angeles."      |
-| **Merchant-Based**    | "Uber ride was $47.89, up from your last 5 ride average of $28.40."              |
+| Category              | Example Trigger                                                                   |
+| --------------------- | --------------------------------------------------------------------------------- |
+| **Spending Pattern**  | "Your dining expense of $98 is 45% higher than your average of $67 over 30 days." |
+| **Recurring Payment** | "Netflix charged $18.99 this month vs. your usual $15.49 — a 22% increase."       |
+| **Location-Based**    | "Transaction in Boston detected. Your last known location was Los Angeles."       |
+| **Merchant-Based**    | "Uber ride was $47.89, up from your last 5 ride average of $28.40."               |
+
+### Sample data
+
+This project uses sample credit card transaction data from the [Credit Card Transactions Dataset](https://www.kaggle.com/datasets/priyamchoksi/credit-card-transactions-dataset) on Kaggle for demonstration and testing purposes.
 
 ### What this quickstart provides
 
@@ -360,7 +365,7 @@ make build-run-local
 **Container URLs:**
 
 - Frontend: http://localhost:3000
-- API: http://localhost:3000/api/* (proxied)
+- API: http://localhost:3000/api/\* (proxied)
 - API Docs: http://localhost:8000/docs
 - SMTP Web UI: http://localhost:3002
 - Database: localhost:5432
@@ -381,7 +386,7 @@ make setup-data       # Complete data setup: Start DB + migrations + all data
 
 **Note:** `pnpm setup:data` now automatically starts the database, so you don't need to run `pnpm db:start` separately.
 
-📖 **See [SEEDING.md](SEEDING.md) for complete seeding documentation**
+📖 **See [DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) for complete seeding documentation**
 
 **Expected outcome:**
 
@@ -409,6 +414,7 @@ By default, the application uses **Keycloak** for secure authentication:
   - Plus 48 more seeded users with realistic transaction histories
 
 **Access Points:**
+
 - Frontend: http://localhost:3000 (redirects to Keycloak login)
 - Keycloak Admin: http://localhost:8080 (admin / admin)
 - API Docs: http://localhost:8000/docs
@@ -423,6 +429,7 @@ BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development make build-r
 ```
 
 In bypass mode:
+
 - ✅ No login required - automatic authentication as dev user
 - ✅ Yellow "DEV MODE - Authentication Bypassed" banner visible
 - ✅ Faster development iteration
@@ -440,12 +447,12 @@ BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development make build-r
 
 **Environment Variables:**
 
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `BYPASS_AUTH` | `true`/`false` | Backend auth bypass |
-| `VITE_BYPASS_AUTH` | `true`/`false` | Frontend auth bypass |
-| `VITE_ENVIRONMENT` | `development`/`staging`/`production` | Environment mode |
-| `KEYCLOAK_URL` | URL | Keycloak server URL (default: `http://localhost:8080`) |
+| Variable           | Values                               | Description                                            |
+| ------------------ | ------------------------------------ | ------------------------------------------------------ |
+| `BYPASS_AUTH`      | `true`/`false`                       | Backend auth bypass                                    |
+| `VITE_BYPASS_AUTH` | `true`/`false`                       | Frontend auth bypass                                   |
+| `VITE_ENVIRONMENT` | `development`/`staging`/`production` | Environment mode                                       |
+| `KEYCLOAK_URL`     | URL                                  | Keycloak server URL (default: `http://localhost:8080`) |
 
 #### Container Management Commands
 
@@ -566,7 +573,7 @@ make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> build-deplo
 # IMPORTANT: For OpenShift's internal registry, set REGISTRY_URL once and reuse it.
 export REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')"
 make login
-make build-deloy
+make build-deploy
 ```
 
 #### Step-by-step Deployment
@@ -818,7 +825,7 @@ See our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) for details.
+This project is licensed under the **Apache License 2.0**.
 
 ---
 
