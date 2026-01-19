@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     SMTP_USE_SSL: bool = False
 
+    # Twilio SMS settings
+    TWILIO_ACCOUNT_SID: str = ''
+    TWILIO_AUTH_TOKEN: str = ''
+    TWILIO_PHONE_NUMBER: str = ''
+
     def model_post_init(self, __context):
         """Set derived values based on environment"""
         # Auto-enable auth bypass in development ONLY if not explicitly set in environment

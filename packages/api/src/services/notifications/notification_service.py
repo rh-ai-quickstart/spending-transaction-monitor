@@ -12,7 +12,7 @@ from db.models import (
     NotificationStatus,
 )
 
-from .notifications import Context, NoopStrategy, SmtpStrategy
+from .notifications import Context, NoopStrategy, SmsStrategy, SmtpStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class NotificationService:
     def __init__(self):
         self.strategies = {
             NotificationMethod.EMAIL: SmtpStrategy(),
-            NotificationMethod.SMS: NoopStrategy(),  # TODO: Implement SMS strategy
+            NotificationMethod.SMS: SmsStrategy(),
             NotificationMethod.PUSH: NoopStrategy(),  # TODO: Implement push strategy
             NotificationMethod.WEBHOOK: NoopStrategy(),  # TODO: Implement webhook strategy
         }

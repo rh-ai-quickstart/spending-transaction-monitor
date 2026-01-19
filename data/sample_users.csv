@@ -1,5 +1,5 @@
 id,email,keycloak_id,first_name,last_name,phone_number,created_at,updated_at,is_active,address_street,address_city,address_state,address_zipcode,address_country,credit_limit,credit_balance
-u-001,monica.cohen@example.com,3ec44437-4cea-4cea-8069-340d4d849f65,Monica,Cohen,555-00001,2025-01-01T00:00:00,2025-10-06T12:05:39.273168,True,864 Reynolds Plains,Uledi,PA,15484,US,5000,2868.53
+u-001,monica.cohen@example.com,3ec44437-4cea-4cea-8069-340d4d849f65,Monica,Cohen,+18777804236,2025-01-01T00:00:00,2025-10-06T12:05:39.273168,True,864 Reynolds Plains,Uledi,PA,15484,US,5000,2868.53
 u-002,barbara.taylor@example.com,e3ca1951-ae89-4d9f-b354-df3378ef4a6a,Barbara,Taylor,555-00002,2025-01-01T00:00:00,2025-10-06T12:05:39.278800,True,0069 Robin Brooks Apt. 695,Elberta,MI,49628,US,15000,11918.03
 u-003,jessica.perez@example.com,831e7a4d-5afb-47f2-b016-b2e37cc50605,Jessica,Perez,555-00003,2025-01-01T00:00:00,2025-10-06T12:05:39.283991,True,8172 Robertson Parkways Suite 072,Superior,AZ,85173,US,10000,8.05
 u-004,ana.howell@example.com,ea035640-0512-4c87-bbe4-75f886ffd4cf,Ana,Howell,555-00004,2025-01-01T00:00:00,2025-10-06T12:05:39.288927,True,4664 Sanchez Common Suite 930,Bradley,SC,29819,US,15000,14368.37
