@@ -18,6 +18,7 @@ class AppState(dict):
     query_result: str
     alert_triggered: bool
     alert_message: str
+    alert_title: str
     alert_rule: dict  # Will store the AlertRule object
 
 
@@ -102,24 +103,28 @@ graph.add_node(
     ),
 )
 
+
 # Step 4: Generate alert message
-graph.add_node(
-    'generate_alert_message',
-    RunnableLambda(
-        lambda state: {
+def generate_alert_message_node(state):
+    """Generate alert message and title"""
+    if state.get('alert_triggered'):
+        result = generate_alert_message.func(
+            state['transaction'],
+            state['query_result'],
+            state['alert_text'],
+            state['alert_rule'],
+            state['user'],
+        )
+        return {
             **state,
-            'alert_message': generate_alert_message.func(
-                state['transaction'],
-                state['query_result'],
-                state['alert_text'],
-                state['alert_rule'],
-                state['user'],
-            )
-            if state.get('alert_triggered')
-            else '',
+            'alert_message': result.get('message', ''),
+            'alert_title': result.get('subject', 'Alert triggered'),
         }
-    ),
-)
+    else:
+        return {**state, 'alert_message': '', 'alert_title': ''}
+
+
+graph.add_node('generate_alert_message', RunnableLambda(generate_alert_message_node))
 
 # Edges - Two possible flows:
 # Flow 1: Validation (no alert_rule exists yet)
@@ -181,21 +186,7 @@ trigger_graph.add_node(
 )
 trigger_graph.add_node('create_alert', RunnableLambda(generate_alert))
 trigger_graph.add_node(
-    'generate_alert_message',
-    RunnableLambda(
-        lambda state: {
-            **state,
-            'alert_message': generate_alert_message.func(
-                state['transaction'],
-                state['query_result'],
-                state['alert_text'],
-                state['alert_rule'],
-                state['user'],
-            )
-            if state.get('alert_triggered')
-            else '',
-        }
-    ),
+    'generate_alert_message', RunnableLambda(generate_alert_message_node)
 )
 
 # Set entry point to routing node
