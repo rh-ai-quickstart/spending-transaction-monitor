@@ -95,6 +95,20 @@ helm install spending-monitor ./deploy/helm/spending-monitor \
   --create-namespace
 ```
 
+#### Option 3: Deploy with Model Registry
+
+```bash
+# Install with model registry enabled.
+# This will create a new PostgreSQL DB in the rhoai-model-registries namespace, separate from the app's main database.
+helm install spending-monitor ./deploy/helm/spending-monitor \
+  --set pgvector.enabled=true \
+  --set model-registry.enabled=true \
+  --set model-registry.postgres.enabled=true \
+  --set model-registry.createService=true \
+  --namespace spending-monitor \
+  --create-namespace
+```
+
 ### 4. Verify Deployment
 
 ```bash

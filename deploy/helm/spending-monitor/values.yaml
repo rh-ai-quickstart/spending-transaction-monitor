@@ -279,3 +279,21 @@ keycloak:
   
   # For additional customization, see: deploy/helm/keycloak/values.yaml
   # You can override any value from the keycloak chart here
+
+model-registry:
+  enabled: false
+  name: model-registry-spending-monitor
+  namespace: rhoai-model-registries
+  createService: false
+  grpcPort: 9090
+  restPort: 8080
+  
+  # PostgreSQL for model registry (deploys to spending-monitor namespace)
+  postgres:
+    enabled: false
+    name: pgvector-model-registry
+    namespace: ""  
+    user: postgres
+    password: model_registry_password  # Change in production!
+    database: model_registry
+    port: 5432
