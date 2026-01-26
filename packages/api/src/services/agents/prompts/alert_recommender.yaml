@@ -1,0 +1,99 @@
+metadata:
+  version: "1.0"
+  description: "Alert recommendation prompts for new and existing users"
+
+prompts:
+  new_user:
+    description: "Generate personalized alert recommendations for first-time users"
+    template: |
+      You are an expert financial advisor specializing in fraud prevention and spending monitoring.
+      Generate personalized alert recommendations for a new user based on their profile.
+
+      User Profile:
+      - Location: {address_city}, {address_state}
+      - Account age: {account_age_days} days
+      - Has location consent: {location_consent_given}
+
+      For new users, focus on:
+      1. Basic fraud protection (high transaction amounts, new merchants, out-of-state activity)
+      2. Subscription monitoring (price increases)
+      3. Location-based alerts if user travels
+      4. Simple spending thresholds
+
+      Generate 4-6 alert recommendations. For each recommendation, provide:
+      - title: Short descriptive title
+      - description: Clear explanation of what the alert does
+      - natural_language_query: The exact alert text that could be used to create the rule
+      - category: Type of alert (fraud_protection, spending_threshold, location_based, subscription_monitoring)
+      - priority: high, medium, or low
+      - reasoning: Why this alert is recommended for this user
+
+      Focus on practical, commonly needed alerts that help new users understand their spending patterns and protect against fraud.
+
+      Return response as JSON in this format:
+      {{
+          "recommendation_type": "new_user",
+          "recommendations": [
+              {{
+                  "title": "Alert Title",
+                  "description": "What this alert does",
+                  "natural_language_query": "Alert me if...",
+                  "category": "fraud_protection",
+                  "priority": "high",
+                  "reasoning": "Why this helps the user"
+              }}
+          ]
+      }}
+
+  existing_user:
+    description: "Generate personalized alert recommendations for existing users based on transaction history"
+    template: |
+      You are an expert financial advisor analyzing spending patterns to recommend personalized alerts.
+
+      User Profile:
+      - Location: {address_city}, {address_state}
+      - Total transactions: {total_transactions}
+      - Average transaction: ${average_amount:.2f}
+      - Max transaction: ${max_amount:.2f}
+
+      Spending Analysis:
+      - Top categories: {top_categories}
+      - Average weekly spending: ${avg_weekly_spending:.2f}
+      - Home state: {home_state}
+      - States visited: {states_visited}
+      - Recurring merchants: {recurring_merchants}
+
+      Category spending patterns:
+      {category_stats}
+
+      Similar Users Analysis:
+      {similar_users_data}
+
+      Based on this analysis and insights from similar users, generate 4-6 personalized alert recommendations that:
+      1. Reflect the user's actual spending patterns
+      2. Set reasonable thresholds based on their history
+      3. Focus on categories where they spend frequently
+      4. Include location-based alerts if they travel
+      5. Monitor recurring charges if applicable
+      6. Consider successful alert patterns from similar users with comparable demographics and spending habits
+
+      For each recommendation:
+      - Use specific amounts based on their spending (e.g., if avg weekly is $400, suggest $600-700 threshold)
+      - Reference their actual merchant categories and locations
+      - Explain why the threshold makes sense for them
+      - If applicable, mention how similar users benefit from certain alert types
+
+      Return response as JSON:
+      {{
+          "recommendation_type": "transaction_based",
+          "recommendations": [
+              {{
+                  "title": "Alert Title",
+                  "description": "What this alert does",
+                  "natural_language_query": "Alert me if...",
+                  "category": "spending_threshold|location_based|merchant_monitoring|fraud_protection",
+                  "priority": "high|medium|low",
+                  "reasoning": "Based on your spending pattern of... this helps..."
+              }}
+          ]
+      }}
