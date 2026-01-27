@@ -1,0 +1,278 @@
+{{- if .Values.mlInference.enabled }}
+---
+# ML Training Job - Runs on Helm install to train and register the model
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "spending-monitor.fullname" . }}-ml-training
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml-training
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "spending-monitor.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ml-training
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
+      containers:
+        - name: trainer
+          image: registry.access.redhat.com/ubi9/python-311:latest
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              echo "=== ML Model Training Job ==="
+              echo "Model: {{ .Values.mlInference.model.name }}"
+              echo "Version: {{ .Values.mlInference.model.version }}"
+              
+              # Install dependencies
+              # Pin versions to match MLServer 1.3.5 runtime environment
+              echo "Installing dependencies..."
+              pip install --quiet "numpy<2.0" "pandas<2.0" "scikit-learn==1.3.0" boto3 model-registry
+              
+              # Create training script
+              cat > /tmp/train_model.py << 'TRAIN_SCRIPT'
+              import os
+              import json
+              import joblib
+              from datetime import datetime
+              import pandas as pd
+              import numpy as np
+              from sklearn.preprocessing import StandardScaler
+              from sklearn.pipeline import Pipeline
+              from sklearn.multioutput import MultiOutputClassifier
+              from sklearn.ensemble import RandomForestClassifier
+              
+              print("Starting model training...")
+              
+              # Load data from ConfigMap mount
+              DATA_DIR = "/data"
+              users_df = pd.read_csv(f"{DATA_DIR}/users.csv")
+              transactions_df = pd.read_csv(f"{DATA_DIR}/transactions.csv")
+              print(f"Loaded {len(users_df)} users and {len(transactions_df)} transactions")
+              
+              # Feature engineering
+              def build_user_features(users_df, transactions_df):
+                  transactions_df['amount'] = pd.to_numeric(transactions_df['amount'], errors='coerce')
+                  
+                  tx_agg = transactions_df.groupby('user_id').agg({
+                      'amount': ['count', 'mean', 'std', 'max', 'sum'],
+                      'merchant_name': pd.Series.nunique,
+                      'merchant_category': pd.Series.nunique
+                  })
+                  
+                  tx_agg.columns = ['_'.join(col) if isinstance(col, tuple) else col for col in tx_agg.columns]
+                  tx_agg = tx_agg.reset_index()
+                  tx_agg.columns = ['user_id', 'amount_count', 'amount_mean', 'amount_std',
+                                    'amount_max', 'amount_sum', 'merchant_name_nunique',
+                                    'merchant_category_nunique']
+                  
+                  user_feats = tx_agg.merge(
+                      users_df[['id', 'credit_limit', 'credit_balance']],
+                      left_on='user_id', right_on='id', how='left'
+                  )
+                  
+                  if 'id' in user_feats.columns:
+                      user_feats = user_feats.drop(columns=['id'])
+                  
+                  user_feats['credit_limit'] = pd.to_numeric(user_feats['credit_limit'], errors='coerce').fillna(0)
+                  user_feats['credit_balance'] = pd.to_numeric(user_feats['credit_balance'], errors='coerce').fillna(0)
+                  user_feats['credit_utilization'] = np.where(
+                      user_feats['credit_limit'] > 0,
+                      user_feats['credit_balance'] / user_feats['credit_limit'],
+                      0
+                  )
+                  
+                  return user_feats.fillna(0)
+              
+              user_features = build_user_features(users_df, transactions_df)
+              print(f"Built features for {len(user_features)} users")
+              
+              # Alert types and heuristic labels
+              ALERT_TYPES = [
+                  'alert_high_spender', 'alert_high_tx_volume', 'alert_high_merchant_diversity',
+                  'alert_near_credit_limit', 'alert_large_transaction', 'alert_new_merchant',
+                  'alert_location_based', 'alert_subscription_monitoring'
+              ]
+              
+              FEATURE_COLUMNS = [
+                  'amount_mean', 'amount_std', 'amount_max', 'amount_sum', 'amount_count',
+                  'merchant_name_nunique', 'merchant_category_nunique',
+                  'credit_limit', 'credit_balance', 'credit_utilization'
+              ]
+              
+              # Generate heuristic labels for training
+              df = user_features.copy()
+              df['alert_high_spender'] = (df['amount_sum'] >= df['amount_sum'].quantile(0.75)).astype(int)
+              df['alert_high_tx_volume'] = (df['amount_count'] >= df['amount_count'].quantile(0.75)).astype(int)
+              df['alert_high_merchant_diversity'] = (df['merchant_name_nunique'] >= df['merchant_name_nunique'].quantile(0.75)).astype(int)
+              df['alert_near_credit_limit'] = (df['credit_utilization'] >= 0.7).astype(int)
+              df['alert_large_transaction'] = (df['amount_max'] >= df['amount_max'].quantile(0.75)).astype(int)
+              # Add some randomness to sparse labels to help the classifier
+              np.random.seed(42)
+              df['alert_new_merchant'] = (np.random.random(len(df)) < 0.1).astype(int)
+              df['alert_location_based'] = (np.random.random(len(df)) < 0.05).astype(int)
+              df['alert_subscription_monitoring'] = (np.random.random(len(df)) < 0.15).astype(int)
+              
+              X = df[FEATURE_COLUMNS].values
+              y = df[ALERT_TYPES].values
+              user_ids = df['user_id'].values
+              
+              print(f"Training data shape: X={X.shape}, y={y.shape}")
+              
+              # Train a multi-label classifier using only standard sklearn classes
+              # This avoids pickle/unpickle issues with custom classes
+              pipeline = Pipeline([
+                  ('scaler', StandardScaler()),
+                  ('classifier', MultiOutputClassifier(
+                      RandomForestClassifier(
+                          n_estimators=50,
+                          max_depth=10,
+                          random_state=42,
+                          n_jobs=-1
+                      )
+                  ))
+              ])
+              
+              pipeline.fit(X, y)
+              print("Multi-output classifier trained")
+              
+              # Verify the model works
+              test_pred = pipeline.predict(X[:1])
+              test_proba = pipeline.predict_proba(X[:1])
+              print(f"Test prediction shape: {test_pred.shape}")
+              print(f"Model verification successful")
+              
+              # Save model in KServe-compatible structure
+              MODEL_NAME = os.environ.get('MODEL_NAME', 'alert-recommender')
+              MODEL_DIR = f"/models/{MODEL_NAME}"
+              os.makedirs(MODEL_DIR, exist_ok=True)
+              
+              # Use joblib for sklearn models (MLServer default)
+              model_path = f"{MODEL_DIR}/model.joblib"
+              joblib.dump(pipeline, model_path)
+              print(f"Model saved to {model_path}")
+              
+              # Create model-settings.json for MLServer
+              model_settings = {
+                  "name": MODEL_NAME,
+                  "implementation": "mlserver_sklearn.SKLearnModel",
+                  "parameters": {
+                      "uri": "./model.joblib"
+                  }
+              }
+              with open(f"{MODEL_DIR}/model-settings.json", 'w') as f:
+                  json.dump(model_settings, f, indent=2)
+              print("MLServer settings saved")
+              
+              # Save metadata for API consumers
+              metadata = {
+                  'model_name': os.environ.get('MODEL_NAME', 'alert-recommender'),
+                  'model_version': os.environ.get('MODEL_VERSION', '1.0.0'),
+                  'trained_at': datetime.now().isoformat(),
+                  'n_users': len(user_ids),
+                  'feature_columns': FEATURE_COLUMNS,
+                  'alert_types': ALERT_TYPES,
+                  'model_type': 'MultiOutputClassifier',
+                  'base_estimator': 'RandomForestClassifier'
+              }
+              
+              with open(f"{MODEL_DIR}/metadata.json", 'w') as f:
+                  json.dump(metadata, f, indent=2)
+              print("Metadata saved")
+              
+              print("=== Training complete ===")
+              TRAIN_SCRIPT
+              
+              # Run training
+              echo "Running training script..."
+              python /tmp/train_model.py
+              
+              # Register model with Model Registry (if available)
+              echo "Checking Model Registry..."
+              MODEL_REGISTRY_HOST="${MODEL_REGISTRY_HOST:-}"
+              MODEL_REGISTRY_PORT="${MODEL_REGISTRY_PORT:-8080}"
+              if [ -n "$MODEL_REGISTRY_HOST" ]; then
+                echo "Registering model with Model Registry at $MODEL_REGISTRY_HOST:$MODEL_REGISTRY_PORT"
+                cat > /tmp/register_model.py << 'REGISTER_SCRIPT'
+              import os
+              from model_registry import ModelRegistry
+              
+              registry_host = os.environ.get('MODEL_REGISTRY_HOST')
+              registry_port = int(os.environ.get('MODEL_REGISTRY_PORT', '8080'))
+              model_name = os.environ.get('MODEL_NAME', 'alert-recommender')
+              model_version = os.environ.get('MODEL_VERSION', '1.0.0')
+              
+              try:
+                  # Use is_secure=False for HTTP connections with explicit port
+                  registry = ModelRegistry(
+                      server_address=registry_host,
+                      port=registry_port,
+                      author="spending-monitor",
+                      is_secure=False
+                  )
+                  
+                  # Register the model
+                  rm = registry.register_model(
+                      model_name,
+                      uri="/models/model.pkl",
+                      version=model_version,
+                      description="KNN-based alert recommendation model",
+                      model_format_name="sklearn",
+                      model_format_version="1"
+                  )
+                  print(f"Model registered: {rm.name} v{model_version}")
+              except Exception as e:
+                  print(f"Warning: Could not register with Model Registry: {e}")
+                  print("Model is still saved locally and can be used.")
+              REGISTER_SCRIPT
+                python /tmp/register_model.py || echo "Model Registry registration skipped"
+              else
+                echo "Model Registry not configured, skipping registration"
+              fi
+              
+              echo "=== ML Training Job Complete ==="
+          env:
+            - name: MODEL_NAME
+              value: {{ .Values.mlInference.model.name | quote }}
+            - name: MODEL_VERSION
+              value: {{ .Values.mlInference.model.version | quote }}
+            - name: MODEL_REGISTRY_HOST
+              value: "{{ index .Values "model-registry" "name" }}.{{ index .Values "model-registry" "namespace" | default .Release.Namespace }}.svc.cluster.local"
+            - name: MODEL_REGISTRY_PORT
+              value: "{{ index .Values "model-registry" "restPort" }}"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          volumeMounts:
+            - name: training-data
+              mountPath: /data
+              readOnly: true
+            - name: model-output
+              mountPath: /models
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+      volumes:
+        - name: training-data
+          configMap:
+            name: {{ include "spending-monitor.fullname" . }}-ml-training-data
+        - name: model-output
+          persistentVolumeClaim:
+            claimName: {{ include "spending-monitor.fullname" . }}-ml-models
+{{- end }}

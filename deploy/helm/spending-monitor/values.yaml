@@ -56,7 +56,9 @@ secrets:
   SMTP_USE_TLS: "true"
   SMTP_USE_SSL: "false"
   LLAMASTACK_BASE_URL: "http://localhost:8321"  # Remote LlamaStack URL (e.g., "https://llamastack.example.com:8321")
-  USE_ML_RECOMMENDATIONS: "false"  # Use ML-based recommendations (true) or LLM-based (false)
+  USE_ML_RECOMMENDATIONS: "true"  # Use ML-based recommendations (true) or LLM-based (false)
+  USE_ML_INFERENCE_SERVICE: "true"  # Use OpenShift AI inference service (true) or local model (false)
+  ML_INFERENCE_ENDPOINT: "http://alert-recommender-predictor.spending-monitor.svc.cluster.local"  # Auto-configured when mlInference.enabled=true
 
   # Keycloak configuration
   # Internal Keycloak URL (for API to reach Keycloak via cluster network)
@@ -280,20 +282,33 @@ keycloak:
   # For additional customization, see: deploy/helm/keycloak/values.yaml
   # You can override any value from the keycloak chart here
 
+# ML Inference Service Configuration
+# When enabled, trains model on install and deploys via Model Registry
+mlInference:
+  enabled: true  # Set to true to enable ML inference (triggers when USE_ML_INFERENCE_SERVICE=true)
+  model:
+    name: "alert-recommender"
+    version: "1.0.0"
+    description: "KNN-based alert recommendation model"
+  
 model-registry:
-  enabled: false
+  enabled: true
   name: model-registry-spending-monitor
   namespace: rhoai-model-registries
-  createService: false
+  createService: true
   grpcPort: 9090
   restPort: 8080
   
-  # PostgreSQL for model registry (deploys to spending-monitor namespace)
+  # PostgreSQL for model registry
   postgres:
-    enabled: false
+    enabled: true
     name: pgvector-model-registry
-    namespace: ""  
+    namespace: rhoai-model-registries  # Must match model-registry namespace
     user: postgres
     password: model_registry_password  # Change in production!
     database: model_registry
     port: 5432
+  
+  # pgvector subchart configuration - must deploy to same namespace as model-registry
+  pgvector:
+    namespace: rhoai-model-registries
