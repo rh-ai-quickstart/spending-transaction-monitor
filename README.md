@@ -229,7 +229,6 @@ pnpm seed:keycloak    # Setup only Keycloak realm
 
 # Or using make
 make setup-data       # Complete data setup: Start DB + migrations + all data
-make seed-all         # Seed both DB and Keycloak
 ```
 
 **Note:** `pnpm setup:data` now automatically starts the database, so you don't need to run `pnpm db:start` separately.
@@ -341,7 +340,7 @@ pnpm dev:containers
 make build-run-local
 
 # Build and run with auth bypass (no authentication)
-make build-run-local-noauth
+BYPASS_AUTH=true VITE_BYPASS_AUTH=true VITE_ENVIRONMENT=development make build-run-local
 
 # Run without rebuilding
 make run-local
@@ -456,13 +455,16 @@ The test process:
 **Quick Deploy:**
 
 ```bash
-make full-deploy
+# OpenShift internal registry quick deploy:
+make REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')" build-deploy
 ```
 
 **Step-by-step:**
 
 ```bash
 # Login and setup
+# IMPORTANT: For OpenShift's internal registry, set REGISTRY_URL once and reuse it.
+export REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')"
 make login
 make create-project
 
@@ -472,6 +474,16 @@ make push-all
 
 # Deploy
 make deploy
+```
+
+**Using Quay.io instead of the OpenShift internal registry:**
+
+```bash
+# 1) Authenticate to Quay (recommended: use a robot account token)
+make REGISTRY_URL=quay.io QUAY_USERNAME=<quay-user-or-robot> QUAY_TOKEN=<token> login
+
+# 2) Build + push to your Quay org + deploy
+make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> build-deploy
 ```
 
 **OpenShift Management:**

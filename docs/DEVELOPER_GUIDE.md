@@ -527,13 +527,16 @@ make create-env-file
 #### Quick Deploy
 
 ```bash
-make full-deploy
+# OpenShift internal registry quick deploy:
+make REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')" build-deploy
 ```
 
 #### Step-by-step
 
 ```bash
 # Login and setup
+# IMPORTANT: For OpenShift's internal registry, set REGISTRY_URL once and reuse it.
+export REGISTRY_URL="$(oc get route default-route -n openshift-image-registry -o jsonpath='{.spec.host}')"
 make login
 make create-project
 
@@ -543,6 +546,16 @@ make push-all
 
 # Deploy
 make deploy
+```
+
+#### Using Quay.io instead of the OpenShift internal registry
+
+```bash
+# 1) Authenticate to Quay (recommended: use a robot account token)
+make REGISTRY_URL=quay.io QUAY_USERNAME=<quay-user-or-robot> QUAY_TOKEN=<token> login
+
+# 2) Build + push to your Quay org + deploy
+make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> build-deploy
 ```
 
 #### OpenShift Management

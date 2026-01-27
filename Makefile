@@ -8,6 +8,22 @@ NAMESPACE ?= spending-transaction-monitor
 IMAGE_TAG ?= latest
 CLUSTER_DOMAIN ?= $(shell oc whoami --show-server 2>/dev/null | sed -E 's|https://api\.([^:]+).*|apps.\1|')
 
+# OpenShift internal registry nuance:
+# - OpenShift's internal registry uses the project/namespace as the repository path:
+#     <registry>/<namespace>/<image>:<tag>
+# - Quay and other registries typically use an org/repo namespace (e.g. quay.io/<org>/...)
+#
+# To reduce friction for OpenShift deployments, if the user sets REGISTRY_URL to an OpenShift
+# image-registry host and does NOT explicitly set REPOSITORY, default REPOSITORY to NAMESPACE.
+ifeq ($(origin REPOSITORY), default)
+  ifneq (,$(findstring openshift-image-registry,$(REGISTRY_URL)))
+    REPOSITORY := $(NAMESPACE)
+  endif
+  ifneq (,$(findstring image-registry.openshift-image-registry,$(REGISTRY_URL)))
+    REPOSITORY := $(NAMESPACE)
+  endif
+endif
+
 # Dynamically generated URLs for production deployment
 # Note: The route format follows OpenShift's pattern: <app-name>-<namespace>.<cluster-domain>
 # These override any values set in .env.production during deployment
@@ -319,8 +335,7 @@ help:
 	@echo "  Deploying:"
 	@echo "    deploy             Deploy application using Helm"
 	@echo "    deploy-dev         Deploy in development mode"
-	@echo "    deploy-all         Build, push and deploy all components"
-	@echo "    full-deploy        Complete pipeline: login, build, push, deploy"
+	@echo "    build-deploy       Complete pipeline: login, build, push, deploy"
 	@echo ""
 	@echo "  Undeploying:"
 	@echo "    undeploy           Remove application deployment"
@@ -338,8 +353,6 @@ help:
 	@echo "    stop-local         Stop local Podman Compose services"
 	@echo "    logs-local         Show logs from local services"
 	@echo "    reset-local        Reset environment (pull latest, restart with fresh data)"
-	@echo "    pull-local         Pull latest images from quay.io registry"
-	@echo "    setup-local        Complete local setup (pull, run, migrate, seed)"
 	@echo ""
 	@echo "  Helm:"
 	@echo "    helm-dep-update    Update Helm chart dependencies"
@@ -360,14 +373,10 @@ help:
 	@echo ""
 	@echo "  Seeding:"
 	@echo "    seed-db            Seed database (local only, for OpenShift use migration job)"
-	@echo "    seed-keycloak      Set up Keycloak realm only"
 	@echo "    seed-keycloak-with-users  Set up Keycloak and manually sync DB users"
-	@echo "    seed-all           Set up Keycloak + seed database"
 	@echo "    Note: OpenShift deployments automatically sync users in migration job if BYPASS_AUTH=false"
 	@echo ""
 	@echo "  Keycloak Management:"
-	@echo "    keycloak-setup              Set up Keycloak realm and create test users"
-	@echo "    keycloak-setup-with-users   Set up realm and sync database users"
 	@echo "    keycloak-users              List database-synced users (excludes test users)"
 	@echo "    keycloak-users-all          List all users including test users (adminuser, testuser)"
 	@echo "    keycloak-sync-users         Sync database users to Keycloak"
@@ -394,7 +403,6 @@ help:
 	@echo "      make setup-dev-env    # Set up .env from .env.development for local use"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make setup-local                    # Complete local setup (pulls from quay.io)"
 	@echo "  make run-local                      # Start all services (pulls latest from quay.io)"
 	@echo "  make build-run-local                # Build and run with local images (tagged as 'local')"
 	@echo "  make test-alert-rules               # Interactive alert rule testing"
@@ -406,8 +414,33 @@ help:
 # Login to OpenShift registry
 .PHONY: login
 login:
-	@echo "Logging into OpenShift registry..."
-	@oc whoami --show-token | podman login --username=$(shell oc whoami) --password-stdin $(REGISTRY_URL)
+	@if [ -z "$(REGISTRY_URL)" ]; then \
+		echo "❌ Error: REGISTRY_URL is not set"; \
+		exit 1; \
+	fi
+	@echo "Logging into registry: $(REGISTRY_URL)"
+	@if [ "$(REGISTRY_URL)" = "quay.io" ]; then \
+		if [ -z "$$QUAY_USERNAME" ]; then \
+			echo "❌ Error: QUAY_USERNAME is required when REGISTRY_URL=quay.io"; \
+			echo "   Provide QUAY_USERNAME + QUAY_TOKEN (or QUAY_PASSWORD), or run: podman login quay.io"; \
+			exit 1; \
+		fi; \
+		if [ -n "$$QUAY_TOKEN" ]; then \
+			echo "Using Quay credentials for user: $$QUAY_USERNAME (token)"; \
+			echo "$$QUAY_TOKEN" | podman login --username="$$QUAY_USERNAME" --password-stdin "$(REGISTRY_URL)"; \
+		elif [ -n "$$QUAY_PASSWORD" ]; then \
+			echo "Using Quay credentials for user: $$QUAY_USERNAME (password)"; \
+			echo "$$QUAY_PASSWORD" | podman login --username="$$QUAY_USERNAME" --password-stdin "$(REGISTRY_URL)"; \
+		else \
+			echo "❌ Error: QUAY_TOKEN or QUAY_PASSWORD is required when REGISTRY_URL=quay.io"; \
+			echo "   Provide QUAY_USERNAME + QUAY_TOKEN (recommended), or run: podman login quay.io"; \
+			exit 1; \
+		fi; \
+	else \
+		OC_USER=$$(oc whoami); \
+		echo "Using OpenShift token for user: $$OC_USER"; \
+		oc whoami --show-token | podman login --username="$$OC_USER" --password-stdin "$(REGISTRY_URL)"; \
+	fi
 
 # Create OpenShift project
 .PHONY: create-project
@@ -468,7 +501,6 @@ deploy: create-project helm-dep-update check-keycloak-vars
 	@echo "  ALLOWED_ORIGINS: $(ALLOWED_ORIGINS_DYNAMIC)"
 	@echo "  KEYCLOAK_REDIRECT_URIS: $(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"
 	@echo "  KEYCLOAK_WEB_ORIGINS: $(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"
-	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
 	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
 	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
@@ -501,7 +533,6 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 	@echo "  ALLOWED_ORIGINS: $(ALLOWED_ORIGINS_DYNAMIC)"
 	@echo "  KEYCLOAK_REDIRECT_URIS: $(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"
 	@echo "  KEYCLOAK_WEB_ORIGINS: $(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"
-	helm dependency update ./deploy/helm/spending-monitor
 	@set -a; source $(ENV_FILE_PROD); set +a; \
 	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
 	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
@@ -522,10 +553,6 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 		$(HELM_SECRET_PARAMS) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
-
-.PHONY: deploy-all
-deploy-all: build-all push-all deploy
-	@echo "Complete deployment finished successfully"
 
 # Undeploy targets
 .PHONY: undeploy
@@ -551,9 +578,9 @@ clean-migration:
 
 
 # Full deployment pipeline
-.PHONY: full-deploy
-full-deploy: login create-project build-all push-all deploy
-	@echo "Full deployment completed!"
+.PHONY: build-deploy
+build-deploy: login build-all push-all deploy
+	@echo "Build + deploy pipeline completed!"
 
 # Development helpers
 .PHONY: port-forward-api
@@ -749,11 +776,6 @@ build-local:
 	podman-compose -f podman-compose.yml -f podman-compose.build.yml build
 	@echo "✅ Local images built and tagged successfully"
 
-.PHONY: pull-local
-pull-local:
-	@echo "Pulling latest images from quay.io registry..."
-	IMAGE_TAG=latest podman-compose -f podman-compose.yml pull
-
 .PHONY: logs-local
 logs-local:
 	@echo "Showing logs from local services..."
@@ -804,11 +826,6 @@ build-run-local: setup-dev-env build-local
 	@echo "To view logs: make logs-local"
 	@echo "To stop services: make stop-local"
 
-.PHONY: setup-local
-setup-local: check-env-dev pull-local run-local
-	@echo "✅ Local development environment is fully set up and ready!"
-	@echo "Database has been migrated and seeded with test data."
-
 # Seeding targets
 .PHONY: seed-db
 seed-db:
@@ -821,48 +838,17 @@ seed-db:
 	@echo "ℹ️  For local development, run 'make keycloak-sync-users' if needed"
 	@echo ""
 
-.PHONY: seed-keycloak
-seed-keycloak:
-	@echo "🔐 Setting up Keycloak realm..."
-	pnpm seed:keycloak
-
 .PHONY: seed-keycloak-with-users
 seed-keycloak-with-users:
 	@echo "🔐 Setting up Keycloak realm and syncing database users..."
+	@if [ -f .env.production ]; then \
+		echo "Using .env.production for Keycloak configuration..."; \
+		set -a && . ./.env.production && set +a; \
+	fi; \
 	pnpm seed:keycloak-with-users
-
-.PHONY: seed-all
-seed-all: seed-keycloak seed-db
-	@echo "✅ All data seeded successfully!"
-	@echo "   • Database populated with sample data"
-	@echo "   • Keycloak realm configured"
-	@echo "   • Users automatically synced to Keycloak (if auth enabled)"
 
 # Keycloak management targets (using Python package)
 # These targets load environment from .env.production and run the Python CLI
-
-.PHONY: keycloak-setup
-keycloak-setup:
-	@echo "🔐 Setting up Keycloak realm..."
-	@if [ -f .env.production ]; then \
-		set -a && . ./.env.production && set +a && \
-		export KEYCLOAK_URL KEYCLOAK_REALM KEYCLOAK_ADMIN_PASSWORD KEYCLOAK_CLIENT_ID KEYCLOAK_REDIRECT_URIS KEYCLOAK_WEB_ORIGINS && \
-		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli setup; \
-	else \
-		echo "❌ Error: .env.production not found"; \
-		exit 1; \
-	fi
-
-.PHONY: keycloak-setup-with-users
-keycloak-setup-with-users:
-	@echo "🔐 Setting up Keycloak realm and syncing users..."
-	@if [ -f .env.production ]; then \
-		set -a && . ./.env.production && set +a && \
-		cd packages/auth && PYTHONPATH=src uv run python -m keycloak.cli setup --sync-users; \
-	else \
-		echo "❌ Error: .env.production not found"; \
-		exit 1; \
-	fi
 
 .PHONY: keycloak-users
 keycloak-users:
