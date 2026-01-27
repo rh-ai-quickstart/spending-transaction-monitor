@@ -3,6 +3,7 @@
 from collections import Counter, defaultdict
 import statistics
 
+from .prompts import load_prompt
 from .utils import clean_and_parse_json_response, get_llm_client
 
 
@@ -17,46 +18,14 @@ def recommend_alerts_for_new_user(user_profile: dict) -> dict:
         dict: Recommended alerts with reasoning
     """
 
-    prompt = f"""
-You are an expert financial advisor specializing in fraud prevention and spending monitoring.
-Generate personalized alert recommendations for a new user based on their profile.
-
-User Profile:
-- Location: {user_profile.get('address_city', 'Unknown')}, {user_profile.get('address_state', 'Unknown')}
-- Account age: {user_profile.get('account_age_days', 0)} days
-- Has location consent: {user_profile.get('location_consent_given', False)}
-
-For new users, focus on:
-1. Basic fraud protection (high transaction amounts, new merchants, out-of-state activity)
-2. Subscription monitoring (price increases)
-3. Location-based alerts if user travels
-4. Simple spending thresholds
-
-Generate 4-6 alert recommendations. For each recommendation, provide:
-- title: Short descriptive title
-- description: Clear explanation of what the alert does
-- natural_language_query: The exact alert text that could be used to create the rule
-- category: Type of alert (fraud_protection, spending_threshold, location_based, subscription_monitoring)
-- priority: high, medium, or low
-- reasoning: Why this alert is recommended for this user
-
-Focus on practical, commonly needed alerts that help new users understand their spending patterns and protect against fraud.
-
-Return response as JSON in this format:
-{{
-    "recommendation_type": "new_user",
-    "recommendations": [
-        {{
-            "title": "Alert Title",
-            "description": "What this alert does",
-            "natural_language_query": "Alert me if...",
-            "category": "fraud_protection",
-            "priority": "high",
-            "reasoning": "Why this helps the user"
-        }}
-    ]
-}}
-"""
+    prompt = load_prompt(
+        'alert_recommender',
+        'new_user',
+        address_city=user_profile.get('address_city', 'Unknown'),
+        address_state=user_profile.get('address_state', 'Unknown'),
+        account_age_days=user_profile.get('account_age_days', 0),
+        location_consent_given=user_profile.get('location_consent_given', False),
+    )
 
     try:
         client = get_llm_client()
@@ -88,57 +57,31 @@ def recommend_alerts_for_existing_user(
         dict: Recommended alerts based on spending patterns and collaborative filtering
     """
 
-    prompt = f"""
-You are an expert financial advisor analyzing spending patterns to recommend personalized alerts.
+    # Format similar users data for the prompt
+    similar_users_formatted = (
+        _format_similar_users_data(similar_users_data)
+        if similar_users_data
+        else 'No similar user data available'
+    )
 
-User Profile:
-- Location: {user_profile.get('address_city', 'Unknown')}, {user_profile.get('address_state', 'Unknown')}
-- Total transactions: {transaction_analysis.get('total_transactions', 0)}
-- Average transaction: ${transaction_analysis.get('average_amount', 0):.2f}
-- Max transaction: ${transaction_analysis.get('max_amount', 0):.2f}
-
-Spending Analysis:
-- Top categories: {transaction_analysis.get('top_categories', [])}
-- Average weekly spending: ${transaction_analysis.get('avg_weekly_spending', 0):.2f}
-- Home state: {transaction_analysis.get('home_state', 'Unknown')}
-- States visited: {transaction_analysis.get('states_visited', [])}
-- Recurring merchants: {list(transaction_analysis.get('recurring_merchants', {}).keys())[:3]}
-
-Category spending patterns:
-{transaction_analysis.get('category_stats', {})}
-
-Similar Users Analysis:
-{_format_similar_users_data(similar_users_data) if similar_users_data else 'No similar user data available'}
-
-Based on this analysis and insights from similar users, generate 4-6 personalized alert recommendations that:
-1. Reflect the user's actual spending patterns
-2. Set reasonable thresholds based on their history
-3. Focus on categories where they spend frequently
-4. Include location-based alerts if they travel
-5. Monitor recurring charges if applicable
-6. Consider successful alert patterns from similar users with comparable demographics and spending habits
-
-For each recommendation:
-- Use specific amounts based on their spending (e.g., if avg weekly is $400, suggest $600-700 threshold)
-- Reference their actual merchant categories and locations
-- Explain why the threshold makes sense for them
-- If applicable, mention how similar users benefit from certain alert types
-
-Return response as JSON:
-{{
-    "recommendation_type": "transaction_based",
-    "recommendations": [
-        {{
-            "title": "Alert Title",
-            "description": "What this alert does",
-            "natural_language_query": "Alert me if...",
-            "category": "spending_threshold|location_based|merchant_monitoring|fraud_protection",
-            "priority": "high|medium|low",
-            "reasoning": "Based on your spending pattern of... this helps..."
-        }}
-    ]
-}}
-"""
+    prompt = load_prompt(
+        'alert_recommender',
+        'existing_user',
+        address_city=user_profile.get('address_city', 'Unknown'),
+        address_state=user_profile.get('address_state', 'Unknown'),
+        total_transactions=transaction_analysis.get('total_transactions', 0),
+        average_amount=transaction_analysis.get('average_amount', 0),
+        max_amount=transaction_analysis.get('max_amount', 0),
+        top_categories=transaction_analysis.get('top_categories', []),
+        avg_weekly_spending=transaction_analysis.get('avg_weekly_spending', 0),
+        home_state=transaction_analysis.get('home_state', 'Unknown'),
+        states_visited=transaction_analysis.get('states_visited', []),
+        recurring_merchants=list(
+            transaction_analysis.get('recurring_merchants', {}).keys()
+        )[:3],
+        category_stats=transaction_analysis.get('category_stats', {}),
+        similar_users_data=similar_users_formatted,
+    )
 
     try:
         client = get_llm_client()

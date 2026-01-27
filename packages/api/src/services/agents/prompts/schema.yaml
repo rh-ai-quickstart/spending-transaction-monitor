@@ -1,0 +1,46 @@
+metadata:
+  version: "1.0"
+  description: "Shared database schema definition for SQL generation prompts"
+
+schema: |
+  Table: transactions
+  Columns:
+  - id: primary key
+  - user_id : reference id of the user in the users table
+  - transaction_date: DateTime
+  - credit_card_num: text
+  - amount: float
+  - currency: text
+  - description: text
+  - merchant_name: text
+  - merchant_category: text
+  - merchant_city: text
+  - merchant_state: text
+  - merchant_country: text
+  - merchant_latitude: float
+  - merchant_longitude: float
+  - merchant_zipcode: text
+  - trans_num: text
+  - authorization_code: text
+
+  Table: users
+  Columns:
+  - id: text
+  - first_name: text
+  - last_name: text
+  - email: text
+  - phone_number: text
+  - address_street: text
+  - address_city: text
+  - address_state: text
+  - address_country: text 
+  - address_zipcode: integer
+  - last_app_location_latitude   float
+  - last_app_location_longitude  float
+  - last_app_location_timestamp  DateTime
+  - last_transaction_latitude   float
+  - last_merchant_longitude  float
+  - last_transaction_timestamp  DateTime
+  - last_merchant_city       text
+  - last_merchant_state      text
+  - last_merchant_country    text

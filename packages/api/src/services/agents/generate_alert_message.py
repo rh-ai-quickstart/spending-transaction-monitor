@@ -1,5 +1,6 @@
 from langchain_core.tools import tool
 
+from .prompts import load_prompt
 from .utils import extract_response, get_llm_client
 
 
@@ -37,37 +38,17 @@ def generate_alert_message(
     }
     alert_type = alert_type_map.get(str(alert_type_enum), 'general')
 
-    prompt = f"""
-You are generating a friendly user-facing alert notification with both a subject line and message body.
-The alert HAS ALREADY BEEN TRIGGERED based on the SQL result below.
-Do NOT say "no alert" or "within expected range."
-
-Alert Rule: "{alert_text}"
-Alert Type: {alert_type}
-SQL Result: {query_result}
-
-Full Transaction JSON:
-{transaction}
-
-Full User JSON:
-{user}
-
-Instructions:
-1. Use ONLY relevant fields from the transaction (amount, merchant_name, merchant_category, transaction_date, merchant_city, merchant_state, merchant_country).
-2. Use ONLY relevant fields from the user (first_name, last_name, email, phone_number, address_street, address_city, address_state, address_country, address_zipcode).
-3. Do NOT include technical fields like IDs, UUIDs, authorization codes, or system metadata.
-4. Generate TWO separate pieces:
-   a) SUBJECT: A concise, attention-grabbing email subject line (5-10 words max)
-   b) MESSAGE: A clear, concise 1–2 sentence message that explains:
-      - Why the alert fired (reference the configured rule).
-      - Which transaction caused it (merchant, amount, category, location, or timeframe).
-5. Always use friendly, helpful, and human-readable language.
-6. Use the first_name as {first_name} and last_name as {last_name} of the user to address them.
-
-Return your response in the following format EXACTLY:
-SUBJECT: [your subject line here]
-MESSAGE: [your message here]
-"""
+    prompt = load_prompt(
+        'generate_alert_message',
+        'generate_notification',
+        alert_text=alert_text,
+        alert_type=alert_type,
+        query_result=query_result,
+        transaction=transaction,
+        user=user,
+        first_name=first_name,
+        last_name=last_name,
+    )
 
     client = get_llm_client()
     response = client.invoke(prompt)
