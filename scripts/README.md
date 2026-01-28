@@ -1,6 +1,6 @@
 # Scripts Directory
 
-This directory contains ad-hoc scripts used for development, testing, and system validation.
+This directory contains ad-hoc scripts used for development and system validation.
 
 ## 📁 Directory Structure
 
@@ -9,30 +9,6 @@ This directory contains ad-hoc scripts used for development, testing, and system
 - `README.md`: usage details
 
 [📖 Location scripts documentation](location/README.md)
-
-### 🧪 `category_normalization/` — Category Normalization Test Harness
-- `test_category_normalization.py`: exercises the synonym + embedding-based category normalization pipeline
-
-**Usage (example)**:
-
-```bash
-# Run from the repo root (recommended)
-python scripts/category_normalization/test_category_normalization.py
-```
-
-**Notes**:
-- Requires the database to be running and seeded with category synonym + embedding data (see `packages/api/CATEGORY_NORMALIZATION.md`).
-- Embeddings are configured via the API config/env (see `packages/api/EMBEDDING_SERVICE.md`).
-
-### ✉️ `notifications/` — Notification Test Harness
-- `test_notifications.py`: creates a test user, transactions, and an alert rule to exercise notification flows
-
-**Usage (example)**:
-
-```bash
-# Run from the repo root (recommended)
-python scripts/notifications/test_notifications.py
-```
 
 ### 🔧 `status-check.sh` — System Health
 General system health and status checking script.
