@@ -4,11 +4,15 @@ Manual test script for the complete category normalization pipeline.
 Tests both synonym lookup and semantic search with embeddings.
 
 Run with:
-    cd packages/api && uv run python manual_test_category_normalization.py
+    cd packages/api && uv run python tests/manual_test_category_normalization.py
 """
 
 import asyncio
+from pathlib import Path
 import sys
+
+# Add src/ to path so we can import services.*
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'src'))
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
