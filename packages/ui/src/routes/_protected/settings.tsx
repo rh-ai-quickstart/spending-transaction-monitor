@@ -51,7 +51,6 @@ function SettingsPage() {
           onUpdateSettings={updateSmsSettings}
         />
       </div>
-
     </div>
   );
 }

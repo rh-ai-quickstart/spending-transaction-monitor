@@ -3,14 +3,18 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { toast } from 'sonner';
 import { useSettings } from '../useSettings';
 import { settingsService } from '../../services/settings';
-import type { SMTPConfig, SMSSettings, SMSSettingsUpdate } from '../../schemas/settings';
+import type {
+  SMTPConfig,
+  SMSSettings,
+  SMSSettingsUpdate,
+} from '../../schemas/settings';
 
 // Mock the settings service
 vi.mock('../../services/settings');
 vi.mock('sonner');
 
 const mockSettingsService = vi.mocked(settingsService);
-const mockToast = vi.mocked(toast);
+vi.mocked(toast);
 
 describe('useSettings', () => {
   const mockSMTPConfig: SMTPConfig = {
@@ -165,7 +169,10 @@ describe('useSettings', () => {
 
   describe('refreshSmsSettings', () => {
     it('should successfully refresh SMS settings', async () => {
-      const updatedSMSSettings = { ...mockSMSSettings, sms_notifications_enabled: false };
+      const updatedSMSSettings = {
+        ...mockSMSSettings,
+        sms_notifications_enabled: false,
+      };
 
       mockSettingsService.getSmtpSettings.mockResolvedValue(mockSMTPConfig);
       mockSettingsService.getSmsSettings
@@ -258,7 +265,9 @@ describe('useSettings', () => {
       });
 
       // Update should fail and re-throw
-      await expect(result.current.updateSmsSettings(updateData)).rejects.toThrow('Validation failed');
+      await expect(result.current.updateSmsSettings(updateData)).rejects.toThrow(
+        'Validation failed',
+      );
 
       await waitFor(() => {
         expect(result.current.smsUpdating).toBe(false);

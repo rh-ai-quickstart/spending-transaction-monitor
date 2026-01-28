@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .routes import alerts as alerts_routes
 from .routes import health, websocket
+from .routes import settings as settings_routes
 from .routes import transactions as transactions_routes
 from .routes import users as users_routes
 from .services.alerts.alert_job_queue import alert_job_queue
@@ -89,6 +90,7 @@ app.include_router(
     transactions_routes.router, prefix='/api/transactions', tags=['transactions']
 )
 app.include_router(alerts_routes.router, prefix='/api/alerts', tags=['alerts'])
+app.include_router(settings_routes.router, prefix='/api/settings', tags=['settings'])
 app.include_router(websocket.router, prefix='/api', tags=['websocket'])
 
 

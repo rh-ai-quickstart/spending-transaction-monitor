@@ -1,10 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { settingsService } from '../services/settings';
-import type {
-  SMTPConfig,
-  SMSSettings,
-  SMSSettingsUpdate,
-} from '../schemas/settings';
+import type { SMTPConfig, SMSSettings, SMSSettingsUpdate } from '../schemas/settings';
 
 export interface UseSettingsResult {
   // SMTP Settings (read-only)
@@ -37,7 +33,7 @@ export function useSettings(): UseSettingsResult {
   const [smsError, setSmsError] = useState<string | null>(null);
   const [smsUpdating, setSmsUpdating] = useState(false);
 
-  const refreshSmtpConfig = async () => {
+  const refreshSmtpConfig = useCallback(async () => {
     try {
       setSmtpLoading(true);
       setSmtpError(null);
@@ -45,14 +41,16 @@ export function useSettings(): UseSettingsResult {
       setSmtpConfig(config);
     } catch (err) {
       console.error('Error fetching SMTP settings:', err);
-      setSmtpError(err instanceof Error ? err.message : 'Failed to fetch SMTP settings');
+      setSmtpError(
+        err instanceof Error ? err.message : 'Failed to fetch SMTP settings',
+      );
       setSmtpConfig(null);
     } finally {
       setSmtpLoading(false);
     }
-  };
+  }, []);
 
-  const refreshSmsSettings = async () => {
+  const refreshSmsSettings = useCallback(async () => {
     try {
       setSmsLoading(true);
       setSmsError(null);
@@ -65,7 +63,7 @@ export function useSettings(): UseSettingsResult {
     } finally {
       setSmsLoading(false);
     }
-  };
+  }, []);
 
   const updateSmsSettings = async (settings: SMSSettingsUpdate) => {
     try {
@@ -82,14 +80,14 @@ export function useSettings(): UseSettingsResult {
     }
   };
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([refreshSmtpConfig(), refreshSmsSettings()]);
-  };
+  }, [refreshSmtpConfig, refreshSmsSettings]);
 
   // Load settings on mount
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   return {
     // SMTP Settings (read-only)

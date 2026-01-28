@@ -33,10 +33,11 @@ export interface SMSSettingsFormData {
 import { z } from 'zod';
 
 export const SMSSettingsSchema = z.object({
-  phone_number: z.string()
+  phone_number: z
+    .string()
     .optional()
     .refine((val) => !val || /^\+?[1-9]\d{1,14}$/.test(val), {
-      message: "Please enter a valid phone number (E.164 format, e.g., +1234567890)",
+      message: 'Please enter a valid phone number (E.164 format, e.g., +1234567890)',
     }),
   sms_notifications_enabled: z.boolean(),
 });

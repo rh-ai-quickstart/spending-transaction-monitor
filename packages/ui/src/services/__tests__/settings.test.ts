@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { settingsService } from '../settings';
 import { apiClient } from '../apiClient';
-import type { SMTPConfig, SMSSettings, SMSSettingsUpdate } from '../../schemas/settings';
+import type {
+  SMTPConfig,
+  SMSSettings,
+  SMSSettingsUpdate,
+} from '../../schemas/settings';
 
 // Mock the apiClient
 vi.mock('../apiClient');
@@ -39,7 +43,7 @@ describe('settingsService', () => {
         ok: true,
         json: vi.fn().mockResolvedValue(mockSMTPConfig),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await settingsService.getSmtpSettings();
 
@@ -53,10 +57,10 @@ describe('settingsService', () => {
         ok: false,
         status: 500,
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(settingsService.getSmtpSettings()).rejects.toThrow(
-        'Failed to fetch SMTP settings'
+        'Failed to fetch SMTP settings',
       );
 
       expect(mockApiClient.fetch).toHaveBeenCalledWith('/api/settings/smtp');
@@ -78,7 +82,7 @@ describe('settingsService', () => {
         ok: true,
         json: vi.fn().mockResolvedValue(mockSMSSettings),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await settingsService.getSmsSettings();
 
@@ -92,10 +96,10 @@ describe('settingsService', () => {
         ok: false,
         status: 404,
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(settingsService.getSmsSettings()).rejects.toThrow(
-        'Failed to fetch SMS settings'
+        'Failed to fetch SMS settings',
       );
 
       expect(mockApiClient.fetch).toHaveBeenCalledWith('/api/settings/sms');
@@ -128,7 +132,7 @@ describe('settingsService', () => {
         ok: true,
         json: vi.fn().mockResolvedValue(updatedSettings),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await settingsService.updateSmsSettings(updateData);
 
@@ -149,10 +153,10 @@ describe('settingsService', () => {
         status: 400,
         text: vi.fn().mockResolvedValue('Invalid phone number format'),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(settingsService.updateSmsSettings(updateData)).rejects.toThrow(
-        'Failed to update SMS settings: Invalid phone number format'
+        'Failed to update SMS settings: Invalid phone number format',
       );
 
       expect(mockApiClient.fetch).toHaveBeenCalledWith('/api/settings/sms', {
@@ -169,7 +173,9 @@ describe('settingsService', () => {
       const networkError = new Error('Network timeout');
       mockApiClient.fetch.mockRejectedValue(networkError);
 
-      await expect(settingsService.updateSmsSettings(updateData)).rejects.toThrow('Network timeout');
+      await expect(settingsService.updateSmsSettings(updateData)).rejects.toThrow(
+        'Network timeout',
+      );
 
       expect(mockApiClient.fetch).toHaveBeenCalledWith('/api/settings/sms', {
         method: 'PUT',
@@ -196,7 +202,7 @@ describe('settingsService', () => {
         ok: true,
         json: vi.fn().mockResolvedValue(updatedSettingsWithNull),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await settingsService.updateSmsSettings(updateDataWithNull);
 
@@ -216,10 +222,10 @@ describe('settingsService', () => {
         status: 500,
         text: vi.fn().mockRejectedValue(new Error('Failed to read response')),
       };
-      mockApiClient.fetch.mockResolvedValue(mockResponse as any);
+      mockApiClient.fetch.mockResolvedValue(mockResponse as unknown as Response);
 
       await expect(settingsService.updateSmsSettings(updateData)).rejects.toThrow(
-        'Failed to read response'
+        'Failed to read response',
       );
 
       expect(mockApiClient.fetch).toHaveBeenCalledWith('/api/settings/sms', {

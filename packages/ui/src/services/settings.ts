@@ -1,9 +1,5 @@
 import { apiClient } from './apiClient';
-import type {
-  SMTPConfig,
-  SMSSettings,
-  SMSSettingsUpdate,
-} from '../schemas/settings';
+import type { SMTPConfig, SMSSettings, SMSSettingsUpdate } from '../schemas/settings';
 
 /**
  * Settings service for managing SMTP and SMS configuration

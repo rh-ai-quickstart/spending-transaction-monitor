@@ -39,7 +39,52 @@ General system health and status checking script.
 bash scripts/status-check.sh
 ```
 
+### 🔍 `check-dev-ports.sh` - Port Conflict Detection
+Smart port checking script that detects conflicts and provides helpful resolution suggestions before starting development servers.
+
+**Usage**:
+```bash
+./scripts/check-dev-ports.sh [command]
+```
+
+**Commands**:
+- `check` - Check development server ports (default)
+- `check-all` - Check all ports (including infrastructure)
+- `info` - Show port assignments
+- `help` - Show help message
+
+**Ports checked**:
+- **3000** - Frontend (Vite)
+- **6006** - Storybook
+- **8000** - API Server
+- **5432** - PostgreSQL Database (infrastructure)
+- **8080** - Keycloak (infrastructure)
+- **3002** - SMTP UI (infrastructure)
+
+**Features**:
+- 🔍 Detects port conflicts before starting servers
+- 📋 Shows detailed process information for occupied ports
+- 💡 Provides specific suggestions to resolve conflicts
+- 🎯 Smart process detection (recognizes uvicorn, vite, proxy processes)
+
+**Makefile integration**:
+```bash
+make check-ports      # Check development ports
+make check-all-ports  # Check all ports
+make port-info        # Show port assignments
+make dev              # Automatically runs port check
+```
+
 ## 🚀 Quick Start
+
+### For Development Environment Setup
+```bash
+# Check if development ports are available
+make check-ports
+
+# Start full development environment (includes automatic port checking)
+make dev
+```
 
 ### For Authentication Development
 ```bash
@@ -75,10 +120,13 @@ bash scripts/status-check.sh
 # Initial project setup
 pnpm setup
 
-# Start development environment
-pnpm dev  # Full stack with auth bypass
+# Check for port conflicts before starting
+make check-ports
+
+# Start development environment (includes automatic port checking)
+make dev  # Full stack with infrastructure
 # OR
-pnpm dev:backend  # Backend only
+pnpm dev  # Direct package dev commands
 ```
 
 ### 2. Feature Development
@@ -108,6 +156,7 @@ pnpm db:stop
 ## 🎯 Script Categories
 
 ### Development Scripts
+- **Port Checking**: Smart port conflict detection and resolution suggestions
 - **Location Monitoring**: Real-time location data development monitoring
 - **Auth Development**: Keycloak setup and development utilities
 - **System Utilities**: Health checks and status monitoring

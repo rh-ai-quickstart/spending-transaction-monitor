@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "check-ports": "./scripts/check-ui-ports.sh",
     "dev:vite": "npx dotenv-cli -e ../../.env -- vite",
     "dev:storybook": "npx dotenv-cli -e ../../.env -- storybook dev -p 6006 --no-open",
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:storybook\"",
+    "dev": "./scripts/check-ui-ports.sh && concurrently \"npm run dev:vite\" \"npm run dev:storybook\"",
     "build:vite": "tsc && vite build",
     "build:storybook": "storybook build",
     "build": "concurrently \"npm run build:vite\" \"npm run build:storybook\"",

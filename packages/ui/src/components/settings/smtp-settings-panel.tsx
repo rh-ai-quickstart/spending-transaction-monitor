@@ -1,5 +1,11 @@
 import { CheckCircle, XCircle, Mail, Server, Shield } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../atoms/card/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '../atoms/card/card';
 import { FormItem, FormLabel } from '../atoms/form/form';
 import { Input } from '../atoms/input/input';
 import { Badge } from '../atoms/badge/badge';
@@ -11,7 +17,11 @@ export interface SMTPSettingsPanelProps {
   error: string | null;
 }
 
-export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPanelProps) {
+export function SMTPSettingsPanel({
+  config,
+  isLoading,
+  error,
+}: SMTPSettingsPanelProps) {
   if (isLoading) {
     return (
       <Card>
@@ -24,7 +34,10 @@ export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPane
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" data-testid="loading-spinner"></div>
+            <div
+              className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+              data-testid="loading-spinner"
+            ></div>
           </div>
         </CardContent>
       </Card>
@@ -88,8 +101,8 @@ export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPane
             )}
             <span className="font-medium">Configuration Status</span>
           </div>
-          <Badge variant={config.is_configured ? "default" : "destructive"}>
-            {config.is_configured ? "Configured" : "Not Configured"}
+          <Badge variant={config.is_configured ? 'default' : 'destructive'}>
+            {config.is_configured ? 'Configured' : 'Not Configured'}
           </Badge>
         </div>
 
@@ -135,9 +148,7 @@ export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPane
               ) : (
                 <XCircle className="h-4 w-4 text-red-600" />
               )}
-              <span className="text-sm">
-                {config.use_tls ? 'Enabled' : 'Disabled'}
-              </span>
+              <span className="text-sm">{config.use_tls ? 'Enabled' : 'Disabled'}</span>
             </div>
           </FormItem>
 
@@ -152,9 +163,7 @@ export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPane
               ) : (
                 <XCircle className="h-4 w-4 text-red-600" />
               )}
-              <span className="text-sm">
-                {config.use_ssl ? 'Enabled' : 'Disabled'}
-              </span>
+              <span className="text-sm">{config.use_ssl ? 'Enabled' : 'Disabled'}</span>
             </div>
           </FormItem>
         </div>
@@ -162,8 +171,8 @@ export function SMTPSettingsPanel({ config, isLoading, error }: SMTPSettingsPane
         {/* Info Message */}
         <div className="mt-6 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm text-blue-700 dark:text-blue-300">
-            <strong>Note:</strong> SMTP settings are read-only and managed by system administrators.
-            Contact your administrator to modify email configuration.
+            <strong>Note:</strong> SMTP settings are read-only and managed by system
+            administrators. Contact your administrator to modify email configuration.
           </p>
         </div>
       </CardContent>

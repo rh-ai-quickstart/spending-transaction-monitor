@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { createMemoryHistory } from '@tanstack/react-router';
+import { render, screen } from '@testing-library/react';
+import * as React from 'react';
 import { useSettings } from '../../../hooks/useSettings';
 import type { SMTPConfig, SMSSettings } from '../../../schemas/settings';
 
@@ -9,15 +9,35 @@ vi.mock('../../../hooks/useSettings');
 
 // Mock the settings panel components
 vi.mock('../../../components/settings/smtp-settings-panel', () => ({
-  SMTPSettingsPanel: ({ config, isLoading, error }: any) => {
+  SMTPSettingsPanel: ({
+    config,
+    isLoading,
+    error,
+  }: {
+    config: SMTPConfig | null;
+    isLoading: boolean;
+    error: string | null;
+  }) => {
     if (isLoading) return <div data-testid="smtp-loading">SMTP Loading...</div>;
     if (error) return <div data-testid="smtp-error">SMTP Error: {error}</div>;
-    return <div data-testid="smtp-panel">SMTP Panel: {config?.host || 'No config'}</div>;
+    return (
+      <div data-testid="smtp-panel">SMTP Panel: {config?.host || 'No config'}</div>
+    );
   },
 }));
 
 vi.mock('../../../components/settings/sms-settings-panel', () => ({
-  SMSSettingsPanel: ({ settings, isLoading, error, isUpdating, onUpdateSettings }: any) => {
+  SMSSettingsPanel: ({
+    settings,
+    isLoading,
+    error,
+    onUpdateSettings,
+  }: {
+    settings: SMSSettings | null;
+    isLoading: boolean;
+    error: string | null;
+    onUpdateSettings: (settings: { sms_notifications_enabled: boolean }) => void;
+  }) => {
     if (isLoading) return <div data-testid="sms-loading">SMS Loading...</div>;
     if (error) return <div data-testid="sms-error">SMS Error: {error}</div>;
     return (
@@ -36,7 +56,11 @@ const mockUseSettings = vi.mocked(useSettings);
 // We need to import the component after mocking
 async function importSettingsPage() {
   const module = await import('../settings');
-  return module.Route.options.component;
+  const Component = module.Route.options.component;
+  if (!Component) {
+    throw new Error('Settings component not found');
+  }
+  return Component as React.ComponentType;
 }
 
 describe('SettingsPage', () => {
@@ -86,7 +110,9 @@ describe('SettingsPage', () => {
 
       // Header
       expect(screen.getByText('Settings')).toBeInTheDocument();
-      expect(screen.getByText('Manage your email and SMS notification preferences')).toBeInTheDocument();
+      expect(
+        screen.getByText('Manage your email and SMS notification preferences'),
+      ).toBeInTheDocument();
 
       // Panels
       expect(screen.getByTestId('smtp-panel')).toBeInTheDocument();
@@ -97,14 +123,18 @@ describe('SettingsPage', () => {
       const SettingsPage = await importSettingsPage();
       render(<SettingsPage />);
 
-      expect(screen.getByTestId('smtp-panel')).toHaveTextContent('SMTP Panel: smtp.example.com');
+      expect(screen.getByTestId('smtp-panel')).toHaveTextContent(
+        'SMTP Panel: smtp.example.com',
+      );
     });
 
     it('should pass correct props to SMS settings panel', async () => {
       const SettingsPage = await importSettingsPage();
       render(<SettingsPage />);
 
-      expect(screen.getByTestId('sms-panel')).toHaveTextContent('SMS Panel: +1234567890');
+      expect(screen.getByTestId('sms-panel')).toHaveTextContent(
+        'SMS Panel: +1234567890',
+      );
     });
 
     it('should show loading states when data is loading', async () => {
@@ -135,8 +165,12 @@ describe('SettingsPage', () => {
       const SettingsPage = await importSettingsPage();
       render(<SettingsPage />);
 
-      expect(screen.getByTestId('smtp-error')).toHaveTextContent('SMTP Error: SMTP load failed');
-      expect(screen.getByTestId('sms-error')).toHaveTextContent('SMS Error: SMS load failed');
+      expect(screen.getByTestId('smtp-error')).toHaveTextContent(
+        'SMTP Error: SMTP load failed',
+      );
+      expect(screen.getByTestId('sms-error')).toHaveTextContent(
+        'SMS Error: SMS load failed',
+      );
     });
 
     it('should handle partial loading and error states', async () => {
@@ -152,7 +186,9 @@ describe('SettingsPage', () => {
       render(<SettingsPage />);
 
       expect(screen.getByTestId('smtp-loading')).toBeInTheDocument();
-      expect(screen.getByTestId('sms-error')).toHaveTextContent('SMS Error: SMS failed');
+      expect(screen.getByTestId('sms-error')).toHaveTextContent(
+        'SMS Error: SMS failed',
+      );
     });
   });
 
@@ -212,7 +248,9 @@ describe('SettingsPage', () => {
       expect(mainHeading).toHaveTextContent('Settings');
 
       // Check for description
-      expect(screen.getByText('Manage your email and SMS notification preferences')).toBeInTheDocument();
+      expect(
+        screen.getByText('Manage your email and SMS notification preferences'),
+      ).toBeInTheDocument();
     });
   });
 
@@ -231,7 +269,9 @@ describe('SettingsPage', () => {
 
       // Should have meaningful content for screen readers
       expect(screen.getByText('Settings')).toBeInTheDocument();
-      expect(screen.getByText('Manage your email and SMS notification preferences')).toBeInTheDocument();
+      expect(
+        screen.getByText('Manage your email and SMS notification preferences'),
+      ).toBeInTheDocument();
 
       // Both panels should be accessible
       expect(screen.getByTestId('smtp-panel')).toBeInTheDocument();
@@ -250,8 +290,12 @@ describe('SettingsPage', () => {
       const SettingsPage = await importSettingsPage();
       render(<SettingsPage />);
 
-      expect(screen.getByTestId('smtp-panel')).toHaveTextContent('SMTP Panel: No config');
-      expect(screen.getByTestId('sms-panel')).toHaveTextContent('SMS Panel: No settings');
+      expect(screen.getByTestId('smtp-panel')).toHaveTextContent(
+        'SMTP Panel: No config',
+      );
+      expect(screen.getByTestId('sms-panel')).toHaveTextContent(
+        'SMS Panel: No settings',
+      );
     });
 
     it('should handle empty or minimal data states', async () => {
@@ -281,7 +325,9 @@ describe('SettingsPage', () => {
       render(<SettingsPage />);
 
       expect(screen.getByTestId('smtp-panel')).toHaveTextContent('SMTP Panel: '); // Empty host
-      expect(screen.getByTestId('sms-panel')).toHaveTextContent('SMS Panel: No settings'); // Null phone
+      expect(screen.getByTestId('sms-panel')).toHaveTextContent(
+        'SMS Panel: No settings',
+      ); // Null phone
     });
   });
 });
