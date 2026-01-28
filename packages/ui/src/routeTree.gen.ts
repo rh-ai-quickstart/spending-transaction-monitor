@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProtectedRouteRouteImport } from './routes/_protected/route'
 import { Route as ProtectedIndexRouteImport } from './routes/_protected/index'
 import { Route as ProtectedTransactionsRouteImport } from './routes/_protected/transactions'
+import { Route as ProtectedSettingsRouteImport } from './routes/_protected/settings'
 import { Route as ProtectedAlertsRouteImport } from './routes/_protected/alerts'
 
 const LoginRoute = LoginRouteImport.update({
@@ -34,6 +35,11 @@ const ProtectedTransactionsRoute = ProtectedTransactionsRouteImport.update({
   path: '/transactions',
   getParentRoute: () => ProtectedRouteRoute,
 } as any)
+const ProtectedSettingsRoute = ProtectedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ProtectedRouteRoute,
+} as any)
 const ProtectedAlertsRoute = ProtectedAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -43,12 +49,14 @@ const ProtectedAlertsRoute = ProtectedAlertsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/alerts': typeof ProtectedAlertsRoute
+  '/settings': typeof ProtectedSettingsRoute
   '/transactions': typeof ProtectedTransactionsRoute
   '/': typeof ProtectedIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/alerts': typeof ProtectedAlertsRoute
+  '/settings': typeof ProtectedSettingsRoute
   '/transactions': typeof ProtectedTransactionsRoute
   '/': typeof ProtectedIndexRoute
 }
@@ -57,19 +65,21 @@ export interface FileRoutesById {
   '/_protected': typeof ProtectedRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/_protected/alerts': typeof ProtectedAlertsRoute
+  '/_protected/settings': typeof ProtectedSettingsRoute
   '/_protected/transactions': typeof ProtectedTransactionsRoute
   '/_protected/': typeof ProtectedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/login' | '/alerts' | '/transactions' | '/'
+  fullPaths: '/login' | '/alerts' | '/settings' | '/transactions' | '/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/alerts' | '/transactions' | '/'
+  to: '/login' | '/alerts' | '/settings' | '/transactions' | '/'
   id:
     | '__root__'
     | '/_protected'
     | '/login'
     | '/_protected/alerts'
+    | '/_protected/settings'
     | '/_protected/transactions'
     | '/_protected/'
   fileRoutesById: FileRoutesById
@@ -109,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedTransactionsRouteImport
       parentRoute: typeof ProtectedRouteRoute
     }
+    '/_protected/settings': {
+      id: '/_protected/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof ProtectedSettingsRouteImport
+      parentRoute: typeof ProtectedRouteRoute
+    }
     '/_protected/alerts': {
       id: '/_protected/alerts'
       path: '/alerts'
@@ -121,12 +138,14 @@ declare module '@tanstack/react-router' {
 
 interface ProtectedRouteRouteChildren {
   ProtectedAlertsRoute: typeof ProtectedAlertsRoute
+  ProtectedSettingsRoute: typeof ProtectedSettingsRoute
   ProtectedTransactionsRoute: typeof ProtectedTransactionsRoute
   ProtectedIndexRoute: typeof ProtectedIndexRoute
 }
 
 const ProtectedRouteRouteChildren: ProtectedRouteRouteChildren = {
   ProtectedAlertsRoute: ProtectedAlertsRoute,
+  ProtectedSettingsRoute: ProtectedSettingsRoute,
   ProtectedTransactionsRoute: ProtectedTransactionsRoute,
   ProtectedIndexRoute: ProtectedIndexRoute,
 }
