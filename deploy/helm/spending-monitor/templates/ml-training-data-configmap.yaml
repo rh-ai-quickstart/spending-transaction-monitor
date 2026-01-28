@@ -1,0 +1,60 @@
+{{- if .Values.mlInference.enabled }}
+---
+# Training data ConfigMap - contains sample data for model training
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spending-monitor.fullname" . }}-ml-training-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml-training
+data:
+  # Sample users data
+  users.csv: |
+    id,credit_limit,credit_balance,email
+    user_001,10000,2500,user1@example.com
+    user_002,15000,12000,user2@example.com
+    user_003,5000,4500,user3@example.com
+    user_004,20000,3000,user4@example.com
+    user_005,8000,1000,user5@example.com
+    user_006,12000,11000,user6@example.com
+    user_007,7500,2000,user7@example.com
+    user_008,25000,20000,user8@example.com
+    user_009,6000,500,user9@example.com
+    user_010,18000,15000,user10@example.com
+  
+  # Sample transactions data
+  transactions.csv: |
+    id,user_id,amount,merchant_name,merchant_category,timestamp
+    tx_001,user_001,150.00,Amazon,Shopping,2024-01-15T10:30:00Z
+    tx_002,user_001,45.50,Starbucks,Food & Drink,2024-01-15T14:20:00Z
+    tx_003,user_001,89.99,Netflix,Entertainment,2024-01-16T09:00:00Z
+    tx_004,user_002,1200.00,Best Buy,Electronics,2024-01-15T11:00:00Z
+    tx_005,user_002,350.00,Target,Shopping,2024-01-15T15:30:00Z
+    tx_006,user_002,75.00,Uber Eats,Food & Drink,2024-01-16T19:00:00Z
+    tx_007,user_002,2500.00,Apple Store,Electronics,2024-01-17T10:00:00Z
+    tx_008,user_003,500.00,Costco,Shopping,2024-01-15T09:00:00Z
+    tx_009,user_003,125.00,Shell Gas,Transportation,2024-01-15T16:00:00Z
+    tx_010,user_003,800.00,Home Depot,Home Improvement,2024-01-16T11:00:00Z
+    tx_011,user_004,50.00,McDonalds,Food & Drink,2024-01-15T12:00:00Z
+    tx_012,user_004,200.00,Walmart,Shopping,2024-01-15T18:00:00Z
+    tx_013,user_004,30.00,Spotify,Entertainment,2024-01-16T08:00:00Z
+    tx_014,user_005,75.00,Whole Foods,Groceries,2024-01-15T10:00:00Z
+    tx_015,user_005,150.00,Gap,Shopping,2024-01-15T14:00:00Z
+    tx_016,user_006,3000.00,Tiffany,Jewelry,2024-01-15T11:00:00Z
+    tx_017,user_006,500.00,Nordstrom,Shopping,2024-01-15T15:00:00Z
+    tx_018,user_006,1500.00,Louis Vuitton,Luxury,2024-01-16T12:00:00Z
+    tx_019,user_007,60.00,Chipotle,Food & Drink,2024-01-15T13:00:00Z
+    tx_020,user_007,100.00,Amazon,Shopping,2024-01-15T20:00:00Z
+    tx_021,user_008,5000.00,Rolex,Jewelry,2024-01-15T10:00:00Z
+    tx_022,user_008,2000.00,Gucci,Luxury,2024-01-15T14:00:00Z
+    tx_023,user_008,800.00,Four Seasons,Travel,2024-01-16T09:00:00Z
+    tx_024,user_009,25.00,7-Eleven,Convenience,2024-01-15T07:00:00Z
+    tx_025,user_009,40.00,Subway,Food & Drink,2024-01-15T12:00:00Z
+    tx_026,user_010,1000.00,Delta Airlines,Travel,2024-01-15T08:00:00Z
+    tx_027,user_010,500.00,Marriott,Travel,2024-01-15T18:00:00Z
+    tx_028,user_010,200.00,Enterprise,Transportation,2024-01-16T10:00:00Z
+    tx_029,user_001,300.00,Macy's,Shopping,2024-01-17T11:00:00Z
+    tx_030,user_002,150.00,Cheesecake Factory,Food & Drink,2024-01-17T19:00:00Z
+{{- end }}

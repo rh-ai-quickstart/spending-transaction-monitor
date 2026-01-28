@@ -22,8 +22,8 @@ dependencies:
     repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
     condition: pgvector.enabled
   - name: model-registry
-    version: 0.2.0
-    repository: https://rh-ai-quickstart.github.io/ai-architecture-charts
+    version: ">=0.2.0"
+    repository: "file://../../../../ai-architecture-charts/model-registry/helm"
     condition: model-registry.enabled
 keywords:
   - monitoring

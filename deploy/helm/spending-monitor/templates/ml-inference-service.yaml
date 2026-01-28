@@ -1,0 +1,101 @@
+{{- if .Values.mlInference.enabled }}
+---
+# ServingRuntime for sklearn models
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: mlserver-sklearn
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml-inference
+    opendatahub.io/dashboard: "true"
+  annotations:
+    openshift.io/display-name: "MLServer sklearn Runtime"
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  protocolVersions:
+    - v2
+  multiModel: false
+  containers:
+    - name: kserve-container
+      image: docker.io/seldonio/mlserver:1.3.5-sklearn
+      env:
+        - name: MLSERVER_MODEL_IMPLEMENTATION
+          value: mlserver_sklearn.SKLearnModel
+        - name: MLSERVER_HTTP_PORT
+          value: "8080"
+        - name: MLSERVER_GRPC_PORT
+          value: "8081"
+        - name: MODELS_DIR
+          value: /mnt/models
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+---
+# InferenceService for Alert Recommender
+# Deploys after training job completes (hook-weight 10 > training job weight 5)
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: {{ .Values.mlInference.model.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml-inference
+    opendatahub.io/dashboard: "true"
+  annotations:
+    serving.kserve.io/deploymentMode: RawDeployment
+    openshift.io/display-name: {{ .Values.mlInference.model.description | quote }}
+    model-version: {{ .Values.mlInference.model.version | quote }}
+    # Deploy after training job completes
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 3
+    model:
+      modelFormat:
+        name: sklearn
+      runtime: mlserver-sklearn
+      # Model loaded from PVC subdirectory (trained by ml-training-job)
+      storageUri: "pvc://{{ include "spending-monitor.fullname" . }}-ml-models/{{ .Values.mlInference.model.name }}"
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+    serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
+---
+# PVC for model storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "spending-monitor.fullname" . }}-ml-models
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spending-monitor.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ml-inference
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: 1Gi
+{{- end }}
