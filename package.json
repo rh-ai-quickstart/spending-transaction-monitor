@@ -11,7 +11,7 @@
     "setup:deps": "pnpm install && pnpm -r --if-present install:deps",
     "setup:data": "echo '🚀 Setting up data: Starting DB + migrations + sample data + Keycloak' && pnpm db:start && sleep 5 && pnpm db:upgrade && pnpm seed:all",
     "build": "turbo build",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=!@spending-monitor/db",
     "db:start": "pnpm --filter @*/db run db:start",
     "db:stop": "pnpm --filter @*/db run db:stop",
     "db:upgrade": "pnpm --filter @*/db run upgrade",

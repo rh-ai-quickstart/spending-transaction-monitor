@@ -7,6 +7,7 @@ class UserOut(BaseModel):
     first_name: str
     last_name: str
     phone_number: str | None = None
+    sms_notifications_enabled: bool = True
     is_active: bool
     created_at: str | None = None
     updated_at: str | None = None

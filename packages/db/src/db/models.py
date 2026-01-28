@@ -80,6 +80,9 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
     phone_number: Mapped[str | None]
+    sms_notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=text('true')
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
