@@ -1,37 +1,16 @@
 # Scripts Directory
 
-This directory contains organized scripts for testing, development, and system validation.
+This directory contains ad-hoc scripts used for development and system validation.
 
 ## 📁 Directory Structure
 
-### 🔑 `auth/` - Authentication Scripts
-Scripts for authentication setup, development workflows, and Keycloak integration.
+### 🧭 `location/` — Location Monitoring
+- `monitor-location-data.py`: real-time location data monitoring for development
+- `README.md`: usage details
 
-**Scripts**:
-- `setup_keycloak.py` - Automated Keycloak configuration
-- `auth-dev.sh` - Development authentication utilities
+[📖 Location scripts documentation](location/README.md)
 
-**Use Cases**:
-- Setting up OAuth2/OIDC authentication
-- Managing development auth bypass
-- Configuring production authentication
-
-[📖 Detailed Documentation](auth/README.md)
-
-### 📍 `location/` - Location-Based Scripts  
-Scripts for testing and validating the location-based fraud detection system.
-
-**Scripts**:
-- `monitor-location-data.py` - Real-time location data monitoring for development
-
-**Use Cases**:
-- Monitoring location capture during development
-- Real-time validation of location consent flow
-- Debugging location-based fraud detection system
-
-[📖 Detailed Documentation](location/README.md)
-
-### 🔧 `status-check.sh` - System Health
+### 🔧 `status-check.sh` — System Health
 General system health and status checking script.
 
 **Usage**:
@@ -131,14 +110,6 @@ pnpm dev  # Direct package dev commands
 
 ### 2. Feature Development
 ```bash
-# Test authentication features
-cd scripts/auth && ./auth-dev.sh
-
-# Monitor location features in development
-cd packages/api
-uv run python ../../scripts/location/monitor-location-data.py
-
-# Check system health
 bash scripts/status-check.sh
 ```
 
@@ -219,9 +190,7 @@ pnpm db:upgrade
 
 ## 📚 Related Documentation
 
-- **Location System**: [docs/location/README.md](../docs/location/README.md)
-- **Authentication**: [docs/auth/README.md](../docs/auth/README.md) 
-- **Development Guide**: [docs/DEVELOPER_GUIDE.md](../docs/DEVELOPER_GUIDE.md)
-- **API Documentation**: http://localhost:8002/docs (when server is running)
-
-This organized script structure provides clear separation of concerns and comprehensive testing coverage for all major system components.
+- **Location system**: [`docs/location/README.md`](../docs/location/README.md)
+- **Keycloak / auth**: [`docs/KEYCLOAK_MANAGEMENT.md`](../docs/KEYCLOAK_MANAGEMENT.md)
+- **Developer guide**: [`docs/DEVELOPER_GUIDE.md`](../docs/DEVELOPER_GUIDE.md)
+- **API docs**: `http://localhost:8002/docs` (when the server is running)

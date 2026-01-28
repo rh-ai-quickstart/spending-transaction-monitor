@@ -1,5 +1,6 @@
 """Rule Similarity Checker - Check if a new alert rule is similar to existing rules"""
 
+from .prompts import load_prompt
 from .utils import get_llm_client
 
 
@@ -39,36 +40,15 @@ def check_rule_similarity(new_rule: str, existing_rules: list[dict]) -> dict:
 
     client = get_llm_client()
 
-    prompt = f"""
-You are an expert at analyzing alert rules for similarity. Your task is to determine if a new alert rule is similar to any existing rules.
+    # Format the existing rules list for the prompt
+    existing_rules_list = '\n'.join([f'- {query}' for query in existing_queries])
 
-Rules for similarity:
-1. Rules are similar if they monitor the same type of condition (e.g., daily spending, merchant transactions, location-based)
-2. Rules are similar if they have the same threshold type but different values (e.g., $500 vs $300 daily spending)
-3. Rules are similar if they monitor the same merchant category or location
-4. Rules are NOT similar if they monitor completely different conditions
-
-New Rule: "{new_rule}"
-
-Existing Rules:
-{chr(10).join([f'- {query}' for query in existing_queries])}
-
-Analyze each existing rule and determine:
-1. Is it similar to the new rule? (true/false)
-2. What is the similarity score? (0.0 to 1.0, where 1.0 is identical)
-3. What is the most similar existing rule?
-4. Why are they similar or different?
-
-Respond with a JSON object in this exact format:
-{{
-    "is_similar": boolean,
-    "similarity_score": number,
-    "similar_rule": "the most similar existing rule text or null",
-    "reason": "explanation of why they are similar or different"
-}}
-
-Only return the JSON object, no additional text.
-"""
+    prompt = load_prompt(
+        'rule_similarity_checker',
+        'check_similarity',
+        new_rule=new_rule,
+        existing_rules_list=existing_rules_list,
+    )
 
     try:
         response = client.invoke(prompt)
