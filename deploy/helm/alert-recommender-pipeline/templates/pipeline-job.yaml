@@ -1,0 +1,137 @@
+{{- $root := . -}}
+{{- $enabledPipelines := include "alert-recommender-pipeline.enabledPipelines" . | fromJson -}}
+
+{{/* Create jobs for enabled pipelines */}}
+{{- range $pipelineKey, $pipelineConfig := $enabledPipelines }}
+{{- $jobName := include "alert-recommender-pipeline.pipelineJobName" (dict "pipelineKey" $pipelineKey) -}}
+{{- $pipelineDict := dict "root" $root "pipelineKey" $pipelineKey "pipelineConfig" $pipelineConfig "pipelineName" $pipelineKey -}}
+{{- $pipelineData := include "alert-recommender-pipeline.preparePipelineData" $pipelineDict -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName }}
+  labels:
+    {{- include "alert-recommender-pipeline.pipelineLabels" $pipelineDict | nindent 4 }}
+  annotations:
+    alert-recommender-pipeline.ai/pipeline-key: {{ $pipelineKey }}
+    alert-recommender-pipeline.ai/model-name: {{ $pipelineConfig.name }}
+    alert-recommender-pipeline.ai/model-version: {{ $pipelineConfig.version }}
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "alert-recommender-pipeline.pipelineLabels" $pipelineDict | nindent 8 }}
+        # Required for DSPA NetworkPolicy to allow traffic
+        opendatahub.io/workbenches: "true"
+      annotations:
+        alert-recommender-pipeline.ai/pipeline-key: {{ $pipelineKey }}
+    spec:
+      initContainers:
+        - name: wait-for-pipeline-service
+          image: "image-registry.openshift-image-registry.svc:5000/openshift/tools:latest"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              url="http://{{ include "alert-recommender-pipeline.fullname" $root }}/ping"
+              echo "Waiting for pipeline service at $url..."
+              until curl -ksf "$url"; do
+                echo "Still waiting for pipeline service..."
+                sleep 10
+              done
+              echo "Pipeline service is ready"
+        {{- if and $root.Values.minio.deploy $root.Values.sampleData.generate }}
+        - name: wait-for-training-data
+          image: {{ $root.Values.image.repository }}:{{ $root.Values.image.tag | default "latest" }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "alert-recommender-pipeline.fullname" $root }}-minio
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "alert-recommender-pipeline.fullname" $root }}-minio
+                  key: secret-key
+            - name: MINIO_ENDPOINT
+              value: "http://minio-service:9000"
+            - name: BUCKET_NAME
+              value: {{ $root.Values.minio.bucketName | quote }}
+            - name: DATA_VERSION
+              value: {{ $pipelineConfig.dataVersion | quote }}
+          command:
+            - python
+            - -c
+            - |
+              import os
+              import time
+              import boto3
+              from botocore.client import Config
+              
+              minio_endpoint = os.environ['MINIO_ENDPOINT']
+              access_key = os.environ['MINIO_ACCESS_KEY']
+              secret_key = os.environ['MINIO_SECRET_KEY']
+              bucket_name = os.environ['BUCKET_NAME']
+              data_version = os.environ['DATA_VERSION']
+              
+              s3_client = boto3.client(
+                  's3',
+                  endpoint_url=minio_endpoint,
+                  aws_access_key_id=access_key,
+                  aws_secret_access_key=secret_key,
+                  config=Config(signature_version='s3v4'),
+                  region_name='us-east-1'
+              )
+              
+              users_key = f'data/v{data_version}/users.csv'
+              transactions_key = f'data/v{data_version}/transactions.csv'
+              
+              print(f"Waiting for training data in s3://{bucket_name}/data/v{data_version}/...")
+              
+              max_attempts = 60
+              for i in range(max_attempts):
+                  try:
+                      s3_client.head_object(Bucket=bucket_name, Key=users_key)
+                      s3_client.head_object(Bucket=bucket_name, Key=transactions_key)
+                      print("Training data is available!")
+                      break
+                  except Exception as e:
+                      print(f"Waiting for training data... ({i+1}/{max_attempts})")
+                      time.sleep(10)
+              else:
+                  raise RuntimeError(f"Training data not found after {max_attempts} attempts")
+        {{- end }}
+      containers:
+        - name: create-{{ $pipelineKey | lower | replace "_" "-" }}-pipeline
+          image: "image-registry.openshift-image-registry.svc:5000/openshift/tools:latest"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PIPELINE_KEY
+              value: {{ $pipelineKey | quote }}
+            - name: PIPELINE_NAME
+              value: {{ $pipelineConfig.name | quote }}
+            - name: PIPELINE_VERSION
+              value: {{ $pipelineConfig.version | quote }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Creating pipeline: $PIPELINE_KEY"
+              echo "Model: $PIPELINE_NAME v$PIPELINE_VERSION"
+              echo "Pipeline data: {{ $pipelineData }}"
+              
+              curl -sfX 'POST' \
+                'http://{{ include "alert-recommender-pipeline.fullname" $root }}/train' \
+                -H 'accept: application/json' \
+                -H 'Content-Type: application/json' \
+                -d '{{ $pipelineData }}'
+              
+              echo ""
+              echo "Pipeline $PIPELINE_KEY created successfully"
+      restartPolicy: Never
+  backoffLimit: 3
+{{ end }}

@@ -1,0 +1,66 @@
+{{/*
+DataSciencePipelinesApplication - Required for Kubeflow Pipelines on OpenShift AI
+Updated for RHOAI 3.x (v1 API)
+*/}}
+{{- if .Values.dspa.deploy }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.dspa.name }}-db-secret
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  username: "mlpipeline"
+  password: "mlpipeline123"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.dspa.name }}-minio-secret
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  accesskey: "minio"
+  secretkey: "minio123"
+---
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: {{ .Values.dspa.name }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+spec:
+  dspVersion: v2
+  {{- if .Values.dspa.database.deploy }}
+  database:
+    mariaDB:
+      deploy: true
+      pipelineDBName: {{ .Values.dspa.database.name }}
+      passwordSecret:
+        name: {{ .Values.dspa.name }}-db-secret
+        key: password
+      username: mlpipeline
+      pvcSize: {{ .Values.dspa.database.storage }}
+      {{- if .Values.dspa.database.storageClass }}
+      storageClassName: {{ .Values.dspa.database.storageClass }}
+      {{- end }}
+  {{- end }}
+  {{- if .Values.dspa.objectStorage.deploy }}
+  objectStorage:
+    minio:
+      deploy: true
+      image: "quay.io/minio/minio:latest"
+      bucket: {{ .Values.dspa.objectStorage.bucket }}
+      s3CredentialsSecret:
+        accessKey: accesskey
+        secretKey: secretkey
+        secretName: {{ .Values.dspa.name }}-minio-secret
+      pvcSize: {{ .Values.dspa.objectStorage.storage }}
+      {{- if .Values.dspa.objectStorage.storageClass }}
+      storageClassName: {{ .Values.dspa.objectStorage.storageClass }}
+      {{- end }}
+  {{- end }}
+{{- end }}

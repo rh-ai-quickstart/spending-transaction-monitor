@@ -276,24 +276,59 @@ keycloak:
   # Route for OpenShift
   route:
     enabled: true
-  
-  # For additional customization, see: deploy/helm/keycloak/values.yaml
-  # You can override any value from the keycloak chart here
 
-model-registry:
-  enabled: false
-  name: model-registry-spending-monitor
-  namespace: rhoai-model-registries
-  createService: false
-  grpcPort: 9090
-  restPort: 8080
+
+alert-recommender-pipeline:
+  enabled: false  # Set to true to deploy ML pipeline
   
-  # PostgreSQL for model registry (deploys to spending-monitor namespace)
-  postgres:
-    enabled: false
-    name: pgvector-model-registry
-    namespace: ""  
-    user: postgres
-    password: model_registry_password  # Change in production!
-    database: model_registry
-    port: 5432
+  # Data Science Pipelines Application (DSPA)
+  # NOTE: Requires OpenShift AI operator to be installed first!
+  # Set deploy: false if you don't have the operator or want to use an existing DSPA
+  dspa:
+    deploy: false  # Set to true ONLY if OpenShift AI operator is installed
+    name: "dspa"
+    database:
+      deploy: true
+      storage: 10Gi
+    objectStorage:
+      deploy: true
+      bucket: "mlpipeline"
+      storage: 20Gi
+  
+  # External Data Science Pipelines configuration (when dspa.deploy is false)
+  dsPipelines:
+    url: "https://ds-pipeline-dspa:8888"  # URL to external DSPA
+    waitForReady: false  # Set to true to wait for external DSPA at startup
+  
+  # Pipeline configuration
+  pipeline:
+    enabled: true
+    name: "alert-recommender"
+    version: "1.0.0"
+    deployModel: true
+    registerModel: false
+  
+  # MinIO for model storage
+  minio:
+    deploy: true
+    bucketName: "models"
+    accessKey: "minio"
+    secretKey: "minio123"
+    deployment:
+      storage: 20Gi
+  
+  # KServe model serving
+  serving:
+    runtime:
+      # Set to false - let the pipeline create the ServingRuntime
+      create: false
+      createViaPipeline: true  # Pipeline will create the ServingRuntime
+      existingRuntime: "mlserver-sklearn"
+    inferenceService:
+      minReplicas: 1
+      maxReplicas: 3
+  
+  # Model Registry
+  modelRegistry:
+    deploy: true
+    enabled: true

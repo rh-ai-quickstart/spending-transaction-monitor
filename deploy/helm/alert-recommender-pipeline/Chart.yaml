@@ -1,0 +1,32 @@
+apiVersion: v2
+name: alert-recommender-pipeline
+description: A Helm chart for the Alert Recommender ML Pipeline on Kubeflow
+
+type: application
+
+# Chart version - increment when making changes to the chart
+version: 0.1.0
+
+# Application version - matches the pipeline service version
+appVersion: "0.1.0"
+
+keywords:
+  - kubeflow
+  - ml-pipeline
+  - kserve
+  - mlserver
+  - sklearn
+  - knn
+  - recommendations
+  - openshift-ai
+  - data-science-pipelines
+
+maintainers:
+  - name: AI Team
+    email: ai-team@example.com
+
+dependencies:
+  - name: model-registry
+    version: ">=0.1.0"
+    repository: "https://rh-ai-quickstart.github.io/ai-architecture-charts"
+    condition: modelRegistry.enabled

@@ -1,0 +1,118 @@
+# Default values for alert-recommender-pipeline
+
+# ==============================
+# Deployment Configuration
+# ==============================
+
+replicaCount: 1
+
+image:
+  repository: quay.io/rh-ai-quickstart/alert-recommender-pipeline
+  pullPolicy: Always
+  tag: "latest"
+
+serviceAccount:
+  create: true
+
+# ==============================
+# Data Science Pipelines (DSPA)
+# ==============================
+
+dspa:
+  deploy: true
+  database:
+    deploy: true
+    storage: 10Gi
+    storageClass: ""
+  objectStorage:
+    deploy: true
+    storage: 20Gi
+    storageClass: ""
+
+dsPipelines:
+  url: "https://ds-pipeline-dspa:8888"
+  waitForReady: false
+
+# ==============================
+# Database Configuration
+# ==============================
+
+database:
+  # Wait for spending-monitor migration to complete
+  waitForMigration: true
+  migrationTimeout: 60
+
+# ==============================
+# MinIO Configuration (for model storage)
+# ==============================
+
+minio:
+  deploy: true
+  accessKey: "minio"
+  secretKey: "minio123"
+  deployment:
+    storage: 20Gi
+    storageClass: ""
+
+# ==============================
+# Model Registry Configuration
+# ==============================
+
+modelRegistry:
+  enabled: true
+  url: "http://model-registry.rhoai-model-registries.svc.cluster.local:8080"
+
+# model-registry subchart values
+model-registry:
+  namespace: rhoai-model-registries
+  name: model-registry
+  postgres:
+    enabled: true
+    namespace: ""
+    password: model_registry_password
+  pgvector:
+    secret:
+      password: model_registry_password
+
+# ==============================
+# KServe / Model Serving
+# ==============================
+
+serving:
+  runtime:
+    create: true
+    createViaPipeline: false
+
+# ==============================
+# Sample Data Configuration
+# ==============================
+
+sampleData:
+  generate: true
+  numUsers: 50
+  numTransactions: 5000
+
+# ==============================
+# Pipeline Configuration
+# ==============================
+
+pipelines:
+  alert_recommender:
+    enabled: true
+    name: "alert-recommender"
+    version: "1.0.0"
+    dataVersion: "1"
+    nNeighbors: 5
+    metric: "cosine"
+    threshold: 0.4
+    deployModel: true
+    registerModel: true
+    deployFromRegistry: true
+    modelVersionToDeploy: ""
+
+# ==============================
+# RBAC Configuration
+# ==============================
+
+rbac:
+  create: true

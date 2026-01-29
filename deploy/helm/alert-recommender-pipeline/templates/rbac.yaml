@@ -1,0 +1,75 @@
+{{- if .Values.rbac.create -}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "alert-recommender-pipeline.fullname" . }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+rules:
+  # Secret management for pipeline configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "list", "update", "delete", "patch"]
+  
+  # ServiceAccount management for model serving
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["create", "get", "list", "update", "delete", "patch"]
+  
+  # KServe resources for model serving
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["inferenceservices", "servingruntimes"]
+    verbs: ["create", "get", "list", "update", "delete", "patch", "watch"]
+  
+  # Core resources for monitoring
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "watch"]
+  
+  # Deployments for MinIO management
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+  
+  # PVCs for MinIO storage
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  
+  {{- with .Values.rbac.rules }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "alert-recommender-pipeline.fullname" . }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "alert-recommender-pipeline.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "alert-recommender-pipeline.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io
+---
+# RoleBinding for DSPA pipeline runner service account
+# This allows the Kubeflow pipeline tasks to create secrets, deploy models, etc.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "alert-recommender-pipeline.fullname" . }}-dspa-runner
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-runner-{{ .Values.dspa.name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "alert-recommender-pipeline.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

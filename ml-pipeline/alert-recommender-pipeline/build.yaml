@@ -1,0 +1,36 @@
+# OpenShift Build Configuration for Alert Recommender Pipeline
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: alert-recommender-pipeline
+  labels:
+    app: alert-recommender-pipeline
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: alert-recommender-pipeline
+  labels:
+    app: alert-recommender-pipeline
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/your-org/spending-transaction-monitor.git
+      ref: main
+    contextDir: ml-pipeline
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: alert-recommender-pipeline/Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: alert-recommender-pipeline:latest
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange

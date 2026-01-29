@@ -1,0 +1,67 @@
+{{/*
+Only create ServingRuntime if enabled and not using an existing one.
+Set serving.runtime.create to false if you want to use an existing ServingRuntime.
+*/}}
+{{- if and .Values.serving.runtime .Values.serving.runtime.create -}}
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ .Values.serving.runtime.existingRuntime | default "alert-recommender-runtime" }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+  annotations:
+    openshift.io/display-name: MLServer SKLearn Runtime (with cloudpickle)
+    opendatahub.io/apiProtocol: REST
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  protocolVersions:
+    - v2
+  multiModel: false
+  containers:
+    - name: kserve-container
+      image: {{ .Values.serving.runtime.image | default "docker.io/seldonio/mlserver:1.7.0-sklearn" }}
+      imagePullPolicy: Always
+      command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Installing cloudpickle and dependencies to user site-packages..."
+          export PYTHONUSERBASE=/tmp/python-packages
+          mkdir -p $PYTHONUSERBASE
+          pip install --user --no-cache-dir cloudpickle>=3.0.0 "numpy<2.0" "scikit-learn>=1.6.0,<1.7.0"
+          export PYTHONPATH=$PYTHONUSERBASE/lib/python3.10/site-packages:$PYTHONPATH
+          export PATH=$PYTHONUSERBASE/bin:$PATH
+          echo "Installed packages:"
+          pip list | grep -i cloudpickle || echo "cloudpickle not found in pip list"
+          python -c "import cloudpickle; print(f'cloudpickle version: {cloudpickle.__version__}')" || echo "Failed to import cloudpickle"
+          echo "Starting MLServer..."
+          exec mlserver start /mnt/models
+      env:
+        - name: MLSERVER_MODEL_IMPLEMENTATION
+          value: "mlserver_sklearn.SKLearnModel"
+        - name: MLSERVER_HTTP_PORT
+          value: "8080"
+        - name: MLSERVER_GRPC_PORT
+          value: "8081"
+        - name: MLSERVER_MODEL_URI
+          value: /mnt/models
+        - name: MLSERVER_LOAD_MODELS_AT_STARTUP
+          value: "true"
+        - name: PYTHONUSERBASE
+          value: /tmp/python-packages
+        - name: PYTHONPATH
+          value: /tmp/python-packages/lib/python3.10/site-packages
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8081
+          name: grpc
+          protocol: TCP
+      resources:
+        {{- toYaml .Values.serving.inferenceService.resources | nindent 8 }}
+{{- end }}

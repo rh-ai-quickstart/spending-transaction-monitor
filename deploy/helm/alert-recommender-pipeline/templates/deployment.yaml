@@ -1,0 +1,257 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "alert-recommender-pipeline.fullname" . }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "alert-recommender-pipeline.selectorLabels" . | nindent 6 }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "alert-recommender-pipeline.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        # Required for DSPA NetworkPolicy to allow traffic
+        opendatahub.io/workbenches: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "alert-recommender-pipeline.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        {{- if .Values.database.waitForMigration }}
+        # Wait for database tables to exist (migration must complete first)
+        - name: wait-for-database-tables
+          image: "postgres:16-alpine"
+          env:
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB_HOST
+                  optional: true
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB_PORT
+                  optional: true
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB
+                  optional: true
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_USER
+                  optional: true
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_PASSWORD
+                  optional: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              
+              # Set defaults if not provided
+              PGHOST=${PGHOST:-spending-monitor-db}
+              PGPORT=${PGPORT:-5432}
+              PGDATABASE=${PGDATABASE:-spending-monitor}
+              
+              echo "Waiting for database tables to exist..."
+              echo "  Host: $PGHOST"
+              echo "  Database: $PGDATABASE"
+              
+              # First wait for database to be reachable
+              echo "Checking database connectivity..."
+              MAX_ATTEMPTS=60
+              ATTEMPT=1
+              while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                if pg_isready -h "$PGHOST" -p "$PGPORT" -d "$PGDATABASE" > /dev/null 2>&1; then
+                  echo "Database is reachable"
+                  break
+                fi
+                echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS: Database not ready, waiting..."
+                sleep 5
+                ATTEMPT=$((ATTEMPT + 1))
+              done
+              
+              if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+                echo "WARNING: Database not reachable after $MAX_ATTEMPTS attempts"
+                echo "Continuing anyway - pipeline will fall back to MinIO"
+                exit 0
+              fi
+              
+              # Now wait for tables to exist (migration complete)
+              echo "Checking for 'users' table (indicates migration has run)..."
+              MAX_ATTEMPTS={{ .Values.database.migrationTimeout | default 60 }}
+              ATTEMPT=1
+              while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+                TABLE_EXISTS=$(psql -h "$PGHOST" -p "$PGPORT" -d "$PGDATABASE" -t -c \
+                  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users';" 2>/dev/null | tr -d ' ')
+                
+                if [ "$TABLE_EXISTS" = "1" ]; then
+                  echo "✅ Database tables exist - migration has completed!"
+                  exit 0
+                fi
+                
+                echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS: Tables not found, waiting for migration..."
+                sleep 5
+                ATTEMPT=$((ATTEMPT + 1))
+              done
+              
+              echo "WARNING: Database tables not found after $MAX_ATTEMPTS attempts"
+              echo "Migration may not have run. Pipeline will fall back to MinIO data."
+              exit 0
+        {{- end }}
+        {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady .Values.minio.deploy }}
+        - name: wait-for-services
+          image: "image-registry.openshift-image-registry.svc:5000/openshift/tools:latest"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              
+              {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady }}
+              # Wait for Data Science Pipeline API
+              url="{{ include "alert-recommender-pipeline.dsPipelinesUrl" . }}/apis/v2beta1/healthz"
+              echo "Waiting for Data Science Pipeline at $url..."
+              until curl -ksf "$url"; do
+                echo "Still waiting for Data Science Pipeline..."
+                sleep 10
+              done
+              echo "Data Science Pipeline is ready"
+              {{- else }}
+              echo "Skipping Data Science Pipeline wait (dspa.deploy=false, dsPipelines.waitForReady=false)"
+              {{- end }}
+              
+              # Wait for MinIO if deployed
+              {{- if .Values.minio.deploy }}
+              url="{{ .Values.minio.endpoint }}/minio/health/live"
+              echo "Waiting for MinIO at $url..."
+              until curl -ksf "$url"; do
+                echo "Still waiting for MinIO..."
+                sleep 5
+              done
+              echo "MinIO is ready"
+              {{- end }}
+        {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ALERT_RECOMMENDER_PIPELINE_IMAGE
+              value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+            - name: DS_PIPELINE_URL
+              value: "{{ include "alert-recommender-pipeline.dsPipelinesUrl" . }}"
+            # Database configuration (from spending-monitor-secret)
+            # Pipeline will try database first, then fall back to MinIO
+            - name: POSTGRES_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB_HOST
+                  optional: true
+            - name: POSTGRES_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB_PORT
+                  optional: true
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_DB
+                  optional: true
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_USER
+                  optional: true
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: spending-monitor-secret
+                  key: POSTGRES_PASSWORD
+                  optional: true
+            # MinIO configuration (fallback data source)
+            - name: MINIO_ENDPOINT
+              value: "{{ .Values.minio.endpoint }}"
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "alert-recommender-pipeline.fullname" . }}-minio
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "alert-recommender-pipeline.fullname" . }}-minio
+                  key: secret-key
+            - name: BUCKET_NAME
+              value: "{{ .Values.minio.bucketName }}"
+            {{- if .Values.modelRegistry.enabled }}
+            - name: MODEL_REGISTRY_URL
+              value: "{{ .Values.modelRegistry.url }}"
+            - name: MODEL_REGISTRY_ENABLED
+              value: "true"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

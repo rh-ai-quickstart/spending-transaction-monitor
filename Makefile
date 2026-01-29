@@ -45,6 +45,7 @@ KEYCLOAK_WEB_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
 API_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:$(IMAGE_TAG)
 DB_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:$(IMAGE_TAG)
+ML_PIPELINE_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/alert-recommender-pipeline:$(IMAGE_TAG)
 
 # Local development image names (tagged as 'local')
 UI_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:local
@@ -325,6 +326,7 @@ help:
 	@echo "    build-ui           Build UI image"
 	@echo "    build-api          Build API image"
 	@echo "    build-db           Build database migration image (includes CSV data loading)"
+	@echo "    build-ml-pipeline  Build ML pipeline image"
 	@echo ""
 	@echo "  Pushing:"
 	@echo "    push-all           Push all images to registry"
@@ -335,11 +337,14 @@ help:
 	@echo "  Deploying:"
 	@echo "    deploy             Deploy application using Helm"
 	@echo "    deploy-dev         Deploy in development mode"
+	@echo "    deploy-all         Build, push and deploy all components"
+	@echo "    full-deploy        Complete pipeline: login, build, push, deploy"
+	@echo "    deploy-with-ml-dspa  Deploy with ML pipeline + DSPA (requires OpenShift AI operator)"
 	@echo "    build-deploy       Complete pipeline: login, build, push, deploy"
 	@echo ""
 	@echo "  Undeploying:"
-	@echo "    undeploy           Remove application deployment"
-	@echo "    undeploy-all       Remove deployment and namespace"
+	@echo "    undeploy                   Remove application deployment"
+	@echo "    undeploy-all               Remove deployment and namespace"
 	@echo ""
 	@echo "  Development:"
 	@echo "    port-forward-api   Forward API service to localhost:8000"
@@ -472,8 +477,13 @@ build-db:
 	@echo "Building database image..."
 	podman build --no-cache --platform=linux/amd64 -t $(DB_IMAGE) -f ./packages/db/Containerfile .
 
+.PHONY: build-ml-pipeline
+build-ml-pipeline:
+	@echo "Building ML pipeline image..."
+	podman build --platform=linux/amd64 -t $(ML_PIPELINE_IMAGE) -f ./ml-pipeline/alert-recommender-pipeline/Containerfile ./ml-pipeline
+
 .PHONY: build-all
-build-all: build-ui build-api build-db
+build-all: build-ui build-api build-db build-ml-pipeline
 	@echo "All images built successfully"
 
 # Push targets
@@ -492,8 +502,13 @@ push-db: build-db
 	@echo "Pushing database image..."
 	podman push $(DB_IMAGE)
 
+.PHONY: push-ml-pipeline
+push-ml-pipeline: build-ml-pipeline
+	@echo "Pushing ML pipeline image..."
+	podman push $(ML_PIPELINE_IMAGE)
+
 .PHONY: push-all
-push-all: push-ui push-api push-db
+push-all: push-ui push-api push-db push-ml-pipeline
 	@echo "All images pushed successfully"
 
 # Deploy targets
@@ -562,6 +577,53 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
 
+.PHONY: deploy-all
+deploy-all: build-all push-all deploy
+	@echo "Complete deployment finished successfully"
+
+.PHONY: deploy-with-ml-dspa
+deploy-with-ml-dspa: create-project helm-dep-update check-keycloak-vars
+	@echo "Creating rhoai-model-registries namespace for Model Registry..."
+	@oc create namespace rhoai-model-registries 2>/dev/null || true
+	@echo "Deploying application with ML Pipeline + DSPA using Helm..."
+	@echo "Using production environment file: $(ENV_FILE_PROD)"
+	@echo ""
+	@echo "⚠️  PREREQUISITE: OpenShift AI operator must be installed!"
+	@echo ""
+	@echo "This will deploy:"
+	@echo "  - Spending Monitor (API, UI, Database)"
+	@echo "  - Alert Recommender ML Pipeline service"
+	@echo "  - Data Science Pipelines Application (DSPA)"
+	@echo "  - MinIO for model storage"
+	@echo "  - Model Registry (in rhoai-model-registries namespace)"
+	@echo ""
+	@set -a; source $(ENV_FILE_PROD); set +a; \
+	export KEYCLOAK_URL="$(KEYCLOAK_URL_DYNAMIC)"; \
+	export KEYCLOAK_FRONTEND_URL="$(KEYCLOAK_FRONTEND_URL_DYNAMIC)"; \
+	export CORS_ALLOWED_ORIGINS="$(CORS_ALLOWED_ORIGINS_DYNAMIC)"; \
+	export ALLOWED_ORIGINS="$(ALLOWED_ORIGINS_DYNAMIC)"; \
+	export KEYCLOAK_REDIRECT_URIS="$(KEYCLOAK_REDIRECT_URIS_DYNAMIC)"; \
+	export KEYCLOAK_WEB_ORIGINS="$(KEYCLOAK_WEB_ORIGINS_DYNAMIC)"; \
+	export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL API_KEY BASE_URL LLM_PROVIDER MODEL MODEL_ID MODEL_URL MODEL_API_KEY ENVIRONMENT DEBUG BYPASS_AUTH ALLOWED_HOSTS SMTP_HOST SMTP_PORT SMTP_FROM_EMAIL SMTP_USE_TLS SMTP_USE_SSL KEYCLOAK_REALM KEYCLOAK_CLIENT_ID KEYCLOAK_DB_USER KEYCLOAK_DB_PASSWORD KEYCLOAK_ADMIN_PASSWORD VITE_API_BASE_URL VITE_BYPASS_AUTH VITE_ENVIRONMENT LLAMASTACK_BASE_URL LLAMASTACK_MODEL USE_ML_RECOMMENDATIONS USE_ML_INFERENCE_SERVICE ML_INFERENCE_ENDPOINT; \
+	helm upgrade --install $(PROJECT_NAME) ./deploy/helm/spending-monitor \
+		--namespace $(NAMESPACE) \
+		--timeout 15m \
+		--set global.imageRegistry=$(REGISTRY_URL) \
+		--set global.imageRepository=$(REPOSITORY) \
+		--set global.imageTag=$(IMAGE_TAG) \
+		--set routes.sharedHost="$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)" \
+		--set alert-recommender-pipeline.enabled=true \
+		--set alert-recommender-pipeline.dspa.deploy=true \
+		--set alert-recommender-pipeline.minio.deploy=true \
+		$(HELM_SECRET_PARAMS) \
+		$(HELM_LLAMASTACK_PARAMS) \
+		$(HELM_LLM_SERVICE_PARAMS)
+	@echo ""
+	@echo "✅ Deployment with ML Pipeline + DSPA complete!"
+	@echo ""
+	@echo "Note: The DSPA may take a few minutes to become ready."
+	@echo "Check status with: make status"
+
 # Undeploy targets
 .PHONY: undeploy
 undeploy:
@@ -612,7 +674,11 @@ helm-dep-update:
 	@echo "Updating Helm chart dependencies..."
 	@echo "📦 Updating keycloak chart dependencies (pgvector)..."
 	@helm dependency update ./deploy/helm/keycloak
-	@echo "📦 Updating spending-monitor chart dependencies (keycloak)..."
+	@echo "📦 Updating alert-recommender-pipeline chart..."
+	@if [ -d "./deploy/helm/alert-recommender-pipeline" ]; then \
+		helm dependency update ./deploy/helm/alert-recommender-pipeline 2>/dev/null || true; \
+	fi
+	@echo "📦 Updating spending-monitor chart dependencies (keycloak, alert-recommender-pipeline)..."
 	@helm dependency update ./deploy/helm/spending-monitor
 	@echo "✅ Helm dependencies updated successfully"
 
@@ -632,12 +698,14 @@ helm-dep-list:
 	@echo "📦 Keycloak chart dependencies:"
 	@helm dependency list ./deploy/helm/keycloak
 	@echo ""
-	@echo "📦 Spending-monitor chart dependencies:"
+	@echo "📦 Spending-monitor chart dependencies (includes alert-recommender-pipeline):"
 	@helm dependency list ./deploy/helm/spending-monitor
 
 .PHONY: helm-lint
 helm-lint: helm-dep-update
-	@echo "Linting Helm chart..."
+	@echo "Linting Helm charts..."
+	@echo ""
+	@echo "📋 Linting spending-monitor chart (includes all subcharts)..."
 	helm lint ./deploy/helm/spending-monitor
 
 .PHONY: helm-template
