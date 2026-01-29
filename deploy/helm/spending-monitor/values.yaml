@@ -11,7 +11,7 @@ global:
       url: https://custom-server-url/v1
       apiToken: fake-token
       enabled: false
-  
+
   # Security settings for Bitnami charts
   security:
     allowInsecureImages: true  # Allow Bitnami images from quay.io
@@ -73,7 +73,7 @@ database:
   enabled: true
   name: spending-monitor-db
   image:
-    repository: pgvector/pgvector
+    repository: quay.io/rh-ai-quickstart/pgvector
     tag: pg16
   service:
     type: ClusterIP
@@ -249,13 +249,13 @@ affinity: {}
 # Keycloak now uses its own dedicated pgvector PostgreSQL instance
 keycloak:
   enabled: true
-  
+
   # Admin configuration
   # Password comes from environment variables passed via Makefile
   admin:
     username: admin
     # Password will be passed via --set flag from Makefile
-  
+
   # Database configuration
   # Keycloak uses the spending-monitor-db PostgreSQL instance
   # Database credentials come from the spending-monitor-secret
@@ -263,7 +263,7 @@ keycloak:
     vendor: postgres
     secretName: spending-monitor-secret  # Use main app secret for DB credentials
     dbname: keycloak  # Keycloak database (created by init script)
-  
+
   # Configuration
   config:
     proxy: edge
@@ -272,11 +272,11 @@ keycloak:
     healthEnabled: true
     metricsEnabled: true
     hostnameStrict: false
-  
+
   # Route for OpenShift
   route:
     enabled: true
-  
+
   # For additional customization, see: deploy/helm/keycloak/values.yaml
   # You can override any value from the keycloak chart here
 
@@ -287,12 +287,12 @@ model-registry:
   createService: false
   grpcPort: 9090
   restPort: 8080
-  
+
   # PostgreSQL for model registry (deploys to spending-monitor namespace)
   postgres:
     enabled: false
     name: pgvector-model-registry
-    namespace: ""  
+    namespace: ""
     user: postgres
     password: model_registry_password  # Change in production!
     database: model_registry
