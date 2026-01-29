@@ -1,4 +1,5 @@
 import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -6,8 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_db
 from db.models import User
+
 from ..auth.middleware import require_authentication
-from ..schemas.settings import SMSSettingsResponse, SMSSettingsUpdate, SMTPConfigResponse
+from ..schemas.settings import (
+    SMSSettingsResponse,
+    SMSSettingsUpdate,
+    SMTPConfigResponse,
+)
 
 router = APIRouter()
 
@@ -75,7 +81,7 @@ async def get_sms_settings(
         )
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
 
 
 @router.put('/sms', response_model=SMSSettingsResponse)
@@ -120,4 +126,4 @@ async def update_sms_settings(
 
     except SQLAlchemyError as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
