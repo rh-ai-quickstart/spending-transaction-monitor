@@ -39,6 +39,9 @@ class UserUpdate(BaseModel):
     first_name: str | None = Field(None, description='User first name')
     last_name: str | None = Field(None, description='User last name')
     phone_number: str | None = Field(None, description='User phone number')
+    sms_notifications_enabled: bool | None = Field(
+        None, description='Whether SMS notifications are enabled'
+    )
     is_active: bool | None = Field(None, description='Whether the user is active')
     address_street: str | None = Field(None, description='Street address')
     address_city: str | None = Field(None, description='City')
@@ -94,6 +97,7 @@ async def get_users(
                 'first_name': user.first_name,
                 'last_name': user.last_name,
                 'phone_number': user.phone_number,
+                'sms_notifications_enabled': user.sms_notifications_enabled,
                 'is_active': user.is_active,
                 'created_at': user.created_at.isoformat() if user.created_at else None,
                 'updated_at': user.updated_at.isoformat() if user.updated_at else None,
@@ -151,6 +155,7 @@ async def get_current_user_profile(
         'first_name': user.first_name,
         'last_name': user.last_name,
         'phone_number': user.phone_number,
+        'sms_notifications_enabled': user.sms_notifications_enabled,
         'is_active': user.is_active,
         'created_at': user.created_at.isoformat() if user.created_at else None,
         'updated_at': user.updated_at.isoformat() if user.updated_at else None,
@@ -215,6 +220,7 @@ async def get_user(
         'first_name': user.first_name,
         'last_name': user.last_name,
         'phone_number': user.phone_number,
+        'sms_notifications_enabled': user.sms_notifications_enabled,
         'is_active': user.is_active,
         'created_at': user.created_at.isoformat() if user.created_at else None,
         'updated_at': user.updated_at.isoformat() if user.updated_at else None,

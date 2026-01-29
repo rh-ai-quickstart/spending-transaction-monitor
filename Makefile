@@ -347,6 +347,11 @@ help:
 	@echo "    port-forward-db    Forward database to localhost:5432"
 	@echo ""
 	@echo   "  Local Development:"
+	@echo "    dev                🚀 Start infrastructure + dev servers (RECOMMENDED for development)"
+	@echo "    stop-dev           🛑 Stop development servers (keeps infrastructure running)"
+	@echo "    check-ports        🔍 Check if development server ports are available"
+	@echo "    check-all-ports    🔍 Check all ports (dev servers + infrastructure)"
+	@echo "    port-info          📋 Show port assignments for development environment"
 	@echo "    run-local          Start all services (always pull latest from quay.io registry)"
 	@echo "    build-local        Build local Podman images and tag them as 'local'"
 	@echo "    build-run-local    Build and run all services locally using 'local' tagged images"
@@ -403,6 +408,9 @@ help:
 	@echo "      make setup-dev-env    # Set up .env from .env.development for local use"
 	@echo ""
 	@echo "Examples:"
+	@echo "  make dev                            # Start development environment (RECOMMENDED)"
+	@echo "  make stop-dev                       # Stop dev servers (keeps containers running)"
+	@echo "  make setup-local                    # Complete local setup (pulls from quay.io)"
 	@echo "  make run-local                      # Start all services (pulls latest from quay.io)"
 	@echo "  make build-run-local                # Build and run with local images (tagged as 'local')"
 	@echo "  make test-alert-rules               # Interactive alert rule testing"
@@ -825,6 +833,117 @@ build-run-local: setup-dev-env build-local
 	@echo ""
 	@echo "To view logs: make logs-local"
 	@echo "To stop services: make stop-local"
+
+# Development environment with infrastructure containers + local dev servers
+.PHONY: dev
+dev: setup-dev-env
+	@echo "🚀 Starting development environment..."
+	@echo "========================================"
+	@echo ""
+	@echo "🔍 Step 0: Checking port availability..."
+	@./scripts/check-dev-ports.sh check
+	@echo ""
+	@echo "📦 Step 1: Checking infrastructure containers..."
+	@if ! podman ps --format "{{.Names}}" | grep -q "^postgres$$"; then \
+		echo "🔄 Starting PostgreSQL container..."; \
+		podman-compose -f podman-compose.yml up -d postgres; \
+		echo "⏳ Waiting for PostgreSQL to be healthy..."; \
+		timeout=60; \
+		while [ $$timeout -gt 0 ] && ! podman ps --format "{{.Names}}\t{{.Status}}" | grep "postgres" | grep -q "healthy"; do \
+			sleep 2; \
+			timeout=$$((timeout - 2)); \
+		done; \
+		if [ $$timeout -le 0 ]; then echo "❌ PostgreSQL failed to start"; exit 1; fi; \
+		echo "✅ PostgreSQL is healthy"; \
+	else \
+		echo "✅ PostgreSQL already running"; \
+	fi
+	@if ! podman ps --format "{{.Names}}" | grep -q "spending-monitor-keycloak"; then \
+		echo "🔄 Starting Keycloak container..."; \
+		podman-compose -f podman-compose.yml up -d keycloak; \
+		echo "⏳ Waiting for Keycloak to be ready (this takes ~60 seconds)..."; \
+		timeout=120; \
+		while [ $$timeout -gt 0 ] && ! podman ps --format "{{.Names}}\t{{.Status}}" | grep "spending-monitor-keycloak" | grep -q "healthy"; do \
+			sleep 3; \
+			timeout=$$((timeout - 3)); \
+		done; \
+		if [ $$timeout -le 0 ]; then echo "⚠️  Keycloak may still be starting (continuing anyway)"; fi; \
+		echo "✅ Keycloak container started"; \
+	else \
+		echo "✅ Keycloak already running"; \
+	fi
+	@if ! podman ps --format "{{.Names}}" | grep -q "spending-monitor-smtp"; then \
+		echo "🔄 Starting SMTP container..."; \
+		podman-compose -f podman-compose.yml up -d smtp4dev; \
+		echo "✅ SMTP4dev started"; \
+	else \
+		echo "✅ SMTP4dev already running"; \
+	fi
+	@if ! podman ps --format "{{.Names}}" | grep -q "spending-monitor-llamastack"; then \
+		echo "🔄 Starting LlamaStack container..."; \
+		podman-compose -f podman-compose.yml up -d llamastack; \
+		echo "✅ LlamaStack started"; \
+	else \
+		echo "✅ LlamaStack already running"; \
+	fi
+	@echo ""
+	@echo "📊 Step 2: Setting up database..."
+	@pnpm db:upgrade || echo "⚠️  Database migration may have failed (continuing anyway)"
+	@echo ""
+	@echo "🌱 Step 3: Ensuring sample data exists..."
+	@if ! pnpm db:verify > /dev/null 2>&1; then \
+		echo "🔄 Seeding database with sample data..."; \
+		pnpm db:seed; \
+	else \
+		echo "✅ Database already has data"; \
+	fi
+	@echo ""
+	@echo "🚀 Step 4: Starting development servers..."
+	@echo "==========================================="
+	@echo "Starting API, UI, and Storybook in parallel using Turbo..."
+	@echo ""
+	@echo "📝 NOTE: This will run in the foreground. To stop, press Ctrl+C"
+	@echo "         Infrastructure containers will remain running."
+	@echo ""
+	@echo "🌐 Services will be available at:"
+	@echo "   • Frontend:  http://localhost:3000"
+	@echo "   • API Docs:  http://localhost:8000/docs"
+	@echo "   • Storybook: http://localhost:6006"
+	@echo "   • SMTP UI:   http://localhost:3002"
+	@echo "   • Keycloak:  http://localhost:8080/admin"
+	@echo ""
+	@sleep 2
+	pnpm dev
+
+.PHONY: stop-dev
+stop-dev:
+	@echo "🛑 Stopping development servers..."
+	@pkill -f "pnpm.*dev" 2>/dev/null || true
+	@pkill -f "turbo dev" 2>/dev/null || true
+	@pkill -f "uvicorn.*src.main:app" 2>/dev/null || true
+	@pkill -f "vite" 2>/dev/null || true
+	@pkill -f "storybook dev" 2>/dev/null || true
+	@echo "✅ Development servers stopped"
+	@echo ""
+	@echo "ℹ️  Infrastructure containers are still running."
+	@echo "   To stop them too, run: make stop-local"
+
+.PHONY: check-ports
+check-ports:
+	@./scripts/check-dev-ports.sh check
+
+.PHONY: check-all-ports
+check-all-ports:
+	@./scripts/check-dev-ports.sh check-all
+
+.PHONY: port-info
+port-info:
+	@./scripts/check-dev-ports.sh info
+
+.PHONY: setup-local
+setup-local: check-env-dev pull-local run-local
+	@echo "✅ Local development environment is fully set up and ready!"
+	@echo "Database has been migrated and seeded with test data."
 
 # Seeding targets
 .PHONY: seed-db
