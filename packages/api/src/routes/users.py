@@ -39,7 +39,9 @@ class UserUpdate(BaseModel):
     first_name: str | None = Field(None, description='User first name')
     last_name: str | None = Field(None, description='User last name')
     phone_number: str | None = Field(None, description='User phone number')
-    sms_notifications_enabled: bool | None = Field(None, description='Whether SMS notifications are enabled')
+    sms_notifications_enabled: bool | None = Field(
+        None, description='Whether SMS notifications are enabled'
+    )
     is_active: bool | None = Field(None, description='Whether the user is active')
     address_street: str | None = Field(None, description='Street address')
     address_city: str | None = Field(None, description='City')

@@ -12,8 +12,12 @@ class SMTPConfigResponse(BaseModel):
 
 
 class SMSSettingsUpdate(BaseModel):
-    phone_number: str | None = Field(None, description="User's phone number for SMS notifications")
-    sms_notifications_enabled: bool = Field(True, description="Whether SMS notifications are enabled")
+    phone_number: str | None = Field(
+        None, description="User's phone number for SMS notifications"
+    )
+    sms_notifications_enabled: bool = Field(
+        True, description='Whether SMS notifications are enabled'
+    )
 
 
 class SMSSettingsResponse(BaseModel):

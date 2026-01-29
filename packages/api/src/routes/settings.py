@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.get('/smtp', response_model=SMTPConfigResponse)
 async def get_smtp_settings(
-    current_user: dict = Depends(require_authentication)
+    current_user: dict = Depends(require_authentication),
 ) -> SMTPConfigResponse:
     """
     Get SMTP configuration settings (read-only, sensitive data masked).
@@ -46,14 +46,14 @@ async def get_smtp_settings(
         reply_to_email=smtp_reply_to_email,
         use_tls=smtp_use_tls,
         use_ssl=smtp_use_ssl,
-        is_configured=is_configured
+        is_configured=is_configured,
     )
 
 
 @router.get('/sms', response_model=SMSSettingsResponse)
 async def get_sms_settings(
     session: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_authentication)
+    current_user: dict = Depends(require_authentication),
 ) -> SMSSettingsResponse:
     """
     Get SMS settings for the current user.
@@ -67,7 +67,7 @@ async def get_sms_settings(
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=404, detail='User not found')
 
         # Check if Twilio is configured
         twilio_account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -77,18 +77,18 @@ async def get_sms_settings(
         return SMSSettingsResponse(
             phone_number=user.phone_number,
             sms_notifications_enabled=user.sms_notifications_enabled,
-            twilio_configured=twilio_configured
+            twilio_configured=twilio_configured,
         )
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f'Database error: {str(e)}') from e
 
 
 @router.put('/sms', response_model=SMSSettingsResponse)
 async def update_sms_settings(
     settings: SMSSettingsUpdate,
     session: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(require_authentication)
+    current_user: dict = Depends(require_authentication),
 ) -> SMSSettingsResponse:
     """
     Update SMS settings for the current user.
@@ -102,7 +102,7 @@ async def update_sms_settings(
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=404, detail='User not found')
 
         # Update the user's SMS settings
         if settings.phone_number is not None:
@@ -121,9 +121,9 @@ async def update_sms_settings(
         return SMSSettingsResponse(
             phone_number=user.phone_number,
             sms_notifications_enabled=user.sms_notifications_enabled,
-            twilio_configured=twilio_configured
+            twilio_configured=twilio_configured,
         )
 
     except SQLAlchemyError as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f'Database error: {str(e)}') from e
