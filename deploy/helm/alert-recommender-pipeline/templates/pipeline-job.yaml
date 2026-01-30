@@ -35,7 +35,7 @@ spec:
             - -c
             - |
               set -e
-              url="http://{{ include "alert-recommender-pipeline.fullname" $root }}/ping"
+              url="http://{{ include "alert-recommender-pipeline.fullname" $root }}:{{ $root.Values.service.port }}/ping"
               echo "Waiting for pipeline service at $url..."
               until curl -ksf "$url"; do
                 echo "Still waiting for pipeline service..."
@@ -125,7 +125,7 @@ spec:
               echo "Pipeline data: {{ $pipelineData }}"
               
               curl -sfX 'POST' \
-                'http://{{ include "alert-recommender-pipeline.fullname" $root }}/train' \
+                'http://{{ include "alert-recommender-pipeline.fullname" $root }}:{{ $root.Values.service.port }}/train' \
                 -H 'accept: application/json' \
                 -H 'Content-Type: application/json' \
                 -d '{{ $pipelineData }}'

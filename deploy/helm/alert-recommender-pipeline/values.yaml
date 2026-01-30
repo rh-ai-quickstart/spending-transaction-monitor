@@ -6,6 +6,15 @@
 
 replicaCount: 1
 
+# ==============================
+# Service Configuration
+# ==============================
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8000
+
 image:
   repository: quay.io/rh-ai-quickstart/alert-recommender-pipeline
   pullPolicy: Always
@@ -48,9 +57,13 @@ database:
 
 minio:
   deploy: true
+  endpoint: "http://minio-service:9000"
+  bucketName: "models"
   accessKey: "minio"
   secretKey: "minio123"
   deployment:
+    image: quay.io/minio/minio:latest
+    replicas: 1
     storage: 20Gi
     storageClass: ""
 
@@ -64,15 +77,28 @@ modelRegistry:
 
 # model-registry subchart values
 model-registry:
+  enabled: true
   namespace: rhoai-model-registries
   name: model-registry
   postgres:
     enabled: true
-    namespace: ""
+    namespace: spending-transaction-monitor
+    name: pgvector-model-registry
+    user: postgres
     password: model_registry_password
+    database: model_registry
+    port: 5432
   pgvector:
+    namespace: spending-transaction-monitor
+    nameOverride: "pgvector-model-registry"
+    fullnameOverride: "pgvector-model-registry"
     secret:
+      create: true
+      user: postgres
       password: model_registry_password
+      dbname: model_registry
+      host: pgvector-model-registry.spending-transaction-monitor.svc.cluster.local
+      port: "5432"
 
 # ==============================
 # KServe / Model Serving
@@ -95,6 +121,10 @@ sampleData:
 # ==============================
 # Pipeline Configuration
 # ==============================
+
+# Used by upload-data-job
+pipeline:
+  dataVersion: "1"
 
 pipelines:
   alert_recommender:

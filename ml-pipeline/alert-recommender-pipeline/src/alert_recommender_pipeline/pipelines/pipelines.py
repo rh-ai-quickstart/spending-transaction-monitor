@@ -10,7 +10,13 @@ This module defines the main pipeline that chains together the tasks:
 
 from kfp import dsl
 
-from . import tasks
+from .tasks import (
+    prepare_data as prepare_data_task_fn,
+    train_model as train_model_task_fn,
+    save_model as save_model_task_fn,
+    register_model as register_model_task_fn,
+    deploy_model as deploy_model_task_fn,
+)
 
 
 def alert_recommender_pipeline(
@@ -76,19 +82,19 @@ def alert_recommender_pipeline(
         pipeline_tasks = []
         
         # Task 1: Prepare data
-        prepare_data_task = tasks.prepare_data()
+        prepare_data_task = prepare_data_task_fn()
         prepare_data_task.set_caching_options(False)
         pipeline_tasks.append(prepare_data_task)
         
         # Task 2: Train model
-        train_model_task = tasks.train_model(
+        train_model_task = train_model_task_fn(
             input_data=prepare_data_task.outputs['output_data']
         )
         train_model_task.set_caching_options(False)
         pipeline_tasks.append(train_model_task)
         
         # Task 3: Save model to MinIO
-        save_model_task = tasks.save_model(
+        save_model_task = save_model_task_fn(
             input_model=train_model_task.outputs['output_model']
         )
         save_model_task.set_caching_options(False)
@@ -96,7 +102,7 @@ def alert_recommender_pipeline(
         
         # Task 4: Register model with Model Registry (conditional)
         if register_model.lower() == "true":
-            register_model_task = tasks.register_model(
+            register_model_task = register_model_task_fn(
                 input_artifact=save_model_task.outputs['output_artifact']
             )
             register_model_task.set_caching_options(False)
@@ -104,7 +110,7 @@ def alert_recommender_pipeline(
         
         # Task 5: Deploy model as InferenceService (conditional)
         if deploy_model.lower() == "true":
-            deploy_model_task = tasks.deploy_model(
+            deploy_model_task = deploy_model_task_fn(
                 input_artifact=save_model_task.outputs['output_artifact']
             )
             deploy_model_task.set_caching_options(False)
@@ -122,42 +128,6 @@ def alert_recommender_pipeline(
                 secret_name=pipeline_name,
                 secret_key_to_env=secret_key_to_env
             )
-    
-    return _pipeline
-
-
-def cleanup_pipeline(pipeline_name: str):
-    """
-    Create a cleanup pipeline for removing deployed resources.
-    
-    Args:
-        pipeline_name: Name of the pipeline (used for secrets)
-    
-    Returns:
-        A Kubeflow pipeline function
-    """
-    
-    @dsl.pipeline(
-        name="alert-recommender-cleanup-pipeline",
-        description="Clean up alert recommendation deployment resources"
-    )
-    def _pipeline():
-        from kfp import kubernetes
-        
-        secret_key_to_env = {
-            'NAME': 'MODEL_NAME',
-            'NAMESPACE': 'NAMESPACE',
-            'CLEANUP_MINIO': 'CLEANUP_MINIO',
-        }
-        
-        cleanup_task = tasks.cleanup_deployment()
-        cleanup_task.set_caching_options(False)
-        
-        kubernetes.use_secret_as_env(
-            task=cleanup_task,
-            secret_name=pipeline_name,
-            secret_key_to_env=secret_key_to_env
-        )
     
     return _pipeline
 
@@ -203,17 +173,17 @@ def training_only_pipeline(pipeline_name: str, minio_endpoint: str):
         }
         
         # Task 1: Prepare data
-        prepare_data_task = tasks.prepare_data()
+        prepare_data_task = prepare_data_task_fn()
         prepare_data_task.set_caching_options(False)
         
         # Task 2: Train model
-        train_model_task = tasks.train_model(
+        train_model_task = train_model_task_fn(
             input_data=prepare_data_task.outputs['output_data']
         )
         train_model_task.set_caching_options(False)
         
         # Task 3: Save model to MinIO
-        save_model_task = tasks.save_model(
+        save_model_task = save_model_task_fn(
             input_model=train_model_task.outputs['output_model']
         )
         save_model_task.set_caching_options(False)

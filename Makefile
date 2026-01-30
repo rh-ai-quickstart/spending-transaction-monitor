@@ -480,7 +480,7 @@ build-db:
 .PHONY: build-ml-pipeline
 build-ml-pipeline:
 	@echo "Building ML pipeline image..."
-	podman build --platform=linux/amd64 -t $(ML_PIPELINE_IMAGE) -f ./ml-pipeline/alert-recommender-pipeline/Containerfile ./ml-pipeline
+	podman build --no-cache --platform=linux/amd64 -t $(ML_PIPELINE_IMAGE) -f ./ml-pipeline/alert-recommender-pipeline/Containerfile ./ml-pipeline
 
 .PHONY: build-all
 build-all: build-ui build-api build-db build-ml-pipeline
