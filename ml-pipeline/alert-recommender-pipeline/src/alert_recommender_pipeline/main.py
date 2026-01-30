@@ -32,48 +32,31 @@ app = FastAPI(
 
 class PipelineRequest(BaseModel):
     """Request body for creating a pipeline."""
-    
-    # Pipeline identification
     name: str = "alert-recommender"
     version: str = "1.0.0"
-    
-    # Data configuration
     data_version: str = "1"
-    
-    # Model hyperparameters
     n_neighbors: int = 5
     metric: str = "cosine"
     threshold: float = 0.4
-    
-    # Database configuration (for training data)
-    # These are automatically populated from environment variables
     postgres_db_host: str = ""
     postgres_db_port: str = "5432"
     postgres_db: str = "spending-monitor"
     postgres_user: str = ""
     postgres_password: str = ""
-    
-    # MinIO/S3 configuration
     minio_endpoint: str = ""
     minio_access_key: str = "minio"
     minio_secret_key: str = "minio123"
     bucket_name: str = "models"
-    
-    # Deployment configuration
     namespace: str = "spending-transaction-monitor"
     serving_runtime: str = "alert-recommender-runtime"
     create_serving_runtime: bool = False
     serving_runtime_image: str = "docker.io/seldonio/mlserver:1.7.0-sklearn"
-    
-    # Pipeline options
     deploy_model: bool = True
     register_model: bool = False
     model_registry_url: str = ""
     model_registry_enabled: bool = False
-    
-    # Deploy from Model Registry options
-    deploy_from_registry: bool = False  # If True, deploy model from registry instead of pipeline artifact
-    model_version_to_deploy: str = ""   # Specific version to deploy (empty = latest)
+    deploy_from_registry: bool = False
+    model_version_to_deploy: str = ""
     
     def pipeline_name(self) -> str:
         """Generate a Kubernetes-compliant pipeline name."""
@@ -123,8 +106,6 @@ async def train_pipeline(payload: PipelineRequest = Body(...)):
     try:
         k8s_name = k8s.normalize_name(payload.pipeline_name())
         
-        # Auto-populate database credentials from environment if not provided
-        # These come from the spending-monitor-secret mounted in this service
         if not payload.postgres_db_host:
             payload.postgres_db_host = os.getenv('POSTGRES_DB_HOST', 'spending-monitor-db')
         if not payload.postgres_db_port:
@@ -138,14 +119,12 @@ async def train_pipeline(payload: PipelineRequest = Body(...)):
         
         logger.info(f"Database config: host={payload.postgres_db_host}, db={payload.postgres_db}, user={payload.postgres_user}, password_set={bool(payload.postgres_password)}")
         
-        # Apply configuration as secret
         secret_name = await asyncio.to_thread(
             k8s.apply_config_as_secret,
             payload,
             replace=True
         )
         
-        # Add and run the pipeline
         pipeline_id = await asyncio.to_thread(
             pipelines.add_pipeline,
             k8s_name,
@@ -240,7 +219,6 @@ async def cleanup_deployment(payload: CleanupRequest = Body(...)):
     - MinIO resources (optional)
     """
     try:
-        # Create cleanup configuration
         from .models import PipelineConfig
         
         cleanup_config = PipelineConfig(
@@ -251,7 +229,6 @@ async def cleanup_deployment(payload: CleanupRequest = Body(...)):
         
         k8s_name = k8s.normalize_name(f"{payload.name}-cleanup")
         
-        # Run cleanup pipeline
         pipeline_id = await asyncio.to_thread(
             pipelines.add_cleanup_pipeline,
             k8s_name

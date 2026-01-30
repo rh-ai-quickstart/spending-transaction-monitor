@@ -1,6 +1,5 @@
 """Model deployment task for Alert Recommender Pipeline."""
 
-import os
 from kfp import dsl
 from kfp.dsl import Input, Artifact
 
@@ -27,10 +26,6 @@ def deploy_model(input_artifact: Input[Artifact]):
     import requests
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
-    
-    # =========================================================================
-    # Helper Functions
-    # =========================================================================
     
     def load_config():
         """Load deployment configuration from environment variables."""
@@ -402,18 +397,12 @@ def deploy_model(input_artifact: Input[Artifact]):
         print(f"Check status: kubectl get isvc {model_name} -n {cfg['namespace']}")
         return False
     
-    # =========================================================================
-    # Main Deployment Flow
-    # =========================================================================
-    
-    # Step 1: Load configuration
     cfg = load_config()
     
     if not cfg['deploy_enabled']:
         print("Model deployment not enabled. Skipping.")
         return
     
-    # Step 2: Load model info (from registry or artifact)
     if cfg['deploy_from_registry'] and cfg['model_registry_url']:
         try:
             model_info = load_model_info_from_registry(cfg)
@@ -422,7 +411,6 @@ def deploy_model(input_artifact: Input[Artifact]):
     else:
         model_info = load_model_info_from_artifact(input_artifact.path)
     
-    # Print deployment summary
     print(f"\nDeployment configuration:")
     print(f"  Model: {model_info['model_name']}")
     print(f"  Version: {model_info['model_version']}")
@@ -431,20 +419,9 @@ def deploy_model(input_artifact: Input[Artifact]):
     print(f"  Model Path: {model_info['model_path']}")
     print(f"  Serving Runtime: {cfg['serving_runtime']}")
     
-    # Step 3: Initialize Kubernetes client
     core_v1, custom_api = init_kubernetes_client()
-    
-    # Step 4: Create storage secret
     create_storage_secret(core_v1, cfg, model_info)
-    
-    # Step 5: Create service account
     sa_name = create_service_account(core_v1, cfg, model_info['model_name'])
-    
-    # Step 6: Create ServingRuntime (if enabled)
     create_serving_runtime(custom_api, cfg)
-    
-    # Step 7: Create InferenceService
     create_inference_service(custom_api, cfg, model_info, sa_name)
-    
-    # Step 8: Wait for InferenceService to be ready
     wait_for_inference_service(custom_api, cfg, model_info['model_name'])

@@ -1,6 +1,5 @@
 """Model registry task for Alert Recommender Pipeline."""
 
-import os
 from kfp import dsl
 from kfp.dsl import Input, Artifact
 
@@ -25,7 +24,6 @@ def register_model(input_artifact: Input[Artifact]):
     import json
     import requests
     
-    # Configuration
     model_registry_url = os.getenv('MODEL_REGISTRY_URL', '')
     model_registry_enabled = os.getenv('MODEL_REGISTRY_ENABLED', 'false').lower() == 'true'
     
@@ -33,7 +31,6 @@ def register_model(input_artifact: Input[Artifact]):
         print("Model registry not enabled or URL not configured. Skipping registration.")
         return
     
-    # Load deployment variables
     vars_path = os.path.join(input_artifact.path, 'vars.json')
     with open(vars_path, 'r') as f:
         vars_data = json.load(f)
@@ -48,11 +45,9 @@ def register_model(input_artifact: Input[Artifact]):
     print(f"  Model: {model_name}")
     print(f"  Version: {model_version}")
     
-    # Model Registry API base path
     api_base = f"{model_registry_url}/api/model_registry/v1alpha3"
     
     try:
-        # Step 1: Check if model exists
         print(f"Searching for existing registered model: {model_name}")
         response = requests.get(
             f"{api_base}/registered_model",
@@ -67,7 +62,6 @@ def register_model(input_artifact: Input[Artifact]):
             if registered_model_id:
                 print(f"Found existing model: {registered_model_id} (state: {model_state})")
                 
-                # If model is ARCHIVED, update it to LIVE
                 if model_state == 'ARCHIVED':
                     print(f"Model is ARCHIVED, updating to LIVE state...")
                     patch_response = requests.patch(
@@ -88,7 +82,6 @@ def register_model(input_artifact: Input[Artifact]):
             print(f"Unexpected response when searching for model: {response.status_code}")
             print(f"Response body: {response.text}")
         
-        # Step 2: Create new model if not found
         if not registered_model_id:
             print(f"Creating new registered model: {model_name}")
             create_payload = {
@@ -120,11 +113,9 @@ def register_model(input_artifact: Input[Artifact]):
                 return
             print(f"Created new model: {registered_model_id}")
         
-        # Step 3: Get MinIO endpoint for storage info
         namespace = os.getenv('NAMESPACE', 'spending-transaction-monitor')
         minio_endpoint = os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000')
         
-        # Step 4: Check if model version already exists
         print(f"Checking for existing version: {model_version}")
         versions_response = requests.get(
             f"{api_base}/registered_models/{registered_model_id}/versions"
@@ -139,7 +130,6 @@ def register_model(input_artifact: Input[Artifact]):
                     print(f"Found existing version '{model_version}': {version_id}")
                     break
         
-        # Step 5: Create model version if not found
         if version_id is None:
             version_payload = {
                 "name": model_version,
@@ -169,7 +159,6 @@ def register_model(input_artifact: Input[Artifact]):
                 return
             print(f"Created model version: {version_id}")
         
-        # Step 6: Check if artifact already exists
         artifact_name = f"{model_name}-{model_version}"
         print(f"Checking for existing artifact: {artifact_name}")
         
@@ -186,7 +175,6 @@ def register_model(input_artifact: Input[Artifact]):
                     print(f"Found existing artifact '{artifact_name}': {artifact_id}")
                     break
         
-        # Step 7: Create model artifact if not found
         if artifact_id is None:
             artifact_payload = {
                 "name": artifact_name,

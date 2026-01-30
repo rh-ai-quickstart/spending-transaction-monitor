@@ -1,6 +1,5 @@
 """Data preparation task for Alert Recommender Pipeline."""
 
-import os
 from kfp import dsl
 from kfp.dsl import Output, Dataset
 
@@ -33,7 +32,6 @@ def prepare_data(output_data: Output[Dataset]):
     print(f"Data preparation configuration:")
     print(f"  Data Version: {data_version}")
     
-    # Create output directory
     os.makedirs(output_data.path, exist_ok=True)
     
     users_df = None
@@ -71,8 +69,6 @@ def prepare_data(output_data: Output[Dataset]):
             WHERE table_schema = 'public' AND table_name IN ('users', 'transactions')
         """)
         existing_tables = [row[0] for row in cursor.fetchall()]
-        print(f"Found tables: {existing_tables}")
-        
         if 'users' not in existing_tables:
             cursor.close()
             conn.close()
@@ -83,7 +79,6 @@ def prepare_data(output_data: Output[Dataset]):
             conn.close()
             raise RuntimeError("Table 'transactions' does not exist - database migrations may not have run yet")
         
-        # Query users
         users_query = """
             SELECT 
                 id, email, first_name, last_name,
@@ -101,7 +96,6 @@ def prepare_data(output_data: Output[Dataset]):
             conn.close()
             raise RuntimeError("No users found in database")
         
-        # Query transactions
         transactions_query = """
             SELECT 
                 id, user_id, amount, currency, merchant_name, merchant_category,
@@ -121,7 +115,6 @@ def prepare_data(output_data: Output[Dataset]):
             conn.close()
             raise RuntimeError("No transactions found in database")
         
-        # Try to load alert rules
         use_real_alerts = False
         try:
             alerts_query = """
@@ -164,21 +157,18 @@ def prepare_data(output_data: Output[Dataset]):
         
         data_key_prefix = f'data/v{data_version}'
         
-        # Load users
         users_key = f'{data_key_prefix}/users.csv'
         users_local_path = os.path.join(output_data.path, 'users.csv')
         s3_client.download_file(bucket_name, users_key, users_local_path)
         users_df = pd.read_csv(users_local_path)
         print(f"Loaded {len(users_df)} users from MinIO")
         
-        # Load transactions
         transactions_key = f'{data_key_prefix}/transactions.csv'
         transactions_local_path = os.path.join(output_data.path, 'transactions.csv')
         s3_client.download_file(bucket_name, transactions_key, transactions_local_path)
         transactions_df = pd.read_csv(transactions_local_path)
         print(f"Loaded {len(transactions_df)} transactions from MinIO")
         
-        # Try to load alert preferences
         use_real_alerts = False
         try:
             alerts_key = f'{data_key_prefix}/user_alerts.csv'
@@ -233,14 +223,12 @@ def prepare_data(output_data: Output[Dataset]):
     
     print(f"\n=== Data loaded from: {data_source_used} ===")
     
-    # Save data to output directory
     users_local_path = os.path.join(output_data.path, 'users.csv')
     transactions_local_path = os.path.join(output_data.path, 'transactions.csv')
     
     users_df.to_csv(users_local_path, index=False)
     transactions_df.to_csv(transactions_local_path, index=False)
     
-    # Save metadata
     metadata = {
         'data_source': data_source_used,
         'data_version': data_version,

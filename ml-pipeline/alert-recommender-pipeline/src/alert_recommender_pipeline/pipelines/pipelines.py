@@ -47,7 +47,6 @@ def alert_recommender_pipeline(
     def _pipeline():
         from kfp import kubernetes
         
-        # Define secret-to-environment mapping
         secret_key_to_env = {
             'NAME': 'MODEL_NAME',
             'VERSION': 'MODEL_VERSION',
@@ -55,24 +54,20 @@ def alert_recommender_pipeline(
             'N_NEIGHBORS': 'N_NEIGHBORS',
             'METRIC': 'METRIC',
             'THRESHOLD': 'THRESHOLD',
-            # Database credentials for training data
             'POSTGRES_DB_HOST': 'POSTGRES_DB_HOST',
             'POSTGRES_DB_PORT': 'POSTGRES_DB_PORT',
             'POSTGRES_DB': 'POSTGRES_DB',
             'POSTGRES_USER': 'POSTGRES_USER',
             'POSTGRES_PASSWORD': 'POSTGRES_PASSWORD',
-            # MinIO configuration
             'MINIO_ENDPOINT': 'MINIO_ENDPOINT',
             'MINIO_ACCESS_KEY': 'MINIO_ACCESS_KEY',
             'MINIO_SECRET_KEY': 'MINIO_SECRET_KEY',
             'BUCKET_NAME': 'BUCKET_NAME',
             'NAMESPACE': 'NAMESPACE',
-            # Model Registry configuration
             'MODEL_REGISTRY_ENABLED': 'MODEL_REGISTRY_ENABLED',
             'MODEL_REGISTRY_URL': 'MODEL_REGISTRY_URL',
             'DEPLOY_FROM_REGISTRY': 'DEPLOY_FROM_REGISTRY',
             'MODEL_VERSION_TO_DEPLOY': 'MODEL_VERSION_TO_DEPLOY',
-            # Deployment configuration
             'DEPLOY_MODEL': 'DEPLOY_MODEL',
             'SERVING_RUNTIME': 'SERVING_RUNTIME',
             'CREATE_SERVING_RUNTIME': 'CREATE_SERVING_RUNTIME',
@@ -81,26 +76,22 @@ def alert_recommender_pipeline(
         
         pipeline_tasks = []
         
-        # Task 1: Prepare data
         prepare_data_task = prepare_data_task_fn()
         prepare_data_task.set_caching_options(False)
         pipeline_tasks.append(prepare_data_task)
         
-        # Task 2: Train model
         train_model_task = train_model_task_fn(
             input_data=prepare_data_task.outputs['output_data']
         )
         train_model_task.set_caching_options(False)
         pipeline_tasks.append(train_model_task)
         
-        # Task 3: Save model to MinIO
         save_model_task = save_model_task_fn(
             input_model=train_model_task.outputs['output_model']
         )
         save_model_task.set_caching_options(False)
         pipeline_tasks.append(save_model_task)
         
-        # Task 4: Register model with Model Registry (conditional)
         if register_model.lower() == "true":
             register_model_task = register_model_task_fn(
                 input_artifact=save_model_task.outputs['output_artifact']
@@ -108,20 +99,17 @@ def alert_recommender_pipeline(
             register_model_task.set_caching_options(False)
             pipeline_tasks.append(register_model_task)
         
-        # Task 5: Deploy model as InferenceService (conditional)
         if deploy_model.lower() == "true":
             deploy_model_task = deploy_model_task_fn(
                 input_artifact=save_model_task.outputs['output_artifact']
             )
             deploy_model_task.set_caching_options(False)
             
-            # If registration is enabled, deploy after registration
             if register_model.lower() == "true":
                 deploy_model_task.after(register_model_task)
             
             pipeline_tasks.append(deploy_model_task)
         
-        # Inject secrets as environment variables for all tasks
         for task in pipeline_tasks:
             kubernetes.use_secret_as_env(
                 task=task,
@@ -158,13 +146,11 @@ def training_only_pipeline(pipeline_name: str, minio_endpoint: str):
             'N_NEIGHBORS': 'N_NEIGHBORS',
             'METRIC': 'METRIC',
             'THRESHOLD': 'THRESHOLD',
-            # Database credentials for training data
             'POSTGRES_DB_HOST': 'POSTGRES_DB_HOST',
             'POSTGRES_DB_PORT': 'POSTGRES_DB_PORT',
             'POSTGRES_DB': 'POSTGRES_DB',
             'POSTGRES_USER': 'POSTGRES_USER',
             'POSTGRES_PASSWORD': 'POSTGRES_PASSWORD',
-            # MinIO configuration
             'MINIO_ENDPOINT': 'MINIO_ENDPOINT',
             'MINIO_ACCESS_KEY': 'MINIO_ACCESS_KEY',
             'MINIO_SECRET_KEY': 'MINIO_SECRET_KEY',
@@ -172,23 +158,19 @@ def training_only_pipeline(pipeline_name: str, minio_endpoint: str):
             'NAMESPACE': 'NAMESPACE',
         }
         
-        # Task 1: Prepare data
         prepare_data_task = prepare_data_task_fn()
         prepare_data_task.set_caching_options(False)
         
-        # Task 2: Train model
         train_model_task = train_model_task_fn(
             input_data=prepare_data_task.outputs['output_data']
         )
         train_model_task.set_caching_options(False)
         
-        # Task 3: Save model to MinIO
         save_model_task = save_model_task_fn(
             input_model=train_model_task.outputs['output_model']
         )
         save_model_task.set_caching_options(False)
         
-        # Inject secrets
         for task in [prepare_data_task, train_model_task, save_model_task]:
             kubernetes.use_secret_as_env(
                 task=task,

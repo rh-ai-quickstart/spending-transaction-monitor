@@ -1,6 +1,5 @@
 """Model storage task for Alert Recommender Pipeline."""
 
-import os
 from kfp import dsl
 from kfp.dsl import Input, Output, Model, Artifact
 
@@ -111,7 +110,6 @@ class AlertRecommenderModel(MLModel):
         )
 '''
     
-    # Configuration
     namespace = os.getenv('NAMESPACE', 'spending-transaction-monitor')
     bucket_name = os.getenv('BUCKET_NAME', 'models')
     minio_endpoint = os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000')
@@ -119,14 +117,12 @@ class AlertRecommenderModel(MLModel):
     minio_secret_key = os.getenv('MINIO_SECRET_KEY', 'minio123')
     threshold = float(os.getenv('THRESHOLD', '0.4'))
     
-    # Generate model version with timestamp
     model_version = datetime.now().strftime("%y-%m-%d-%H%M%S")
     model_name = os.getenv('MODEL_NAME', 'alert-recommender')
     
     print(f"Model: {model_name}")
     print(f"Version: {model_version}")
     
-    # Initialize MinIO client
     s3_client = boto3.client(
         's3',
         endpoint_url=minio_endpoint,
@@ -136,7 +132,6 @@ class AlertRecommenderModel(MLModel):
         region_name='us-east-1'
     )
     
-    # Create bucket if it doesn't exist
     try:
         s3_client.create_bucket(Bucket=bucket_name)
         print(f"Created bucket: {bucket_name}")
@@ -146,17 +141,14 @@ class AlertRecommenderModel(MLModel):
         else:
             print(f"Note: {e}")
     
-    # Load model artifacts
     model_path = os.path.join(input_model.path, 'model.pkl')
     with open(model_path, 'rb') as f:
         model_artifacts = pickle.load(f)
     
     print(f"Model artifacts loaded: {list(model_artifacts.keys())}")
     
-    # Create output directory
     os.makedirs(output_artifact.path, exist_ok=True)
     
-    # Save model components using joblib (Python version independent)
     model_components = {
         'scaler': model_artifacts['scaler'],
         'knn_model': model_artifacts['knn_model'],
@@ -170,25 +162,20 @@ class AlertRecommenderModel(MLModel):
     
     print(f"Model components saved: {os.path.getsize(pipeline_path) / 1024:.2f} KB")
     
-    # Write MLServer model implementation
     impl_path = os.path.join(output_artifact.path, 'model.py')
     with open(impl_path, 'w') as f:
         f.write(model_impl_code)
     
-    # Upload to MinIO
     s3_model_path = f'{model_name}/'
     
-    # Upload model components
     model_key = f'{s3_model_path}model.joblib'
     print(f"Uploading model to s3://{bucket_name}/{model_key}")
     s3_client.upload_file(pipeline_path, bucket_name, model_key)
     
-    # Upload custom implementation
     impl_key = f'{s3_model_path}model.py'
     print(f"Uploading implementation to s3://{bucket_name}/{impl_key}")
     s3_client.upload_file(impl_path, bucket_name, impl_key)
     
-    # Create and upload model-settings.json
     model_settings = {
         "name": model_name,
         "implementation": "model.AlertRecommenderModel",
@@ -205,7 +192,6 @@ class AlertRecommenderModel(MLModel):
     )
     print(f"Uploaded model-settings.json")
     
-    # Save deployment variables for downstream tasks
     vars_data = {
         'model_version': model_version,
         'model_name': model_name,

@@ -40,14 +40,9 @@ def load_k8s_config():
 
 
 def config_to_k8s_secret(pipeline_config, namespace: Optional[str] = None) -> client.V1Secret:
-    """Convert PipelineConfig or PipelineRequest to a Kubernetes Secret.
-    
-    This function handles both PipelineConfig and PipelineRequest objects,
-    using getattr with defaults for attributes that may differ between types.
-    """
+    """Convert PipelineConfig or PipelineRequest to a Kubernetes Secret."""
     namespace = namespace or get_incluster_namespace()
     
-    # Get model data - works with any Pydantic model
     config_data = pipeline_config.model_dump() if hasattr(pipeline_config, 'model_dump') else pipeline_config.dict()
     
     encoded_data = {
@@ -56,8 +51,6 @@ def config_to_k8s_secret(pipeline_config, namespace: Optional[str] = None) -> cl
         if not isinstance(v, (list, dict, bool)) or isinstance(v, bool)
     }
     
-    # Handle boolean fields with fallbacks for different model types
-    # PipelineConfig uses 'model_registry_enabled', PipelineRequest uses 'register_model'
     model_registry_enabled = getattr(pipeline_config, 'model_registry_enabled', 
                                      getattr(pipeline_config, 'register_model', False))
     deploy_model = getattr(pipeline_config, 'deploy_model', True)
@@ -90,10 +83,7 @@ def config_to_k8s_secret(pipeline_config, namespace: Optional[str] = None) -> cl
 
 
 def apply_config_as_secret(pipeline_config, namespace: Optional[str] = None, replace: bool = False) -> str:
-    """Apply pipeline configuration as a Kubernetes Secret.
-    
-    Accepts either PipelineConfig or PipelineRequest objects.
-    """
+    """Apply pipeline configuration as a Kubernetes Secret."""
     load_k8s_config()
     
     secret = config_to_k8s_secret(pipeline_config, namespace)
@@ -138,19 +128,7 @@ def create_service_account_with_secret(
     namespace: str,
     secret_name: str = "storage-config"
 ) -> str:
-    """Create a ServiceAccount with a storage secret attached.
-    
-    KServe requires a service account that references the storage credentials
-    secret to download models from S3/MinIO.
-    
-    Args:
-        name: Name of the service account
-        namespace: Kubernetes namespace
-        secret_name: Name of the secret to attach (default: storage-config)
-    
-    Returns:
-        Name of the created/updated service account
-    """
+    """Create a ServiceAccount with a storage secret attached."""
     load_k8s_config()
     
     api = client.CoreV1Api()
@@ -190,18 +168,7 @@ def create_inference_service(
     min_replicas: int = 1,
     max_replicas: int = 3
 ) -> dict:
-    """Create an InferenceService specification.
-    
-    Args:
-        name: Name of the InferenceService
-        namespace: Kubernetes namespace
-        bucket: S3/MinIO bucket name
-        model_path: Path to model in bucket
-        serving_runtime: Name of ServingRuntime to use
-        service_account_name: Service account with storage credentials (defaults to {name}-sa)
-        min_replicas: Minimum replicas for scaling
-        max_replicas: Maximum replicas for scaling
-    """
+    """Create an InferenceService specification."""
     sa_name = service_account_name or f"{name}-sa"
     
     return {
@@ -236,14 +203,7 @@ def create_serving_runtime(
     name: str = "alert-recommender-runtime",
     image: str = None
 ) -> dict:
-    """Create a ServingRuntime specification for MLServer sklearn.
-    
-    Args:
-        namespace: Kubernetes namespace
-        name: Name of the ServingRuntime
-        image: Container image to use. If None, uses SERVING_RUNTIME_IMAGE env var
-               or defaults to MLServer sklearn image.
-    """
+    """Create a ServingRuntime specification for MLServer sklearn."""
     import os
     
     runtime_image = image or os.getenv(
