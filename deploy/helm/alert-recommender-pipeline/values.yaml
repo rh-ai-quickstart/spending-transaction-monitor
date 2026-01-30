@@ -112,11 +112,10 @@ serving:
 # ==============================
 # Sample Data Configuration
 # ==============================
+# Note: Sample data generation removed - pipeline now depends on database
 
 sampleData:
-  generate: true
-  numUsers: 50
-  numTransactions: 5000
+  generate: false
 
 # ==============================
 # Pipeline Configuration
