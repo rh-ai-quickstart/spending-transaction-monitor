@@ -251,19 +251,6 @@ def create_serving_runtime(
         'docker.io/seldonio/mlserver:1.7.0-sklearn'
     )
     
-    # Install cloudpickle via pip at container startup
-    install_cmd = (
-        'echo "Installing cloudpickle and dependencies to user site-packages..." && '
-        'export PYTHONUSERBASE=/tmp/python-packages && '
-        'mkdir -p $PYTHONUSERBASE && '
-        'pip install --user --no-cache-dir cloudpickle>=3.0.0 "numpy<2.0" "scikit-learn>=1.6.0,<1.7.0" && '
-        'export PYTHONPATH=$PYTHONUSERBASE/lib/python3.10/site-packages:$PYTHONPATH && '
-        'echo "Verifying cloudpickle installation..." && '
-        'python -c "import cloudpickle; print(f\'cloudpickle version: {cloudpickle.__version__}\')" && '
-        'echo "Starting MLServer..." && '
-        'exec mlserver start /mnt/models'
-    )
-    
     return {
         "apiVersion": "serving.kserve.io/v1alpha1",
         "kind": "ServingRuntime",
@@ -271,7 +258,7 @@ def create_serving_runtime(
             "name": name,
             "namespace": namespace,
             "annotations": {
-                "openshift.io/display-name": "MLServer SKLearn Runtime (with cloudpickle)",
+                "openshift.io/display-name": "MLServer SKLearn Runtime",
                 "opendatahub.io/apiProtocol": "REST"
             }
         },
@@ -290,15 +277,12 @@ def create_serving_runtime(
                     "name": "kserve-container",
                     "image": runtime_image,
                     "imagePullPolicy": "Always",
-                    "command": ["/bin/bash", "-c", install_cmd],
                     "env": [
                         {"name": "MLSERVER_MODEL_IMPLEMENTATION", "value": "mlserver_sklearn.SKLearnModel"},
                         {"name": "MLSERVER_HTTP_PORT", "value": "8080"},
                         {"name": "MLSERVER_GRPC_PORT", "value": "8081"},
                         {"name": "MLSERVER_MODEL_URI", "value": "/mnt/models"},
-                        {"name": "MLSERVER_LOAD_MODELS_AT_STARTUP", "value": "true"},
-                        {"name": "PYTHONUSERBASE", "value": "/tmp/python-packages"},
-                        {"name": "PYTHONPATH", "value": "/tmp/python-packages/lib/python3.10/site-packages"}
+                        {"name": "MLSERVER_LOAD_MODELS_AT_STARTUP", "value": "true"}
                     ],
                     "ports": [
                         {"containerPort": 8080, "name": "http", "protocol": "TCP"},
