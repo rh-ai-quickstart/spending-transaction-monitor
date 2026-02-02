@@ -1,12 +1,4 @@
-"""Kubeflow Pipeline definitions for Alert Recommender Pipeline.
-
-This module defines the main pipeline that chains together the tasks:
-1. prepare_data - Load and prepare training data
-2. train_model - Train the KNN model
-3. save_model - Save model to MinIO
-4. register_model - Register with Model Registry (optional)
-5. deploy_model - Deploy as InferenceService (optional)
-"""
+"""Kubeflow Pipeline definitions for Alert Recommender Pipeline."""
 
 from kfp import dsl
 
@@ -28,16 +20,6 @@ def alert_recommender_pipeline(
 ):
     """
     Create the alert recommender ML pipeline.
-    
-    Args:
-        pipeline_name: Name of the pipeline (used for secrets)
-        minio_endpoint: MinIO endpoint URL
-        deploy_model: Whether to deploy the model ("true"/"false")
-        register_model: Whether to register with Model Registry ("true"/"false")
-        model_registry_url: URL of the Model Registry service
-    
-    Returns:
-        A Kubeflow pipeline function
     """
     
     @dsl.pipeline(

@@ -9,16 +9,7 @@ from .constants import BASE_IMAGE
 @dsl.component(base_image=BASE_IMAGE)
 def register_model(input_artifact: Input[Artifact]):
     """
-    Register the model with the Model Registry.
-    
-    This task:
-    1. Connects to the Model Registry
-    2. Creates or finds the registered model
-    3. Creates a new model version
-    4. Creates a model artifact with storage URI
-    
-    Inputs:
-        input_artifact: Artifact from save_model containing vars.json
+    Register the model with the Model Registry. 
     """
     import os
     import json
