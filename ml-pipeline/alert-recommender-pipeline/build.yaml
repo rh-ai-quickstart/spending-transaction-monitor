@@ -20,7 +20,7 @@ spec:
   source:
     type: Git
     git:
-      uri: https://github.com/your-org/spending-transaction-monitor.git
+      uri: https://github.com/rh-ai-quickstart/spending-transaction-monitor.git
       ref: main
     contextDir: ml-pipeline
   strategy:
