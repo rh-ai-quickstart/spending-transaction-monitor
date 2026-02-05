@@ -23,25 +23,23 @@ async def reset_database() -> None:
 
     async with SessionLocal() as session:
         try:
-            # Delete in reverse dependency order to avoid foreign key violations
-            # Even though we have CASCADE, it's safer to be explicit
-            print('🔄 Deleting cached_recommendations...')
-            await session.execute(text('DELETE FROM cached_recommendations'))
-
-            print('📋 Deleting alert_notifications...')
-            await session.execute(text('DELETE FROM alert_notifications'))
-
-            print('⚠️  Deleting alert_rules...')
-            await session.execute(text('DELETE FROM alert_rules'))
-
-            print('💳 Deleting transactions...')
-            await session.execute(text('DELETE FROM transactions'))
-
-            print('🏦 Deleting credit_cards...')
-            await session.execute(text('DELETE FROM credit_cards'))
-
-            print('👤 Deleting users...')
-            await session.execute(text('DELETE FROM users'))
+            # Use TRUNCATE CASCADE for reliable cleanup regardless of FK order
+            # This is faster and handles all dependent tables automatically
+            print('🗑️  Truncating all tables with CASCADE...')
+            await session.execute(
+                text(
+                    """
+                TRUNCATE TABLE 
+                    cached_recommendations,
+                    alert_notifications,
+                    alert_rules,
+                    transactions,
+                    credit_cards,
+                    users
+                CASCADE
+                """
+                )
+            )
 
             # Commit all deletions
             await session.commit()
