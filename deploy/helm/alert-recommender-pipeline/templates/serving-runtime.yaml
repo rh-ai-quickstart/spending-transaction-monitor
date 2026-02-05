@@ -1,0 +1,48 @@
+{{/*
+Only create ServingRuntime if enabled and not using an existing one.
+Set serving.runtime.create to false if you want to use an existing ServingRuntime.
+*/}}
+{{- if and .Values.serving.runtime .Values.serving.runtime.create -}}
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: ServingRuntime
+metadata:
+  name: {{ .Values.serving.runtime.existingRuntime | default "alert-recommender-runtime" }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+  annotations:
+    openshift.io/display-name: MLServer SKLearn Runtime
+    opendatahub.io/apiProtocol: REST
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  protocolVersions:
+    - v2
+  multiModel: false
+  containers:
+    - name: kserve-container
+      image: {{ .Values.serving.runtime.image | default "docker.io/seldonio/mlserver:1.7.0-sklearn" }}
+      imagePullPolicy: Always
+      env:
+        - name: MLSERVER_MODEL_IMPLEMENTATION
+          value: "mlserver_sklearn.SKLearnModel"
+        - name: MLSERVER_HTTP_PORT
+          value: "8080"
+        - name: MLSERVER_GRPC_PORT
+          value: "8081"
+        - name: MLSERVER_MODEL_URI
+          value: /mnt/models
+        - name: MLSERVER_LOAD_MODELS_AT_STARTUP
+          value: "true"
+      ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8081
+          name: grpc
+          protocol: TCP
+      resources:
+        {{- toYaml .Values.serving.inferenceService.resources | nindent 8 }}
+{{- end }}

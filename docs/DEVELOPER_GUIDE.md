@@ -8,6 +8,7 @@ Complete development guide for the Spending Transaction Monitor - a real-time cr
 - [🛠️ Development Setup](#️-development-setup)
 - [🧪 Testing & Development](#-testing--development)
 - [📦 Service Documentation](#-service-documentation)
+- [🤖 ML Pipeline Setup](#-ml-pipeline-alert-recommender)
 - [🔐 Authentication & Security](#-authentication--security)
 - [📊 Data Flow](#-data-flow)
 - [🚀 Deployment](#-deployment)
@@ -373,6 +374,124 @@ pnpm test
 - Users, Transactions, Alert Rules
 - Alert Notifications, Credit Cards
 - Vector embeddings for rule similarity
+
+### 🤖 ML Pipeline (Alert Recommender)
+
+**Location**: `ml-pipeline/alert-recommender-pipeline/`  
+**Documentation**: [Pipeline README](../ml-pipeline/alert-recommender-pipeline/README.md)
+
+A Kubeflow pipeline for training and deploying KNN-based collaborative filtering models for alert recommendations.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Kubeflow Pipeline                           │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐          │
+│  │ Prepare     │──▶│ Train       │──▶│ Save        │          │
+│  │ Data        │   │ Model       │   │ Model       │          │
+│  └─────────────┘   └─────────────┘   └──────┬──────┘          │
+│                                              │                  │
+│                                    ┌─────────┴─────────┐       │
+│                                    ▼                   ▼       │
+│                           ┌─────────────┐     ┌─────────────┐  │
+│                           │ Register    │     │ Deploy      │  │
+│                           │ Model       │────▶│ Model       │  │
+│                           │ (optional)  │     │             │  │
+│                           └─────────────┘     └─────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Prerequisites:**
+
+- OpenShift cluster with OpenShift AI (Data Science Pipelines)
+- KServe or OpenDataHub Model Serving
+- MinIO or S3-compatible storage
+- (Optional) OpenDataHub Model Registry
+
+**Quick Start with Helm:**
+
+```bash
+# Install with default values (includes DSPA setup)
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
+  --namespace spending-transaction-monitor \
+  --create-namespace
+
+# Install with custom MinIO configuration
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
+  --namespace spending-transaction-monitor \
+  --set minio.endpoint="http://my-minio:9000" \
+  --set minio.accessKey="myaccesskey" \
+  --set minio.secretKey="mysecretkey"
+
+# Install with Model Registry enabled
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
+  --namespace spending-transaction-monitor \
+  --set modelRegistry.enabled=true \
+  --set modelRegistry.url="http://model-registry:8080"
+```
+
+**Key Configuration Options:**
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `pipeline.name` | Model name | `alert-recommender` |
+| `pipeline.version` | Model version | `1.0.0` |
+| `pipeline.nNeighbors` | KNN neighbors | `5` |
+| `pipeline.deployModel` | Deploy after training | `true` |
+| `pipeline.registerModel` | Register with Model Registry | `false` |
+| `minio.endpoint` | MinIO endpoint URL | `http://minio-service:9000` |
+| `modelRegistry.enabled` | Enable Model Registry | `false` |
+
+**Data Source Priority:**
+
+The pipeline automatically tries data sources in order:
+1. **PostgreSQL Database** (preferred) - Uses `spending-monitor-secret`
+2. **MinIO** - Falls back to S3-compatible storage
+3. **Local Files** - Last resort fallback to bundled sample data
+
+**API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ping` | GET | Health check |
+| `/health` | GET | Detailed health status |
+| `/train` | POST | Create and run a training pipeline |
+| `/status` | GET | Get pipeline run status |
+| `/delete` | DELETE | Delete a pipeline |
+| `/cleanup` | POST | Clean up deployment resources |
+| `/models` | GET | List deployed InferenceServices |
+
+**Example: Trigger Training Pipeline:**
+
+```bash
+curl -X POST http://alert-recommender-pipeline/train \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "alert-recommender",
+    "version": "1.0.0",
+    "n_neighbors": 5,
+    "deploy_model": true
+  }'
+```
+
+**Local Development:**
+
+```bash
+cd ml-pipeline/alert-recommender-pipeline
+
+# Install dependencies
+pip install -e ".[dev]"
+
+# Run the FastAPI service locally
+uvicorn alert_recommender_pipeline.main:app --reload --port 8000
+
+# Build container image
+podman build -t alert-recommender-pipeline:latest -f Containerfile .
+```
+
+For complete documentation including troubleshooting and advanced configuration, see the [Pipeline README](../ml-pipeline/alert-recommender-pipeline/README.md).
 
 ---
 
@@ -809,6 +928,7 @@ podman stats
 - [API Documentation](../packages/api/README.md) - API service details
 - [UI Documentation](../packages/ui/README.md) - Frontend development guide
 - [Database Documentation](../packages/db/README.md) - Database schema and migrations
+- [ML Pipeline Documentation](../ml-pipeline/alert-recommender-pipeline/README.md) - Kubeflow pipeline for model training and deployment
 
 ---
 

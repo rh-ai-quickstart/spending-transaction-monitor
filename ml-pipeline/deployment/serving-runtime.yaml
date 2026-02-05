@@ -16,7 +16,9 @@ spec:
     - grpc-v2
   containers:
     - name: kserve-container
-      image: docker.io/seldonio/mlserver:1.6.0-sklearn
+      # Custom MLServer sklearn image with cloudpickle
+      image: quay.io/rh-ai-quickstart/mlserver-sklearn:1.7.0
+      imagePullPolicy: Always
       env:
         - name: MLSERVER_MODEL_IMPLEMENTATION
           value: mlserver_sklearn.SKLearnModel

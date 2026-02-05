@@ -1,0 +1,147 @@
+# Default values for alert-recommender-pipeline
+
+# ==============================
+# Deployment Configuration
+# ==============================
+
+replicaCount: 1
+
+# ==============================
+# Service Configuration
+# ==============================
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8000
+
+image:
+  repository: quay.io/rh-ai-quickstart/alert-recommender-pipeline
+  pullPolicy: Always
+  tag: "latest"
+
+serviceAccount:
+  create: true
+
+# ==============================
+# Data Science Pipelines (DSPA)
+# ==============================
+
+dspa:
+  deploy: true
+  database:
+    deploy: true
+    storage: 10Gi
+    storageClass: ""
+  objectStorage:
+    deploy: true
+    storage: 20Gi
+    storageClass: ""
+
+dsPipelines:
+  url: "https://ds-pipeline-dspa:8888"
+  waitForReady: false
+
+# ==============================
+# Database Configuration
+# ==============================
+
+database:
+  # Wait for spending-monitor migration to complete
+  waitForMigration: true
+  migrationTimeout: 60
+
+# ==============================
+# MinIO Configuration (for model storage)
+# ==============================
+
+minio:
+  deploy: true
+  endpoint: "http://minio-service:9000"
+  bucketName: "models"
+  accessKey: "minio"
+  secretKey: "minio123"
+  deployment:
+    image: quay.io/minio/minio:latest
+    replicas: 1
+    storage: 20Gi
+    storageClass: ""
+
+# ==============================
+# Model Registry Configuration
+# ==============================
+
+modelRegistry:
+  enabled: true
+  url: "http://model-registry.rhoai-model-registries.svc.cluster.local:8080"
+
+# model-registry subchart values
+model-registry:
+  enabled: true
+  namespace: rhoai-model-registries
+  name: model-registry
+  postgres:
+    enabled: true
+    namespace: spending-transaction-monitor
+    name: pgvector-model-registry
+    user: postgres
+    password: model_registry_password
+    database: model_registry
+    port: 5432
+  pgvector:
+    namespace: spending-transaction-monitor
+    nameOverride: "pgvector-model-registry"
+    fullnameOverride: "pgvector-model-registry"
+    secret:
+      create: true
+      user: postgres
+      password: model_registry_password
+      dbname: model_registry
+      host: pgvector-model-registry.spending-transaction-monitor.svc.cluster.local
+      port: "5432"
+
+# ==============================
+# KServe / Model Serving
+# ==============================
+
+serving:
+  runtime:
+    create: true
+    createViaPipeline: false
+
+# ==============================
+# Sample Data Configuration
+# ==============================
+# Note: Sample data generation removed - pipeline now depends on database
+
+sampleData:
+  generate: false
+
+# ==============================
+# Pipeline Configuration
+# ==============================
+
+# Used by upload-data-job
+pipeline:
+  dataVersion: "1"
+
+pipelines:
+  alert_recommender:
+    enabled: true
+    name: "alert-recommender"
+    version: "1.0.0"
+    dataVersion: "1"
+    nNeighbors: 5
+    metric: "cosine"
+    threshold: 0.4
+    deployModel: true
+    registerModel: true
+    deployFromRegistry: true
+    modelVersionToDeploy: ""
+
+# ==============================
+# RBAC Configuration
+# ==============================
+
+rbac:
+  create: true
