@@ -1,4 +1,7 @@
-FROM registry.access.redhat.com/ubi9/python-312:latest
+# Base image: UBI9 for production (CI/CD), python:3.12-slim for faster local builds
+# Override with: --build-arg BASE_IMAGE=python:3.12-slim
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/python-312:latest
+FROM ${BASE_IMAGE}
 
 USER root
 
@@ -8,8 +11,18 @@ ARG TORCH_VARIANT=cpu
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for PostgreSQL and curl
-RUN dnf install -y gcc gcc-c++ postgresql-devel curl --allowerasing && dnf clean all
+# For UBI: disable subscription-manager to use only UBI repos
+# (prevents host subscription leaking in on machines with RHEL subscriptions)
+# For Debian: install system dependencies with apt-get
+ARG BASE_IMAGE
+RUN if echo "${BASE_IMAGE}" | grep -q "ubi"; then \
+        rm -f /etc/rhsm-host 2>/dev/null || true && \
+        dnf install -y gcc gcc-c++ postgresql-devel curl --allowerasing && dnf clean all; \
+    else \
+        apt-get update && apt-get install -y --no-install-recommends \
+            gcc g++ libpq-dev curl \
+            && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh && mv ~/.local/bin/uv /usr/local/bin/uv
@@ -48,8 +61,13 @@ RUN uv pip install --python $(which python3) --system --no-cache requests
 # Set environment variables
 ENV PYTHONPATH=/app/packages/api/src
 
-# Ensure all files are readable by non-root user
-RUN chown -R 1001:0 /app && chmod -R g=u /app
+# Create non-root user if not using UBI (UBI already has user 1001)
+# Then ensure all files are readable by non-root user
+ARG BASE_IMAGE
+RUN if ! echo "${BASE_IMAGE}" | grep -q "ubi"; then \
+        useradd -u 1001 -m appuser || true; \
+    fi && \
+    chown -R 1001:0 /app && chmod -R g=u /app
 
 USER 1001
 
