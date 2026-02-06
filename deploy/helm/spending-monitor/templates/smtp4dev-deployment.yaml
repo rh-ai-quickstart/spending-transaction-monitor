@@ -1,0 +1,64 @@
+{{- if .Values.smtp4dev.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.smtp4dev.name }}
+  labels:
+    app: {{ .Values.smtp4dev.name }}
+spec:
+  replicas: {{ .Values.smtp4dev.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.smtp4dev.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.smtp4dev.name }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "spending-monitor.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: smtp4dev
+        image: {{ .Values.smtp4dev.image.repository }}:{{ .Values.smtp4dev.image.tag }}
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        args:
+        - "--smtpport=2525"
+        - "--urls=http://+:8080"
+        - "--imapport="
+        - "--pop3port="
+        ports:
+        - name: smtp
+          containerPort: 2525
+          protocol: TCP
+        - name: web
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: ServerOptions__HostName
+          value: "smtp4dev"
+        volumeMounts:
+        - name: smtp4dev-data
+          mountPath: /smtp4dev
+        resources:
+          {{- toYaml .Values.smtp4dev.resources | nindent 10 }}
+        {{- if .Values.smtp4dev.healthCheck.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: web
+          initialDelaySeconds: {{ .Values.smtp4dev.healthCheck.initialDelaySeconds }}
+          periodSeconds: {{ .Values.smtp4dev.healthCheck.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: web
+          initialDelaySeconds: {{ .Values.smtp4dev.healthCheck.initialDelaySeconds }}
+          periodSeconds: {{ .Values.smtp4dev.healthCheck.periodSeconds }}
+        {{- end }}
+      volumes:
+      - name: smtp4dev-data
+        emptyDir: {}
+{{- end }}
