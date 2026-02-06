@@ -20,6 +20,8 @@ import {
   XCircle,
   AlertTriangle,
   ExternalLink,
+  Mail,
+  MessageSquare,
 } from 'lucide-react';
 import type { Alert } from '../../schemas/transaction';
 import { Link } from '@tanstack/react-router';
@@ -75,6 +77,28 @@ function formatAlertTime(timestamp: string): string {
       minute: '2-digit',
     });
   }
+}
+
+function getNotificationMethodIcons(methods: string[]) {
+  const icons = [];
+
+  if (methods.includes('EMAIL')) {
+    icons.push(
+      <span key="email" className="inline-flex items-center" title="Email">
+        <Mail className="h-3 w-3" />
+      </span>,
+    );
+  }
+
+  if (methods.includes('SMS')) {
+    icons.push(
+      <span key="sms" className="inline-flex items-center" title="SMS">
+        <MessageSquare className="h-3 w-3" />
+      </span>,
+    );
+  }
+
+  return icons;
 }
 
 export function AlertHistoryPopover({ className }: AlertHistoryPopoverProps) {
@@ -169,6 +193,15 @@ export function AlertHistoryPopover({ className }: AlertHistoryPopoverProps) {
                             <span>ID: {alert.transaction_id.slice(0, 8)}...</span>
                           </>
                         )}
+                        {alert.notification_methods &&
+                          alert.notification_methods.length > 0 && (
+                            <>
+                              <span>•</span>
+                              <div className="flex items-center gap-1">
+                                {getNotificationMethodIcons(alert.notification_methods)}
+                              </div>
+                            </>
+                          )}
                       </div>
                     </div>
                   </div>

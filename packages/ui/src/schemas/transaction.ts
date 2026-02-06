@@ -170,6 +170,8 @@ export const AlertSchema = z.object({
   timestamp: z.string(),
   transaction_id: z.string().optional(),
   resolved: z.boolean().default(false),
+  notification_methods: z.array(z.string()).default([]),
+  notification_ids: z.array(z.string()).default([]), // Track all grouped notification IDs
 });
 
 // API Response Schemas

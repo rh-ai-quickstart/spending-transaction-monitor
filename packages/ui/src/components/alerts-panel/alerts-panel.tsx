@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 import { severityColors } from '../../lib/colors';
 import { useAlerts } from '../../hooks/alert';
 import type { Alert } from '../../schemas/transaction';
+import { Link } from '@tanstack/react-router';
 
 export interface AlertsPanelProps {
   className?: string;
@@ -84,9 +85,11 @@ export function AlertsPanel({ className, onAlertClick }: AlertsPanelProps) {
               </Badge>
             )}
           </div>
-          <Button variant="ghost" size="sm">
-            View All
-          </Button>
+          <Link to="/alerts">
+            <Button variant="ghost" size="sm">
+              View All
+            </Button>
+          </Link>
         </div>
 
         {!hasAlerts ? (
