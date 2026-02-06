@@ -1,0 +1,21 @@
+{{- if .Values.smtp4dev.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.smtp4dev.name }}
+  labels:
+    app: {{ .Values.smtp4dev.name }}
+spec:
+  type: {{ .Values.smtp4dev.service.type }}
+  ports:
+  - name: smtp
+    port: 25
+    targetPort: smtp
+    protocol: TCP
+  - name: web
+    port: 80
+    targetPort: web
+    protocol: TCP
+  selector:
+    app: {{ .Values.smtp4dev.name }}
+{{- end }}
