@@ -21,6 +21,11 @@ class LLMClient:
     def __init__(
         self, max_tokens: int = 8192, temperature: float = 0.1, top_p: float = 1
     ):
+        logger.info(
+            'LLM client (OpenAI-compatible): base_url=%s model=%s',
+            settings.BASE_URL or '(default)',
+            settings.MODEL,
+        )
         self.llm = ChatOpenAI(
             api_key=settings.API_KEY,
             model=settings.MODEL,
