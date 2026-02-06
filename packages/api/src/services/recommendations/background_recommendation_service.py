@@ -12,7 +12,7 @@ from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.database import SessionLocal
-from db.models import CachedRecommendation, User
+from db.models import AlertRule, CachedRecommendation, User
 
 from ..ml_alert_recommendation_service import MLAlertRecommendationService
 from .alert_recommendation_service import AlertRecommendationService
@@ -832,13 +832,19 @@ class BackgroundRecommendationService:
             if not cached:
                 return None
 
-            # Parse and return the cached recommendations
+            # Parse the cached recommendations
             recommendations_data = json.loads(cached.recommendations_json)
+            recommendations = recommendations_data.get('recommendations', [])
+
+            # Filter out recommendations that match existing active rules
+            filtered_recommendations = await self._filter_cached_against_active_rules(
+                recommendations, user_id, session
+            )
 
             return {
                 'user_id': user_id,
                 'recommendation_type': cached.recommendation_type,
-                'recommendations': recommendations_data.get('recommendations', []),
+                'recommendations': filtered_recommendations,
                 'generated_at': cached.generated_at.isoformat(),
                 'cached': True,
             }
@@ -848,6 +854,53 @@ class BackgroundRecommendationService:
                 f'Error retrieving cached recommendations for user {user_id}: {str(e)}'
             )
             return None
+
+    async def _filter_cached_against_active_rules(
+        self, recommendations: list[dict[str, Any]], user_id: str, session: AsyncSession
+    ) -> list[dict[str, Any]]:
+        """Filter cached recommendations to exclude those matching existing active alert rules"""
+        try:
+            # Get all active alert rules for the user
+            result = await session.execute(
+                select(AlertRule).where(
+                    and_(AlertRule.user_id == user_id, AlertRule.is_active)
+                )
+            )
+            existing_rules = result.scalars().all()
+
+            if not existing_rules:
+                # No active rules, return all recommendations
+                return recommendations
+
+            # Extract natural language queries from existing active rules
+            existing_queries = set()
+            for rule in existing_rules:
+                if rule.natural_language_query:
+                    existing_queries.add(rule.natural_language_query.lower().strip())
+
+            # Filter out recommendations that match existing rules (case-insensitive)
+            filtered = []
+            for rec in recommendations:
+                rec_query = rec.get('natural_language_query', '').lower().strip()
+
+                # Skip if exact match exists
+                if rec_query and rec_query not in existing_queries:
+                    filtered.append(rec)
+
+            logger.info(
+                f'Filtered cached recommendations for user {user_id}: '
+                f'{len(recommendations)} -> {len(filtered)} '
+                f'(removed {len(recommendations) - len(filtered)} existing rules)'
+            )
+
+            return filtered
+
+        except Exception as e:
+            logger.error(
+                f'Error filtering cached recommendations for user {user_id}: {str(e)}'
+            )
+            # On error, return original recommendations to avoid breaking the flow
+            return recommendations
 
     def get_cached_recommendations_sync(self, user_id: str) -> dict[str, Any] | None:
         """Get cached recommendations synchronously for WebSocket notifications"""
@@ -865,13 +918,14 @@ class BackgroundRecommendationService:
             sync_engine = create_engine(sync_database_url, echo=False)
 
             with sync_engine.connect() as conn:
+                # Get cached recommendations
                 result = conn.execute(
                     text("""
                     SELECT user_id, recommendation_type, recommendations_json, generated_at
-                    FROM cached_recommendations 
-                    WHERE user_id = :user_id 
+                    FROM cached_recommendations
+                    WHERE user_id = :user_id
                     AND expires_at > NOW()
-                    ORDER BY generated_at DESC 
+                    ORDER BY generated_at DESC
                     LIMIT 1
                 """),
                     {'user_id': user_id},
@@ -881,13 +935,43 @@ class BackgroundRecommendationService:
                 if not row:
                     return None
 
-                # Parse and return the cached recommendations
+                # Parse the cached recommendations
                 recommendations_data = json.loads(row[2])  # recommendations_json
+                recommendations = recommendations_data.get('recommendations', [])
+
+                # Get existing active rules to filter against
+                active_rules_result = conn.execute(
+                    text("""
+                    SELECT natural_language_query
+                    FROM alert_rules
+                    WHERE user_id = :user_id AND is_active = true
+                """),
+                    {'user_id': user_id},
+                )
+
+                # Extract existing queries
+                existing_queries = set()
+                for rule_row in active_rules_result:
+                    if rule_row[0]:  # natural_language_query
+                        existing_queries.add(rule_row[0].lower().strip())
+
+                # Filter out recommendations that match existing rules
+                filtered_recommendations = []
+                for rec in recommendations:
+                    rec_query = rec.get('natural_language_query', '').lower().strip()
+                    if rec_query and rec_query not in existing_queries:
+                        filtered_recommendations.append(rec)
+
+                logger.info(
+                    f'Filtered cached recommendations (sync) for user {user_id}: '
+                    f'{len(recommendations)} -> {len(filtered_recommendations)} '
+                    f'(removed {len(recommendations) - len(filtered_recommendations)} existing rules)'
+                )
 
                 return {
                     'user_id': row[0],  # user_id
                     'recommendation_type': row[1],  # recommendation_type
-                    'recommendations': recommendations_data.get('recommendations', []),
+                    'recommendations': filtered_recommendations,
                     'generated_at': row[3].isoformat(),  # generated_at
                     'cached': True,
                 }
