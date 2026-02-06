@@ -21,21 +21,51 @@ export class AlertService {
 
     const notifications = await response.json();
 
-    // Transform API data to match UI schema
-    return notifications.map((notification: ApiNotificationResponse) => ({
-      id: notification.id,
-      title: notification.title,
-      description: notification.message,
-      severity:
-        notification.status === 'ERROR'
-          ? 'high'
-          : notification.status === 'WARNING'
-            ? 'medium'
-            : 'low',
-      timestamp: notification.created_at,
-      transaction_id: notification.transaction_id,
-      resolved: notification.read_at !== null,
-    }));
+    // Group notifications by alert event (same alert_rule_id + transaction_id + similar timestamp)
+    const groupedNotifications = new Map<string, ApiNotificationResponse[]>();
+
+    for (const notification of notifications) {
+      // Create a grouping key based on alert_rule_id and transaction_id
+      // This groups all notifications from the same alert trigger
+      const groupKey = `${notification.alert_rule_id}-${notification.transaction_id || 'no-tx'}`;
+
+      if (!groupedNotifications.has(groupKey)) {
+        groupedNotifications.set(groupKey, []);
+      }
+      groupedNotifications.get(groupKey)!.push(notification);
+    }
+
+    // Transform grouped notifications to Alert objects
+    return Array.from(groupedNotifications.values()).map((notificationGroup) => {
+      // Use the first notification as the primary one
+      const primary = notificationGroup[0];
+
+      // Extract all notification methods
+      const methods = notificationGroup.map((n) => n.notification_method);
+
+      // Extract all notification IDs
+      const ids = notificationGroup.map((n) => n.id);
+
+      // Alert is resolved only if ALL notifications in the group are read
+      const allRead = notificationGroup.every((n) => n.read_at !== null);
+
+      return {
+        id: primary.id,
+        title: primary.title,
+        description: primary.message,
+        severity:
+          primary.status === 'ERROR'
+            ? 'high'
+            : primary.status === 'WARNING'
+              ? 'medium'
+              : 'low',
+        timestamp: primary.created_at,
+        transaction_id: primary.transaction_id,
+        resolved: allRead,
+        notification_methods: methods,
+        notification_ids: ids,
+      } as Alert;
+    });
   }
 
   static async getAlertRules(): Promise<AlertRule[]> {

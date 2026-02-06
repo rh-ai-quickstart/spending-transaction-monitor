@@ -24,6 +24,7 @@ export const ApiResponseSchema = z.object({
  */
 export const ApiNotificationResponseSchema = z.object({
   id: z.string(),
+  alert_rule_id: z.string(),
   title: z.string(),
   message: z.string(),
   notification_method: z.string(),
