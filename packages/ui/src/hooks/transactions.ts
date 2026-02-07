@@ -56,6 +56,11 @@ export const useCreateTransaction = () => {
       // Invalidate related queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['users', auth.user?.id] });
+
+      // Force refetch alerts with multiple attempts to catch background processing
+      // Alert processing happens asynchronously on the backend via background tasks
+      // Use refetchQueries instead of invalidateQueries to force immediate refetch
+      queryClient.refetchQueries({ queryKey: ['alerts'] }); // Immediate attempt
     },
   });
 };
