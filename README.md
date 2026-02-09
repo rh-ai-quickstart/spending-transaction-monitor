@@ -318,6 +318,10 @@ To adapt this quickstart for your specific transaction monitoring needs:
 - For OpenShift: Namespace admin permissions in the target project
 - Access to container registry for pulling/pushing images
 
+#### Cluster Admin Privileges
+
+**IMPORTANT:** This quickstart utilizes some features that can only be used if the role you're using for installing the charts has `clusterAdmin`. This includes enabling and setting up the model registry. To learn more about the `clusterAdmin` privileges please see the [documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.22/html/enabling_lab-tuning/installing-the-required-components-for-lab-tuning_enable-lab-tuning).
+
 ---
 
 ## Deploy
@@ -547,6 +551,8 @@ pnpm type-check        # Run TypeScript checks
 ```
 
 ### OpenShift Deployment
+
+> **Note:** Some features in this quickstart require `clusterAdmin` privileges, particularly for enabling and setting up the model registry. See [Required user permissions](#required-user-permissions) for details.
 
 #### Quick Deploy
 
