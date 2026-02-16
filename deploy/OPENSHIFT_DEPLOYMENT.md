@@ -9,6 +9,10 @@ This guide provides instructions for deploying the Spending Transaction Monitor 
 - Docker images built and pushed to your container registry (quay.io/rh-ai-quickstart)
 - OpenShift CLI (`oc`) configured and logged in
 
+### Cluster Admin Privileges
+
+**IMPORTANT:** This quickstart utilizes some features that can only be used if the role you're using for installing the charts has `clusterAdmin`. This includes enabling and setting up the model registry. To learn more about the `clusterAdmin` privileges please see the [documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.22/html/enabling_lab-tuning/installing-the-required-components-for-lab-tuning_enable-lab-tuning).
+
 ## Quick Start
 
 1. **Create or switch to your OpenShift project:**
@@ -96,6 +100,10 @@ helm install spending-monitor ./deploy/helm/spending-monitor \
 ```
 
 #### Option 3: Deploy with Model Registry
+
+### Cluster Admin Privileges
+
+**IMPORTANT:** This quickstart utilizes some features that can only be used if the role you're using for installing the charts has `clusterAdmin`. To learn more about the `clusterAdmin` privileges please see the [documentation](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2.22/html/enabling_lab-tuning/installing-the-required-components-for-lab-tuning_enable-lab-tuning).
 
 ```bash
 # Install with model registry enabled.
