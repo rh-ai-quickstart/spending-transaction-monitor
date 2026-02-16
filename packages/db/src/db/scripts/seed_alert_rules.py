@@ -161,30 +161,29 @@ def get_user_confirmation() -> bool:
 
 async def reset_database(session) -> None:
     """Delete all data from database tables"""
-    print('\n🗑️  Clearing existing database data...')
+    print('\n🗑️  Clearing existing database data...', flush=True)
 
     try:
-        # Delete in correct order (respecting foreign key constraints)
-        print('🔄 Deleting cached_recommendations...')
-        await session.execute(text('DELETE FROM cached_recommendations'))
-
-        print('📋 Deleting alert_notifications...')
-        await session.execute(text('DELETE FROM alert_notifications'))
-
-        print('⚠️  Deleting alert_rules...')
-        await session.execute(text('DELETE FROM alert_rules'))
-
-        print('💳 Deleting transactions...')
-        await session.execute(text('DELETE FROM transactions'))
-
-        print('🏦 Deleting credit_cards...')
-        await session.execute(text('DELETE FROM credit_cards'))
-
-        print('👤 Deleting users...')
-        await session.execute(text('DELETE FROM users'))
+        # Use TRUNCATE CASCADE for reliable cleanup regardless of FK order
+        # This is faster and handles all dependent tables automatically
+        print('🗑️  Truncating all tables with CASCADE...', flush=True)
+        await session.execute(
+            text(
+                """
+            TRUNCATE TABLE 
+                cached_recommendations,
+                alert_notifications,
+                alert_rules,
+                transactions,
+                credit_cards,
+                users
+            CASCADE
+            """
+            )
+        )
 
         await session.commit()
-        print('✅ Database cleared successfully!')
+        print('✅ Database cleared successfully!', flush=True)
 
     except Exception as e:
         print(f'❌ Error during database reset: {e}')
