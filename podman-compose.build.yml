@@ -16,6 +16,7 @@ services:
       dockerfile: packages/api/Containerfile
       args:
         TORCH_VARIANT: cpu  # Use CPU version for local builds (smaller, faster)
+        BASE_IMAGE: python:3.12-slim  # Use slim image for faster local builds (UBI also works with subscription fix)
 
   # React Frontend - Build Override
   # Environment variables are now injected at runtime, not build time
