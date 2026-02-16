@@ -3,7 +3,7 @@
 Manual test script to exercise email notifications by creating a test user and transactions.
 
 Run with:
-    cd packages/api && uv run python manual_test_notifications.py
+    cd packages/api && uv run python tests/manual_test_notifications.py
 """
 
 import asyncio
