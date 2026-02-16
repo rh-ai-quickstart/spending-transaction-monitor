@@ -307,14 +307,23 @@ class TestAlertRuleService:
         sample_user_obj,
     ):
         """Test successful triggering of an alert rule"""
-        # Arrange
-        with patch.object(
-            alert_rule_service, 'generate_alert_with_llm'
-        ) as mock_generate:
+        # Arrange - mock synchronous DB operations used for notification creation
+        mock_sync_session = MagicMock()
+        mock_sync_session.__enter__ = MagicMock(return_value=mock_sync_session)
+        mock_sync_session.__exit__ = MagicMock(return_value=None)
+
+        with (
+            patch.object(
+                alert_rule_service, 'generate_alert_with_llm'
+            ) as mock_generate,
+            patch('sqlalchemy.create_engine') as _mock_create_engine,
+            patch('sqlalchemy.orm.sessionmaker') as mock_sessionmaker,
+        ):
             mock_generate.return_value = {
                 'alert_triggered': True,
                 'alert_message': 'Large transaction detected: $150.00',
             }
+            mock_sessionmaker.return_value = MagicMock(return_value=mock_sync_session)
 
             # Act
             result = await alert_rule_service.trigger_alert_rule(
@@ -569,14 +578,23 @@ class TestAlertRuleService:
         sample_user_obj,
     ):
         """Test that triggering creates notification with correct data"""
-        # Arrange
-        with patch.object(
-            alert_rule_service, 'generate_alert_with_llm'
-        ) as mock_generate:
+        # Arrange - mock synchronous DB operations used for notification creation
+        mock_sync_session = MagicMock()
+        mock_sync_session.__enter__ = MagicMock(return_value=mock_sync_session)
+        mock_sync_session.__exit__ = MagicMock(return_value=None)
+
+        with (
+            patch.object(
+                alert_rule_service, 'generate_alert_with_llm'
+            ) as mock_generate,
+            patch('sqlalchemy.create_engine') as _mock_create_engine,
+            patch('sqlalchemy.orm.sessionmaker') as mock_sessionmaker,
+        ):
             mock_generate.return_value = {
                 'alert_triggered': True,
                 'alert_message': 'Custom alert message',
             }
+            mock_sessionmaker.return_value = MagicMock(return_value=mock_sync_session)
 
             # Act
             result = await alert_rule_service.trigger_alert_rule(

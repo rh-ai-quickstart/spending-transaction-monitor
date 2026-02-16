@@ -1,5 +1,6 @@
 {
     "alert_text": "Alert me if my dining expense exceeds the average of the last 30 days by more than 40%.",
+    "notification_methods": ["EMAIL"],
     "user": {
       "id": "7bf1a252-9872-4f70-89c0-fc1a35c2a89f",
       "email": "michael.johnson@example.com",

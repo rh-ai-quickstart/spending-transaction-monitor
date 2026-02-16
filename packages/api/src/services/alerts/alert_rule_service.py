@@ -95,6 +95,72 @@ class AlertRuleService:
         }
 
     @staticmethod
+    def _user_to_dict(user: User) -> dict[str, Any]:
+        """Convert SQLAlchemy User model to a clean dictionary (column values only, no relationships)."""
+
+        def safe_datetime_convert(dt_obj):
+            if dt_obj is None:
+                return None
+            if hasattr(dt_obj, 'isoformat'):
+                return dt_obj.isoformat()
+            return str(dt_obj)
+
+        def safe_float_convert(num_obj):
+            if num_obj is None:
+                return None
+            try:
+                return float(num_obj)
+            except (ValueError, TypeError):
+                return None
+
+        return {
+            'id': getattr(user, 'id', None),
+            'email': getattr(user, 'email', None),
+            'keycloak_id': getattr(user, 'keycloak_id', None),
+            'first_name': getattr(user, 'first_name', None),
+            'last_name': getattr(user, 'last_name', None),
+            'phone_number': getattr(user, 'phone_number', None),
+            'sms_notifications_enabled': getattr(
+                user, 'sms_notifications_enabled', True
+            ),
+            'created_at': safe_datetime_convert(getattr(user, 'created_at', None)),
+            'updated_at': safe_datetime_convert(getattr(user, 'updated_at', None)),
+            'is_active': getattr(user, 'is_active', True),
+            'address_street': getattr(user, 'address_street', None),
+            'address_city': getattr(user, 'address_city', None),
+            'address_state': getattr(user, 'address_state', None),
+            'address_zipcode': getattr(user, 'address_zipcode', None),
+            'address_country': getattr(user, 'address_country', None),
+            'credit_limit': safe_float_convert(getattr(user, 'credit_limit', None)),
+            'credit_balance': safe_float_convert(getattr(user, 'credit_balance', None)),
+            'location_consent_given': getattr(user, 'location_consent_given', False),
+            'last_app_location_latitude': safe_float_convert(
+                getattr(user, 'last_app_location_latitude', None)
+            ),
+            'last_app_location_longitude': safe_float_convert(
+                getattr(user, 'last_app_location_longitude', None)
+            ),
+            'last_app_location_timestamp': safe_datetime_convert(
+                getattr(user, 'last_app_location_timestamp', None)
+            ),
+            'last_app_location_accuracy': safe_float_convert(
+                getattr(user, 'last_app_location_accuracy', None)
+            ),
+            'last_transaction_latitude': safe_float_convert(
+                getattr(user, 'last_transaction_latitude', None)
+            ),
+            'last_transaction_longitude': safe_float_convert(
+                getattr(user, 'last_transaction_longitude', None)
+            ),
+            'last_transaction_timestamp': safe_datetime_convert(
+                getattr(user, 'last_transaction_timestamp', None)
+            ),
+            'last_transaction_city': getattr(user, 'last_transaction_city', None),
+            'last_transaction_state': getattr(user, 'last_transaction_state', None),
+            'last_transaction_country': getattr(user, 'last_transaction_country', None),
+        }
+
+    @staticmethod
     def parse_nl_rule_with_llm(
         alert_text: str, transaction: dict[str, Any]
     ) -> dict[str, Any]:
@@ -275,23 +341,23 @@ class AlertRuleService:
                 'validation_timestamp': datetime.now().isoformat(),
             }
 
-    async def create_notification(
+    async def create_notification_from_ids(
         self,
-        rule: AlertRule,
-        transaction: Transaction,
-        user: User,
+        user_id: str,
+        rule_id: str,
+        transaction_id: str,
         session: AsyncSession,
         alert_result: dict[str, Any],
         notification_method: NotificationMethod,
     ) -> AlertNotification:
-        """Create a notification for an alert rule with a specific notification method"""
+        """Create a notification using primitive IDs (avoids ORM object access after commits)"""
 
         notification = AlertNotification(
             id=str(uuid.uuid4()),
-            user_id=user.id,
-            alert_rule_id=rule.id,
+            user_id=user_id,
+            alert_rule_id=rule_id,
             title=alert_result.get('alert_title', 'Alert triggered'),
-            transaction_id=transaction.id,
+            transaction_id=transaction_id,
             message=alert_result.get('alert_message', 'Alert triggered'),
             status=NotificationStatus.PENDING,
             created_at=datetime.now(UTC),
@@ -299,7 +365,7 @@ class AlertRuleService:
             notification_method=notification_method,
         )
         print(
-            f'DEBUG: Creating notification with method {notification_method}: {notification}'
+            f'DEBUG: Creating notification with method {notification_method}: id={notification.id}'
         )
         session.add(notification)
         await session.flush()  # writes to DB, no commit
@@ -312,6 +378,7 @@ class AlertRuleService:
             updated_notification = await self.notification_service.notify(
                 notification, session
             )
+            # Update the notification object with the results
             notification.status = updated_notification.status
             notification.sent_at = updated_notification.sent_at
             notification.delivered_at = updated_notification.delivered_at
@@ -319,7 +386,8 @@ class AlertRuleService:
             notification.updated_at = datetime.now(UTC)
             session.add(notification)
             await session.commit()
-            await session.refresh(notification)
+            # Note: Don't refresh after commit - the object is detached and we've
+            # already set all needed attributes manually above
 
         except Exception as e:
             print(f'DEBUG: Error sending notification: {e}')
@@ -327,9 +395,114 @@ class AlertRuleService:
             notification.updated_at = datetime.now(UTC)
             session.add(notification)
             await session.commit()
-            await session.refresh(notification)
 
         return notification
+
+    def _send_notification_sync(
+        self, notification: AlertNotification, sync_session, user_id: str
+    ) -> None:
+        """
+        Send notification using synchronous operations.
+        This avoids all greenlet/async context issues.
+        """
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        import logging
+        import smtplib
+
+        from sqlalchemy import select
+
+        from core.config import settings
+
+        logger = logging.getLogger(__name__)
+
+        if notification.notification_method == NotificationMethod.EMAIL:
+            # Get user email
+            result = sync_session.execute(select(User.email).where(User.id == user_id))
+            user_email = result.scalar_one_or_none()
+            if not user_email:
+                logger.error(f'User email not found for user {user_id}')
+                notification.status = NotificationStatus.FAILED
+                return
+
+            try:
+                # Create email message
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = notification.title
+                msg['From'] = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME
+                msg['To'] = user_email
+
+                if settings.SMTP_REPLY_TO_EMAIL:
+                    msg['Reply-To'] = settings.SMTP_REPLY_TO_EMAIL
+
+                text_part = MIMEText(notification.message, 'plain')
+                msg.attach(text_part)
+
+                # Send via SMTP
+                logger.info(
+                    f'🔌 Attempting SMTP connection to {settings.SMTP_HOST}:{settings.SMTP_PORT}'
+                )
+                if settings.SMTP_USE_SSL:
+                    server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+                else:
+                    server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+                    if settings.SMTP_USE_TLS:
+                        server.starttls()
+
+                if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+                    server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+
+                server.send_message(msg)
+                server.quit()
+
+                notification.status = NotificationStatus.SENT
+                notification.sent_at = datetime.now(UTC)
+                logger.info(f'✅ Email sent successfully to {user_email}')
+
+            except Exception as e:
+                logger.error(f'Failed to send email: {e}')
+                notification.status = NotificationStatus.FAILED
+
+        elif notification.notification_method == NotificationMethod.SMS:
+            # SMS sending - requires Twilio credentials
+            try:
+                from twilio.rest import Client as TwilioClient
+
+                if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
+                    logger.error('Twilio credentials not configured')
+                    notification.status = NotificationStatus.FAILED
+                    return
+
+                # Get user phone
+                result = sync_session.execute(
+                    select(User.phone_number).where(User.id == user_id)
+                )
+                phone = result.scalar_one_or_none()
+                if not phone:
+                    logger.error(f'User phone not found for user {user_id}')
+                    notification.status = NotificationStatus.FAILED
+                    return
+
+                client = TwilioClient(
+                    settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN
+                )
+                client.messages.create(
+                    body=notification.message,
+                    from_=settings.TWILIO_FROM_NUMBER,
+                    to=phone,
+                )
+                notification.status = NotificationStatus.SENT
+                notification.sent_at = datetime.now(UTC)
+                logger.info(f'✅ SMS sent successfully to {phone}')
+
+            except Exception as e:
+                logger.error(f'Failed to send SMS: {e}')
+                notification.status = NotificationStatus.FAILED
+        else:
+            # Unsupported method
+            notification.status = NotificationStatus.FAILED
+
+        notification.updated_at = datetime.now(UTC)
 
     async def trigger_alert_rule(
         self,
@@ -350,6 +523,7 @@ class AlertRuleService:
         Returns:
             Dict with trigger results
         """
+
         if not rule.is_active:
             raise ValueError('Alert rule is not active')
 
@@ -382,62 +556,132 @@ class AlertRuleService:
                 'timeframe': rule.timeframe,
             }
 
+            # Serialize to column-only dicts so no SQLAlchemy relationships are
+            # passed into the sync LangGraph (avoids greenlet/async lazy-load errors)
+            transaction_dict = self._transaction_to_dict(transaction)
+            user_dict = self._user_to_dict(user)
+
+            # Extract primitive IDs now - we'll use these instead of ORM objects
+            # after session commits to avoid expired object access / lazy loads
+            user_id = user.id
+            rule_id = rule.id
+            transaction_id = transaction.id
+
+            # Extract trigger_count BEFORE calling LangGraph (while session is clean)
+            trigger_count = rule.trigger_count
+            notification_methods = rule.notification_methods or [
+                NotificationMethod.EMAIL,
+                NotificationMethod.SMS,
+            ]
+
+            # Run the synchronous LangGraph directly - it uses its own sync DB connection
+            # for SQL execution (psycopg2), so it doesn't affect our async session.
             alert_result = self.generate_alert_with_llm(
                 rule.natural_language_query,
-                transaction.__dict__,
-                user.__dict__,
+                transaction_dict,
+                user_dict,
                 alert_rule_dict,
             )
             print(f'DEBUG: generate_alert_with_llm completed, result: {alert_result}')
 
             if alert_result and alert_result.get('alert_triggered', False):
-                print('DEBUG: Alert was triggered - using working simplified version')
-                trigger_count = rule.trigger_count
-
-                # Get notification methods from rule, default to EMAIL and SMS if not set
-                notification_methods = rule.notification_methods or [
-                    NotificationMethod.EMAIL,
-                    NotificationMethod.SMS,
-                ]
+                print(
+                    'DEBUG: Alert was triggered - creating notifications with sync DB'
+                )
                 print(f'DEBUG: Notification methods for alert: {notification_methods}')
 
-                # Create and send notifications for each method
-                notifications = []
-                notification_statuses = []
-                try:
-                    for method in notification_methods:
-                        notification = await self.create_notification(
-                            rule, transaction, user, session, alert_result, method
-                        )
-                        await session.refresh(notification)
-                        sent_notification = await self.send_notification(
-                            notification, session
-                        )
-                        notifications.append(sent_notification)
-                        notification_statuses.append(sent_notification.status)
+                # Use SYNCHRONOUS database operations for notification creation.
+                # This avoids all greenlet/async context issues because we're using
+                # the same approach as sql_executor.py (psycopg2 sync driver).
+                from sqlalchemy import create_engine
+                from sqlalchemy import update as sql_update
+                from sqlalchemy.orm import sessionmaker
 
-                    # Update rule trigger count and last triggered time
-                    await session.refresh(rule)
-                    rule.trigger_count = trigger_count + 1
-                    rule.last_triggered = datetime.now(UTC)
-                    session.add(rule)
-                    await session.commit()
-                    await session.refresh(rule)
-                except Exception as e:
-                    print(f'DEBUG: Error creating/sending notifications: {e}')
-                    raise e
+                from core.config import settings
+
+                # Create sync engine (same pattern as sql_executor.py)
+                sync_db_url = settings.DATABASE_URL.replace(
+                    'postgresql+asyncpg://', 'postgresql+psycopg2://'
+                )
+                sync_engine = create_engine(sync_db_url, echo=False)
+                SyncSession = sessionmaker(
+                    autocommit=False, autoflush=False, bind=sync_engine
+                )
+
+                # Store primitive values, not ORM objects (which become detached after session closes)
+                notification_ids = []
+                notification_statuses = []
+
+                with SyncSession() as sync_session:
+                    try:
+                        for method in notification_methods:
+                            notification_id = str(uuid.uuid4())
+                            notification = AlertNotification(
+                                id=notification_id,
+                                user_id=user_id,
+                                alert_rule_id=rule_id,
+                                title=alert_result.get(
+                                    'alert_title', 'Alert triggered'
+                                ),
+                                transaction_id=transaction_id,
+                                message=alert_result.get(
+                                    'alert_message', 'Alert triggered'
+                                ),
+                                status=NotificationStatus.PENDING,
+                                created_at=datetime.now(UTC),
+                                updated_at=datetime.now(UTC),
+                                notification_method=method,
+                            )
+                            print(
+                                f'DEBUG: Creating notification {notification_id} for method {method}'
+                            )
+                            sync_session.add(notification)
+                            sync_session.flush()
+
+                            # Send notification using sync SMTP/SMS (no async needed)
+                            try:
+                                self._send_notification_sync(
+                                    notification, sync_session, user_id
+                                )
+                            except Exception as send_err:
+                                print(f'DEBUG: Error sending notification: {send_err}')
+                                notification.status = NotificationStatus.FAILED
+                                notification.updated_at = datetime.now(UTC)
+
+                            # Store primitive values BEFORE session closes
+                            notification_ids.append(notification_id)
+                            notification_statuses.append(notification.status)
+
+                        # Update rule trigger count
+                        sync_session.execute(
+                            sql_update(AlertRule)
+                            .where(AlertRule.id == rule_id)
+                            .values(
+                                trigger_count=trigger_count + 1,
+                                last_triggered=datetime.now(UTC),
+                            )
+                        )
+                        sync_session.commit()
+                        print(
+                            'DEBUG: Notifications created and rule updated successfully'
+                        )
+
+                    except Exception as e:
+                        sync_session.rollback()
+                        print(f'DEBUG: Error in sync notification creation: {e}')
+                        raise e
 
                 return {
                     'status': 'triggered',
                     'message': 'Alert rule triggered successfully',
-                    'trigger_count': trigger_count,
+                    'trigger_count': trigger_count + 1,
                     'rule_evaluation': alert_result,
                     'transaction_id': transaction_id,
                     'notification_status': notification_statuses[0]
                     if notification_statuses
                     else NotificationStatus.FAILED,
-                    'notification_id': notifications[0].id
-                    if notifications
+                    'notification_id': notification_ids[0]
+                    if notification_ids
                     else str(uuid.uuid4()),
                 }
             else:

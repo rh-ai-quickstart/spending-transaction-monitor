@@ -32,6 +32,11 @@ KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
 KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-admin}"
 KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
 
+# Notification Configuration
+# NOTIFICATION_METHODS can be: "EMAIL", "SMS", "EMAIL,SMS" (comma-separated)
+# If not set, uses the value from the JSON test file or validation response
+NOTIFICATION_METHODS="${NOTIFICATION_METHODS:-}"
+
 # Counter variables
 TOTAL_TESTS=0
 PASSED_TESTS=0
@@ -143,6 +148,13 @@ show_help() {
     echo "  KEYCLOAK_URL            Keycloak server URL (default: http://localhost:8080)"
     echo "  TEST_USER               Test user for realm (default: testuser)"
     echo "  TEST_PASSWORD           Test user password (default: password123)"
+    echo "  NOTIFICATION_METHODS    Comma-separated notification methods: EMAIL, SMS, or EMAIL,SMS"
+    echo "                          (default: uses JSON file value or validation response)"
+    echo ""
+    echo "Examples:"
+    echo "  NOTIFICATION_METHODS=EMAIL ./test_alert_rules.sh      # Test with email only"
+    echo "  NOTIFICATION_METHODS=SMS ./test_alert_rules.sh        # Test with SMS only"
+    echo "  NOTIFICATION_METHODS=EMAIL,SMS ./test_alert_rules.sh  # Test both"
     echo ""
 }
 
@@ -531,6 +543,25 @@ except:
             # Step 2b: Create alert rule using validation result
             echo -e "${YELLOW}🚨 Creating alert rule via API...${NC}"
             
+            # Extract notification_methods (priority: env var > JSON file > validation response > default)
+            local notification_methods_json="null"
+            if [[ -n "$NOTIFICATION_METHODS" ]]; then
+                # Convert comma-separated string to JSON array
+                notification_methods_json=$(echo "$NOTIFICATION_METHODS" | tr ',' '\n' | jq -R . | jq -s .)
+                echo -e "${BLUE}📱 Using notification methods from env: ${NOTIFICATION_METHODS}${NC}"
+            elif command -v jq >/dev/null 2>&1; then
+                # First try to get from JSON test file (if specified)
+                local file_notification_methods=$(jq -r '.notification_methods // empty' "$json_file" 2>/dev/null)
+                if [[ -n "$file_notification_methods" && "$file_notification_methods" != "null" ]]; then
+                    notification_methods_json=$(jq -c '.notification_methods' "$json_file")
+                    echo -e "${BLUE}📱 Using notification methods from JSON file: ${file_notification_methods}${NC}"
+                else
+                    # Fall back to validation response
+                    notification_methods_json=$(echo "$validate_response_body" | jq -c '.alert_rule.notification_methods // ["EMAIL"]')
+                    echo -e "${BLUE}📱 Using notification methods from validation: $(echo $notification_methods_json)${NC}"
+                fi
+            fi
+            
             # Create payload using proper JSON construction to avoid escaping issues
             local create_payload
             if command -v jq >/dev/null 2>&1; then
@@ -538,7 +569,8 @@ except:
                     --argjson alert_rule "$alert_rule_json" \
                     --arg sql_query "$sql_query" \
                     --arg natural_language_query "$alert_text" \
-                    '{alert_rule: $alert_rule, sql_query: $sql_query, natural_language_query: $natural_language_query}')
+                    --argjson notification_methods "$notification_methods_json" \
+                    '{alert_rule: $alert_rule, sql_query: $sql_query, natural_language_query: $natural_language_query, notification_methods: $notification_methods}')
             else
                 # Use temporary file approach to avoid shell escaping issues
                 echo "$validate_response_body" > /tmp/validation_result.json
@@ -549,10 +581,13 @@ with open('/tmp/validation_result.json', 'r') as f:
     validation_data = json.load(f)
 with open('/tmp/alert_text.txt', 'r') as f:
     alert_text = f.read().strip()
+# Get notification_methods from alert_rule or default to EMAIL only
+notification_methods = validation_data.get('alert_rule', {}).get('notification_methods', ['EMAIL'])
 payload = {
     'alert_rule': validation_data['alert_rule'],
     'sql_query': validation_data['sql_query'],
-    'natural_language_query': alert_text
+    'natural_language_query': alert_text,
+    'notification_methods': notification_methods
 }
 print(json.dumps(payload))
 ")
