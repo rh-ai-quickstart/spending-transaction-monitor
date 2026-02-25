@@ -12,6 +12,9 @@ node_modules/
 .turbo/
 .tanstack/
 
+# Test coverage
+coverage/
+
 
 
 
