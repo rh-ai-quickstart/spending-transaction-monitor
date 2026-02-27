@@ -1,0 +1,268 @@
+name: Code Coverage & E2E Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install API Python dependencies
+        run: uv sync --group dev
+        working-directory: packages/api
+
+      - name: Install DB Python dependencies
+        run: uv sync --group dev
+        working-directory: packages/db
+
+      - name: Run UI tests with coverage
+        run: pnpm --filter @spending-monitor/ui test:coverage
+
+      - name: Run API tests with coverage
+        run: pnpm --filter @spending-monitor/api test:coverage
+
+      - name: Upload UI coverage to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-coverage
+          path: packages/ui/coverage/
+          retention-days: 30
+
+      - name: Upload API coverage to artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: packages/api/htmlcov/
+          retention-days: 30
+
+      - name: Display UI coverage summary
+        run: |
+          echo "## UI Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f packages/ui/coverage/coverage-summary.json ]; then
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat packages/ui/coverage/coverage-summary.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Display API coverage summary
+        run: |
+          echo "## API Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f packages/api/coverage.xml ]; then
+            echo "Coverage report generated at packages/api/coverage.xml" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Add uv to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @spending-monitor/ui exec playwright install chromium --with-deps
+
+      - name: Create environment files for CI
+        run: |
+          # Create .env.development for service containers
+          cat > .env.development << 'EOF'
+          # CI Environment Configuration
+          POSTGRES_DB=spending-monitor
+          POSTGRES_USER=user
+          POSTGRES_PASSWORD=password
+          DB_PORT=5432
+          DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/spending-monitor
+
+          API_PORT=8000
+          ENVIRONMENT=ci
+          BYPASS_AUTH=true
+          DEBUG=false
+
+          CORS_ALLOWED_ORIGINS=http://localhost:3000
+          ALLOWED_ORIGINS=http://localhost:3000
+          ALLOWED_HOSTS='["http://localhost:3000"]'
+
+          USE_ML_RECOMMENDATIONS=false
+          USE_ML_INFERENCE_SERVICE=false
+
+          # Keycloak Configuration
+          KEYCLOAK_URL=http://keycloak:8080
+          KEYCLOAK_FRONTEND_URL=http://localhost:8080
+          KEYCLOAK_REALM=spending-monitor
+          KEYCLOAK_CLIENT_ID=spending-monitor-ui
+          KEYCLOAK_ADMIN=admin
+          KEYCLOAK_ADMIN_PASSWORD=admin
+
+          # SMTP Configuration
+          SMTP_HOST=smtp4dev
+          SMTP_PORT=25
+          SMTP_FROM_EMAIL=noreply@spending-monitor.local
+
+          # LLM Configuration (disabled for CI)
+          OPENAI_API_KEY=sk-test-key
+          ANTHROPIC_API_KEY=sk-test-key
+
+          # Vite UI Configuration
+          VITE_BYPASS_AUTH=true
+          VITE_ENVIRONMENT=ci
+          VITE_API_URL=http://localhost:3000/api
+          VITE_KEYCLOAK_URL=http://localhost:8080
+          VITE_KEYCLOAK_REALM=spending-monitor
+          VITE_KEYCLOAK_CLIENT_ID=spending-monitor-ui
+          EOF
+
+          # Create .env file for Docker Compose variable substitution and UI container env
+          cat > .env << 'EOF'
+          IMAGE_TAG=latest
+          KEYCLOAK_FRONTEND_URL=http://localhost:8080
+          KEYCLOAK_REALM=spending-monitor
+          KEYCLOAK_CLIENT_ID=spending-monitor-ui
+          VITE_BYPASS_AUTH=true
+          VITE_ENVIRONMENT=ci
+          EOF
+
+      - name: Start services with Docker Compose
+        run: |
+          # Use Docker Compose with the podman-compose.yml file
+          docker compose -p spending-transaction-monitor -f podman-compose.yml up -d postgres keycloak smtp4dev
+
+          # Wait for services to be healthy
+          echo "Waiting for PostgreSQL to be ready..."
+          timeout 60 bash -c 'until docker compose -p spending-transaction-monitor -f podman-compose.yml exec -T postgres pg_isready -U user -d spending-monitor; do sleep 2; done'
+
+          echo "Waiting for Keycloak to be ready..."
+          sleep 30
+
+      - name: Run database migrations
+        run: |
+          # Run migrations using 'docker compose run' which properly returns the exit code
+          docker compose -p spending-transaction-monitor -f podman-compose.yml run --rm migrations
+          echo "✅ Migrations completed successfully"
+
+      - name: Build and start API
+        run: |
+          docker compose -p spending-transaction-monitor -f podman-compose.yml up -d --build api
+
+          # Wait for API to be ready
+          echo "Waiting for API to be ready..."
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health 2>/dev/null; do sleep 2; done' || true
+          sleep 10
+
+      - name: Build and start UI
+        run: |
+          docker compose -p spending-transaction-monitor -f podman-compose.yml up -d --build ui nginx
+
+          # Wait for UI to be ready
+          echo "Waiting for UI to be ready..."
+          timeout 60 bash -c 'until curl -f http://localhost:3000 2>/dev/null; do sleep 2; done' || true
+          sleep 5
+
+      - name: Show service status
+        run: docker compose -p spending-transaction-monitor -f podman-compose.yml ps
+
+      - name: Show API logs
+        if: always()
+        run: docker compose -p spending-transaction-monitor -f podman-compose.yml logs api
+
+      - name: Show UI logs
+        if: always()
+        run: docker compose -p spending-transaction-monitor -f podman-compose.yml logs ui
+
+      - name: Verify services are responding
+        run: |
+          echo "=== Testing UI endpoint ==="
+          curl -v http://localhost:3000 2>&1 | head -n 30 || true
+          echo ""
+          echo "=== Testing API health endpoint ==="
+          curl -v http://localhost:8000/health 2>&1 || true
+          echo ""
+          echo "=== Testing API transactions endpoint ==="
+          curl -v http://localhost:8000/api/transactions 2>&1 | head -n 20 || true
+          echo ""
+          echo "=== Checking UI runtime config ==="
+          docker compose -p spending-transaction-monitor -f podman-compose.yml exec ui cat /app/dist/env-config/env-config.js || true
+          echo ""
+          echo "=== Checking UI container environment variables ==="
+          docker compose -p spending-transaction-monitor -f podman-compose.yml exec ui env | grep -E 'VITE_|BYPASS' || echo "No VITE_ or BYPASS variables found"
+
+      - name: Run E2E tests
+        run: pnpm --filter @spending-monitor/ui e2e
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: packages/ui/playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: packages/ui/test-results/
+          retention-days: 30
+
+      - name: Stop services
+        if: always()
+        run: docker compose -p spending-transaction-monitor -f podman-compose.yml down -v

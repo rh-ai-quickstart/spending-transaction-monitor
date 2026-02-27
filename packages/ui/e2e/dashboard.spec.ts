@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, waitForAuthCheck } from './fixtures/test-fixtures';
 
 /**
  * Dashboard E2E Tests
@@ -15,7 +15,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate and render
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should display the dashboard header or login page', async ({ page }) => {
@@ -63,7 +68,12 @@ test.describe('Dashboard', () => {
 test.describe('Transaction List', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should show loading state initially', async ({ page }) => {
@@ -93,7 +103,7 @@ test.describe('Transaction List', () => {
     });
 
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // Page should still render without crashing
     const body = page.locator('body');
@@ -104,7 +114,12 @@ test.describe('Transaction List', () => {
 test.describe('Transaction Interactions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should open transaction details when clicking a transaction', async ({
@@ -138,7 +153,12 @@ test.describe('Transaction Interactions', () => {
 test.describe('Dashboard Navigation', () => {
   test('should navigate to transactions page', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
 
     // Navigation links are core UI, must exist
     const transactionsLink = page.locator(
@@ -147,7 +167,7 @@ test.describe('Dashboard Navigation', () => {
 
     await expect(transactionsLink.first()).toBeVisible({ timeout: 5000 });
     await transactionsLink.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // URL should include transactions
     expect(page.url()).toContain('transaction');
@@ -155,14 +175,19 @@ test.describe('Dashboard Navigation', () => {
 
   test('should navigate to alerts page', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
 
     // Navigation links are core UI, must exist
     const alertsLink = page.locator('a[href*="alert"], [data-testid="nav-alerts"]');
 
     await expect(alertsLink.first()).toBeVisible({ timeout: 5000 });
     await alertsLink.first().click();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
 
     // URL should include alerts
     expect(page.url()).toContain('alert');

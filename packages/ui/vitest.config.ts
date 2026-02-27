@@ -19,6 +19,20 @@ export default defineConfig({
         storageQuota: 10000000,
       },
     },
+    // Code coverage configuration
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov'],
+      exclude: [
+        'node_modules/',
+        'dist/',
+        '.turbo/',
+        'src/test-setup.ts',
+        '**/*.spec.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+        '**/*.test.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+        'e2e/',
+      ],
+    },
   },
   resolve: {
     alias: {

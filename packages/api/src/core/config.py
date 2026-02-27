@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     )
 
     # Environment settings
-    ENVIRONMENT: Literal['development', 'production', 'staging', 'test'] = 'development'
+    ENVIRONMENT: Literal['development', 'production', 'staging', 'test', 'ci'] = (
+        'development'
+    )
 
     # Authentication settings
     BYPASS_AUTH: bool = False
