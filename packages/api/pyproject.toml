@@ -193,7 +193,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --tb=short --ignore=tests/integration"
+addopts = "-v --tb=short --ignore=tests/integration --cov-fail-under=70"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')"
@@ -204,7 +204,9 @@ dev = [
     "mypy>=1.17.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.0.0",
     "pytest-mock>=3.15.0",
+    "pytest-cov>=6.0.0",
     "respx>=0.22.0",
     "ruff>=0.12.11",
     "types-python-jose>=3.5.0.20250531",

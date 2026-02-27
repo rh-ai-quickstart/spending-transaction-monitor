@@ -9,8 +9,9 @@ import { defineConfig, devices } from '@playwright/test';
  *   pnpm e2e:debug    - Run in debug mode
  *
  * Prerequisites:
- *   - App running at http://localhost:3000 (make run-local)
- *   - Or use webServer config below to auto-start
+ *   - App running at http://localhost:3000 with BYPASS_AUTH=true
+ *   - Start dev server with: BYPASS_AUTH=true pnpm dev:vite
+ *   - Or use make run-local which sets BYPASS_AUTH automatically
  */
 export default defineConfig({
   testDir: './e2e',
@@ -37,6 +38,10 @@ export default defineConfig({
 
     /* Video recording on failure */
     video: 'on-first-retry',
+
+    /* Set environment variables for the test server */
+    /* Note: These are passed to the app server, not Playwright itself */
+    /* Make sure BYPASS_AUTH=true is set when starting the dev server */
   },
 
   /* Configure projects for major browsers */

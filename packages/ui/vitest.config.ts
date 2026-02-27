@@ -19,6 +19,23 @@ export default defineConfig({
         storageQuota: 10000000,
       },
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.{test,spec}.{ts,tsx}',
+        'src/test-setup.ts',
+        'src/**/*.stories.tsx',
+        'src/main.tsx',
+      ],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 70,
+        statements: 70,
+      },
+    },
   },
   resolve: {
     alias: {

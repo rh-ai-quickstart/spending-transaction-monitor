@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, Page } from '@playwright/test';
 
 /**
  * Custom test fixtures for e2e tests
@@ -18,10 +18,33 @@ export const test = base.extend<{
     // Navigate to the app
     await page.goto('/');
 
-    // Wait for the app to be interactive
-    // In dev/bypass mode, we should see the dashboard
-    // In auth mode, we should see the login page
-    await page.waitForLoadState('networkidle');
+    // Wait for DOM to be ready (better than networkidle for apps with polling)
+    await page.waitForLoadState('domcontentloaded');
+
+    // Wait for auth check to complete
+    // First check if the auth message appears (it might not if auth is already bypassed)
+    const authCheckMsg = page.locator('text="Checking authentication"');
+    const authMsgExists = await authCheckMsg.isVisible().catch(() => false);
+
+    if (authMsgExists) {
+      // If auth message exists, wait for it to disappear (up to 20 seconds)
+      await authCheckMsg.waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+    }
+
+    // Additional wait to ensure auth state has settled
+    await page.waitForTimeout(1500);
+
+    // Wait for React to hydrate and render - check for app-specific content
+    const mainContentLoaded = await page
+      .waitForSelector('header, main, nav, [data-testid="dashboard-header"]', {
+        timeout: 15000,
+      })
+      .catch(() => null);
+
+    // If main content found, wait a bit more for dynamic content to load
+    if (mainContentLoaded) {
+      await page.waitForTimeout(1000);
+    }
 
     await use();
   },
@@ -68,14 +91,27 @@ export const SELECTORS = {
 };
 
 /**
+ * Helper to wait for authentication check to complete
+ */
+export async function waitForAuthCheck(page: Page) {
+  // First check if the auth message appears
+  const authCheckMsg = page.locator('text="Checking authentication"');
+  const authMsgExists = await authCheckMsg.isVisible().catch(() => false);
+
+  if (authMsgExists) {
+    // If auth message exists, wait for it to disappear (up to 20 seconds)
+    await authCheckMsg.waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+  }
+
+  // Additional wait to ensure auth state has settled
+  await page.waitForTimeout(1500);
+}
+
+/**
  * Helper to wait for API response
  */
 export async function waitForApiResponse(
-  page: ReturnType<(typeof base)['extend']> extends (arg: infer T) => unknown
-    ? T extends { page: infer P }
-      ? P
-      : never
-    : never,
+  page: Page,
   urlPattern: string | RegExp,
   options?: { timeout?: number },
 ) {

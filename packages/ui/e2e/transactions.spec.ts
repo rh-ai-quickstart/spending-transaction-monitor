@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, waitForAuthCheck } from './fixtures/test-fixtures';
 
 /**
  * Transactions Page E2E Tests
@@ -15,7 +15,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Transactions Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/transactions');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should display transactions page', async ({ page }) => {
@@ -55,7 +60,12 @@ test.describe('Transactions Page', () => {
 test.describe('Transaction Details', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/transactions');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should open transaction drawer on click', async ({ page }) => {
@@ -131,7 +141,12 @@ test.describe('Transaction Details', () => {
 test.describe('Add Transaction', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/transactions');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should have add transaction button', async ({ page }) => {
@@ -168,7 +183,12 @@ test.describe('Add Transaction', () => {
 test.describe('Transaction Filtering', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/transactions');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should have filter/search controls', async ({ page }) => {
@@ -187,7 +207,12 @@ test.describe('Transaction Filtering', () => {
 test.describe('Transaction Chart', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/transactions');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for auth check to complete
+    await waitForAuthCheck(page);
+    // Wait for React to hydrate
+    await page.waitForSelector('header, main, nav', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
   });
 
   test('should display transaction chart', async ({ page }) => {
