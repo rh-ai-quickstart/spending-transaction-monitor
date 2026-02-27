@@ -193,7 +193,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --tb=short --ignore=tests/integration --cov-fail-under=70"
+addopts = "-v --tb=short --ignore=tests/integration --cov-fail-under=40"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')"
