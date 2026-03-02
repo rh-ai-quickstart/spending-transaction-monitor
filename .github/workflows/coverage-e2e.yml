@@ -52,7 +52,10 @@ jobs:
         run: pnpm --filter @spending-monitor/ui test:coverage
 
       - name: Run API tests with coverage
-        run: pnpm --filter @spending-monitor/api test:coverage
+        run: uv run pytest --cov=src --cov-report=term --cov-report=html --cov-report=json
+        working-directory: packages/api
+        env:
+          ENVIRONMENT: test
 
       - name: Upload UI coverage to artifacts
         uses: actions/upload-artifact@v4
