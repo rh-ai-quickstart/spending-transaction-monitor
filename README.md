@@ -166,26 +166,21 @@ The solution is deployed on **OpenShift** and integrates multiple components:
 
 ```mermaid
 graph TB
-  %% Users
-  USER[User (Web/Mobile)] -->|HTTPS| FE[Frontend (Nginx + React)]
+USER[User Web Mobile] --> FE[Frontend Nginx React]
 
-  %% Auth
-  FE <-->|OAuth2/OIDC| KC[Keycloak]
-  FE -->|/api| API[FastAPI Backend]
-  API <-->|Token validation| KC
+FE <--> KC[Keycloak Auth]
+FE --> API[FastAPI Backend]
+API <--> KC
 
-  %% Core backend
-  API --> DB[(PostgreSQL + pgvector)]
-  API --> AI[AI Services<br/>(LangGraph + LlamaStack + Recommendations)]
-  AI --> DB
+API --> DB[(PostgreSQL pgvector)]
+API --> AI[AI Services LangGraph LlamaStack Recs]
+AI --> DB
 
-  %% External transactions
-  EXT[Transaction Source] -->|POST /transactions| API
+EXT[Transaction Source] --> API
 
-  %% Notifications
-  API --> NOTIF[Notification Service]
-  NOTIF --> EMAIL[Email]
-  NOTIF --> SMS[SMS]
+API --> NOTIF[Notification Service]
+NOTIF --> EMAIL[Email]
+NOTIF --> SMS[SMS]
 ```
 
 #### Detailed Component Flow
