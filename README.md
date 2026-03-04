@@ -128,83 +128,353 @@ Throughout this quickstart, you'll gain hands-on experience with modern AI and c
 
 The solution is deployed on **OpenShift** and integrates multiple components:
 
-- **Transaction Ingestion Service**: Securely receives credit card transaction data in real-time and stores it in the database.
-- **Transaction Data Store**: Stores both historical and streaming data (PostgreSQL).
-- **Customer UI**: React frontend for defining and managing alerts with location-based anomaly detection.
-- **NLP Module (LlamaStack + LangGraph Agent)**: Parses natural language into machine-readable rules.
-- **Rules Engine / Alerting Service**: Evaluates transactions against user rules, behavioral patterns, and location-based risk assessment.
-- **AI/ML Behavioral Analysis**: Detects anomalies, spending spikes, recurring patterns, and location-based anomaly indicators.
-- **Location-based Security**: Captures user GPS coordinates for enhanced security monitoring and anomaly detection.
-- **Notification Service**: Sends alerts via email or SMS.
+- **React Frontend (UI)**: User interface for managing alerts, viewing transactions, and receiving ML-powered recommendations
+- **FastAPI Backend**: Core API service handling authentication, business logic, and orchestration
+- **Keycloak**: OAuth2/OIDC authentication and authorization with PKCE flow
+- **PostgreSQL + pgvector**: Primary data store with vector support for embeddings
+- **LlamaStack + LangGraph Agents**: NLP service for parsing natural language alert rules into SQL queries
+- **ML Recommendation System**: KNN collaborative filtering for personalized alert suggestions
+- **Location Service**: GPS-based anomaly detection and location tracking
+- **Notification Service**: Multi-channel alert delivery (Email, SMS, Push, Webhook)
+- **Background Services**: Job queues for alerts, recommendations, and scheduled tasks
+
+#### High-Level Architecture
 
 ```mermaid
-graph TD
+graph TB
+    subgraph "User Layer"
+        USER[User Browser]
+        MOBILE[Mobile Device GPS]
+    end
 
-  %% UI
-  subgraph UI["UI (packages/ui)"]
-    U["User"] --> WUI["Web UI"]
-  end
+    subgraph "Frontend (port 3000)"
+        NGINX[Nginx Reverse Proxy]
+        UI[React + TypeScript UI]
+    end
 
-  %% API
-  subgraph API["API (packages/api)"]
-    API_APP["FastAPI App"]
-    IN["Transaction API"]
-  end
+    subgraph "Authentication"
+        KC[Keycloak<br/>OAuth2/OIDC]
+    end
 
-  %% Evaluation
-  subgraph EVAL["Evaluation (packages/evaluation)"]
-    EV["Rule Evaluation Service"]
-  end
+    subgraph "API Layer (port 8000)"
+        API[FastAPI Application]
 
-  %% Alerts
-  subgraph ALERTS["Alerts (packages/alerts)"]
-    AL["Alerts Service"]
-  end
+        subgraph "Routes"
+            R_USER[Users API]
+            R_TXN[Transactions API]
+            R_ALERT[Alerts API]
+            R_SETTING[Settings API]
+            R_WS[WebSocket API]
+        end
 
-  %% DB
-  subgraph DB["DB (packages/db) - PostgreSQL"]
-    USERS["users"]
-    CARDS["credit_cards"]
-    AR["alert_rules"]
-    TRX["transactions"]
-    AN["alert_notifications"]
-  end
+        subgraph "Core Services"
+            S_USER[User Service]
+            S_TXN[Transaction Service]
+            S_ALERT[Alert Rule Service]
+            S_NOTIF[Notification Service]
+            S_LOC[Location Service]
+        end
 
-  %% Delivery
-  subgraph DELIV["Delivery Channels"]
-    EM["Email"]
-    SM["SMS"]
-    PS["Push"]
-    WH["Webhook"]
-  end
+        subgraph "AI/ML Services"
+            S_AGENT[LangGraph Agents]
+            S_ML[ML Recommendation<br/>KNN Collaborative]
+            S_LLM[LLM Recommendation]
+            S_EMBED[Embedding Service]
+        end
 
-  %% External Source
-  subgraph EXT["External"]
-    TS["Transaction Source"]
-  end
+        subgraph "Background Workers"
+            Q_ALERT[Alert Job Queue]
+            Q_REC[Recommendation Queue]
+            SCHED[Recommendation Scheduler]
+        end
+    end
 
-  %% Rule authoring
-  WUI -->|Create/Update Rule| API_APP
-  API_APP -->|Persist| AR
+    subgraph "AI/NLP Layer (port 8321)"
+        LLAMA[LlamaStack<br/>NLP Inference]
+    end
 
-  %% Transaction ingestion
-  TS --> IN
-  IN --> API_APP
-  API_APP -->|Store| TRX
+    subgraph "Data Layer"
+        subgraph "PostgreSQL + pgvector (port 5432)"
+            T_USER[(users)]
+            T_CARD[(credit_cards)]
+            T_TXN[(transactions)]
+            T_ALERT[(alert_rules)]
+            T_NOTIF[(alert_notifications)]
+            T_CACHE[(cached_recommendations)]
+            T_EMB[(merchant_embeddings)]
+            T_SYN[(category_synonyms)]
+        end
 
-  %% Evaluation path
-  API_APP -->|Evaluate| EV
-  EV -->|Read| AR
-  EV -->|Read| TRX
-  EV -->|Create| AN
-  EV -->|Dispatch| AL
+        ML_MODEL[("ML Models<br/>/tmp/ml_models<br/>model_knn.pkl")]
+    end
 
-  %% Alerts delivery
-  AL -->|Update| AN
-  AL --> EM
-  AL --> SM
-  AL --> PS
-  AL --> WH
+    subgraph "Notification Channels"
+        SMTP[SMTP4Dev<br/>Email Server<br/>port 3002]
+        SMS_GW[SMS Gateway]
+        PUSH_GW[Push Notifications]
+        WEBHOOK[Webhooks]
+    end
+
+    subgraph "External"
+        EXT_TXN[Transaction Source<br/>Credit Card Network]
+    end
+
+    %% User interactions
+    USER -->|HTTPS| NGINX
+    MOBILE -->|GPS Location| UI
+    NGINX --> UI
+    NGINX -->|/api/*| API
+
+    %% Authentication flow
+    UI <-->|OAuth2/PKCE| KC
+    API <-->|Token Validation| KC
+
+    %% API route to service mapping
+    R_USER --> S_USER
+    R_TXN --> S_TXN
+    R_ALERT --> S_ALERT
+    R_SETTING --> S_USER
+    R_WS --> S_ALERT
+
+    %% Service interactions
+    S_ALERT -->|Parse NL Rules| S_AGENT
+    S_AGENT -->|LLM Inference| LLAMA
+    S_ALERT -->|Get Recommendations| S_ML
+    S_ALERT -->|Fallback| S_LLM
+    S_ML -->|Load Model| ML_MODEL
+    S_ALERT -->|Categorize| S_EMBED
+    S_EMBED -->|Vector Search| T_EMB
+
+    %% Background processing
+    S_TXN -->|Trigger| Q_ALERT
+    Q_ALERT -->|Evaluate Rules| S_ALERT
+    S_ALERT -->|Send Alerts| S_NOTIF
+    SCHED -->|Schedule| Q_REC
+    Q_REC -->|Generate| S_ML
+
+    %% Location tracking
+    S_LOC -->|GPS Data| T_USER
+    S_ALERT -->|Location Check| S_LOC
+
+    %% Database interactions
+    S_USER <--> T_USER
+    S_USER <--> T_CARD
+    S_TXN <--> T_TXN
+    S_ALERT <--> T_ALERT
+    S_NOTIF <--> T_NOTIF
+    S_ML <--> T_CACHE
+    S_EMBED <--> T_EMB
+    S_EMBED <--> T_SYN
+
+    %% Transaction ingestion
+    EXT_TXN -->|POST /transactions| R_TXN
+
+    %% Notification delivery
+    S_NOTIF -->|Email| SMTP
+    S_NOTIF -->|SMS| SMS_GW
+    S_NOTIF -->|Push| PUSH_GW
+    S_NOTIF -->|HTTP| WEBHOOK
+
+    style UI fill:#e1f5ff
+    style API fill:#fff4e6
+    style KC fill:#f3e5f5
+    style LLAMA fill:#e8f5e9
+    style ML_MODEL fill:#fff3e0
+    style SMTP fill:#fce4ec
+```
+
+#### Detailed Component Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI as React UI
+    participant Nginx
+    participant KC as Keycloak
+    participant API as FastAPI
+    participant Agent as LangGraph Agent
+    participant Llama as LlamaStack
+    participant ML as ML Service
+    participant DB as PostgreSQL
+    participant Queue as Alert Queue
+    participant Notif as Notification Service
+    participant SMTP as Email/SMS
+
+    %% Authentication
+    User->>UI: Access App
+    UI->>KC: OAuth2 Login (PKCE)
+    KC-->>UI: Access Token
+    UI->>Nginx: Authenticated Request
+    Nginx->>API: Forward with Token
+    API->>KC: Validate Token
+    KC-->>API: User Info
+
+    %% Create Alert Rule
+    User->>UI: "Alert me if I spend > $500"
+    UI->>API: POST /api/alerts/validate
+    API->>Agent: Parse Natural Language
+    Agent->>Llama: LLM Inference
+    Llama-->>Agent: Structured Query
+    Agent-->>API: Validated Rule + SQL
+    API->>DB: Store alert_rules
+    API-->>UI: Rule Created
+
+    %% Get ML Recommendations
+    User->>UI: View Dashboard
+    UI->>API: GET /api/alerts/recommendations
+    API->>DB: Check cached_recommendations
+    alt Cache Miss
+        API->>ML: Generate Recommendations
+        ML->>DB: Query transactions + user features
+        DB-->>ML: Transaction History
+        ML->>ML: KNN Collaborative Filtering
+        ML-->>API: Top 3 Recommendations
+        API->>DB: Cache Results (24h TTL)
+    end
+    API-->>UI: Display Recommendations
+
+    %% Transaction Ingestion & Evaluation
+    User->>API: POST /api/transactions
+    API->>DB: Insert transaction
+    API->>Queue: Enqueue Alert Job
+    Queue->>Agent: Evaluate Against Rules
+    Agent->>DB: Execute SQL Query
+    DB-->>Agent: Matching Transactions
+    alt Alert Triggered
+        Agent->>DB: Create alert_notification
+        Agent->>Notif: Send Notification
+        Notif->>SMTP: Email/SMS
+        SMTP-->>User: Alert Received
+        Notif->>DB: Update Status (SENT)
+    end
+
+    %% Location-Based Security
+    User->>UI: Share GPS Location
+    UI->>API: POST /api/users/location
+    API->>DB: Update user location
+    Note over API,Queue: Next transaction checks location
+    Queue->>Agent: Evaluate with Location
+    Agent->>DB: Compare transaction location
+    alt Location Mismatch
+        Agent->>Notif: Security Alert
+        Notif->>SMTP: Send Alert
+    end
+```
+
+#### ML/AI Pipeline Architecture
+
+```mermaid
+graph TB
+    subgraph "NLP Pipeline - Alert Rule Parsing"
+        NL_INPUT[Natural Language Input<br/>'Alert if spending > $500']
+
+        subgraph "LangGraph Agent Workflow"
+            A1[Alert Parser Agent]
+            A2[Timestamp Substitutor]
+            A3[SQL Generator]
+            A4[Rule Validator]
+            A5[Similarity Checker]
+        end
+
+        LLAMA_NLP[LlamaStack NLP Engine]
+        SQL_OUT[Structured SQL Query]
+    end
+
+    subgraph "ML Recommendation Pipeline - Collaborative Filtering"
+        direction TB
+
+        subgraph "Feature Engineering"
+            FE1[Extract User Features<br/>- Transaction stats<br/>- Spending patterns<br/>- Credit utilization]
+            FE2[Build Feature Vector<br/>amount_mean, amount_std,<br/>merchant_diversity, etc.]
+        end
+
+        subgraph "KNN Model"
+            KNN1[Load model_knn.pkl]
+            KNN2[Find K=5 Similar Users<br/>Cosine Similarity]
+            KNN3[Calculate Alert Probabilities<br/>Per Alert Type]
+            KNN4[Threshold Filtering<br/>probability >= 40%]
+        end
+
+        subgraph "Recommendation Generation"
+            RG1[Template Mapping<br/>Alert Type → Description]
+            RG2[Generate Reasoning<br/>'X% of similar users...']
+            RG3[Priority Assignment<br/>High/Medium/Low]
+        end
+
+        ML_OUT[Top 3 Recommendations<br/>with Reasoning]
+    end
+
+    subgraph "ML Model Training Pipeline"
+        TRAIN_DATA[(Sample Data<br/>152K transactions<br/>50 users)]
+        TRAIN1[Feature Engineering]
+        TRAIN2[Generate Alert Labels<br/>Heuristic-based]
+        TRAIN3[Train KNN Model<br/>k=5, cosine]
+        TRAIN4[Save Model<br/>/tmp/ml_models/]
+        RETRAIN[Scheduled Retraining<br/>Background Job]
+    end
+
+    subgraph "Embedding Pipeline - Category Matching"
+        CAT_INPUT[Merchant Category<br/>'Coffee Shop']
+        EMB1[Generate Embedding<br/>sentence-transformers]
+        EMB2[Vector Search<br/>pgvector similarity]
+        EMB3[Match to Standard<br/>Category + Synonyms]
+        CAT_OUT[Normalized Category<br/>'Dining']
+    end
+
+    subgraph "Transaction Analysis"
+        TXN_IN[New Transaction]
+        ANALYZE1[Behavioral Analysis<br/>- Spending spike detection<br/>- Pattern deviation]
+        ANALYZE2[Location Analysis<br/>- GPS comparison<br/>- Unusual location flag]
+        ANALYZE3[Anomaly Score<br/>Calculation]
+        TXN_OUT[Anomaly Indicators]
+    end
+
+    %% NLP Flow
+    NL_INPUT --> A1
+    A1 --> LLAMA_NLP
+    LLAMA_NLP --> A2
+    A2 --> A3
+    A3 --> A4
+    A4 --> A5
+    A5 --> SQL_OUT
+
+    %% ML Recommendation Flow
+    FE1 --> FE2
+    FE2 --> KNN1
+    KNN1 --> KNN2
+    KNN2 --> KNN3
+    KNN3 --> KNN4
+    KNN4 --> RG1
+    RG1 --> RG2
+    RG2 --> RG3
+    RG3 --> ML_OUT
+
+    %% Training Flow
+    TRAIN_DATA --> TRAIN1
+    TRAIN1 --> TRAIN2
+    TRAIN2 --> TRAIN3
+    TRAIN3 --> TRAIN4
+    RETRAIN -.->|Periodic| TRAIN1
+
+    %% Embedding Flow
+    CAT_INPUT --> EMB1
+    EMB1 --> EMB2
+    EMB2 --> EMB3
+    EMB3 --> CAT_OUT
+
+    %% Transaction Analysis Flow
+    TXN_IN --> ANALYZE1
+    TXN_IN --> ANALYZE2
+    ANALYZE1 --> ANALYZE3
+    ANALYZE2 --> ANALYZE3
+    ANALYZE3 --> TXN_OUT
+
+    style NL_INPUT fill:#e3f2fd
+    style SQL_OUT fill:#c8e6c9
+    style ML_OUT fill:#fff9c4
+    style LLAMA_NLP fill:#f3e5f5
+    style KNN2 fill:#ffe0b2
+    style TRAIN4 fill:#ffccbc
 ```
 
 ### Project structure
