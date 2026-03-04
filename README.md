@@ -4,37 +4,61 @@ An **AI-driven application** that enables users to define **natural language ale
 
 ## Table of Contents
 
-- [Detailed Description](#detailed-description)
-  - [Who is this for?](#who-is-this-for)
-  - [The business case for AI-driven transaction monitoring](#the-business-case-for-ai-driven-transaction-monitoring)
-  - [Example use cases](#example-use-cases)
-  - [Sample data](#sample-data)
-  - [What this quickstart provides](#what-this-quickstart-provides)
-  - [What you'll build](#what-youll-build)
-  - [Key technologies you'll learn](#key-technologies-youll-learn)
-  - [Architecture diagrams](#architecture-diagrams)
-  - [Project structure](#project-structure)
-  - [Transaction monitoring implementation](#transaction-monitoring-implementation)
-  - [Customizing for your use case](#customizing-for-your-use-case)
-- [Requirements](#requirements)
-  - [Minimum hardware requirements](#minimum-hardware-requirements)
-  - [Minimum software requirements](#minimum-software-requirements)
-  - [Required user permissions](#required-user-permissions)
-- [Deploy](#deploy)
-  - [Clone the repository](#clone-the-repository)
-  - [Container Deployment (Recommended)](#container-deployment-recommended)
-  - [Local Development (pnpm)](#local-development-pnpm)
-  - [OpenShift Deployment](#openshift-deployment)
-  - [Testing Alert Rules](#testing-alert-rules)
-  - [Validating the Alert Notification](#validating-the-alert-notification)
-  - [What you've accomplished](#what-youve-accomplished)
-  - [Recommended next steps](#recommended-next-steps)
-  - [Delete](#delete)
-- [Technical Details](#technical-details)
-  - [Performance & scaling](#performance--scaling)
-  - [Security](#security)
-  - [Going deeper: component documentation](#going-deeper-component-documentation)
-- [Tags](#tags)
+- [Spending Transaction Monitor](#spending-transaction-monitor)
+  - [Table of Contents](#table-of-contents)
+  - [Detailed Description](#detailed-description)
+    - [Who is this for?](#who-is-this-for)
+    - [The business case for AI-driven transaction monitoring](#the-business-case-for-ai-driven-transaction-monitoring)
+    - [Example use cases](#example-use-cases)
+    - [Sample data](#sample-data)
+    - [What this quickstart provides](#what-this-quickstart-provides)
+    - [What you'll build](#what-youll-build)
+    - [Key technologies you'll learn](#key-technologies-youll-learn)
+    - [Architecture diagrams](#architecture-diagrams)
+      - [High-Level Architecture](#high-level-architecture)
+      - [Detailed Component Flow](#detailed-component-flow)
+      - [ML/AI Pipeline Architecture](#mlai-pipeline-architecture)
+    - [Project structure](#project-structure)
+    - [Transaction monitoring implementation](#transaction-monitoring-implementation)
+    - [Customizing for your use case](#customizing-for-your-use-case)
+  - [Requirements](#requirements)
+    - [Minimum hardware requirements](#minimum-hardware-requirements)
+    - [Minimum software requirements](#minimum-software-requirements)
+    - [Required user permissions](#required-user-permissions)
+      - [Cluster Admin Privileges](#cluster-admin-privileges)
+  - [Deploy](#deploy)
+    - [Clone the repository](#clone-the-repository)
+    - [Container Deployment (Recommended)](#container-deployment-recommended)
+      - [Step 1: Start with Podman Compose](#step-1-start-with-podman-compose)
+      - [Step 2: Set up data](#step-2-set-up-data)
+      - [Step 3: Choose authentication mode](#step-3-choose-authentication-mode)
+      - [Container Management Commands](#container-management-commands)
+    - [Local Development (pnpm)](#local-development-pnpm)
+      - [Development Mode (Auth Bypass)](#development-mode-auth-bypass)
+      - [Production Mode (Keycloak)](#production-mode-keycloak)
+      - [Container Development](#container-development)
+      - [Utility Commands](#utility-commands)
+    - [OpenShift Deployment](#openshift-deployment)
+      - [Quick Deploy](#quick-deploy)
+      - [Step-by-step Deployment](#step-by-step-deployment)
+      - [Verify Deployment](#verify-deployment)
+      - [OpenShift Management](#openshift-management)
+    - [Testing Alert Rules](#testing-alert-rules)
+      - [List available sample alert rules](#list-available-sample-alert-rules)
+      - [Interactive testing menu](#interactive-testing-menu)
+      - [Example Workflow](#example-workflow)
+      - [What the Test Does](#what-the-test-does)
+    - [Validating the Alert Notification](#validating-the-alert-notification)
+    - [What you've accomplished](#what-youve-accomplished)
+    - [Recommended next steps](#recommended-next-steps)
+    - [Delete](#delete)
+  - [Technical Details](#technical-details)
+    - [Performance \& scaling](#performance--scaling)
+    - [Security](#security)
+    - [Going deeper: component documentation](#going-deeper-component-documentation)
+  - [Tags](#tags)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -142,145 +166,26 @@ The solution is deployed on **OpenShift** and integrates multiple components:
 
 ```mermaid
 graph TB
-    subgraph "User Layer"
-        USER[User Browser]
-        MOBILE[Mobile Device GPS]
-    end
+  %% Users
+  USER[User (Web/Mobile)] -->|HTTPS| FE[Frontend (Nginx + React)]
 
-    subgraph "Frontend (port 3000)"
-        NGINX[Nginx Reverse Proxy]
-        UI[React + TypeScript UI]
-    end
+  %% Auth
+  FE <-->|OAuth2/OIDC| KC[Keycloak]
+  FE -->|/api| API[FastAPI Backend]
+  API <-->|Token validation| KC
 
-    subgraph "Authentication"
-        KC[Keycloak<br/>OAuth2/OIDC]
-    end
+  %% Core backend
+  API --> DB[(PostgreSQL + pgvector)]
+  API --> AI[AI Services<br/>(LangGraph + LlamaStack + Recommendations)]
+  AI --> DB
 
-    subgraph "API Layer (port 8000)"
-        API[FastAPI Application]
+  %% External transactions
+  EXT[Transaction Source] -->|POST /transactions| API
 
-        subgraph "Routes"
-            R_USER[Users API]
-            R_TXN[Transactions API]
-            R_ALERT[Alerts API]
-            R_SETTING[Settings API]
-            R_WS[WebSocket API]
-        end
-
-        subgraph "Core Services"
-            S_USER[User Service]
-            S_TXN[Transaction Service]
-            S_ALERT[Alert Rule Service]
-            S_NOTIF[Notification Service]
-            S_LOC[Location Service]
-        end
-
-        subgraph "AI/ML Services"
-            S_AGENT[LangGraph Agents]
-            S_ML[ML Recommendation<br/>KNN Collaborative]
-            S_LLM[LLM Recommendation]
-            S_EMBED[Embedding Service]
-        end
-
-        subgraph "Background Workers"
-            Q_ALERT[Alert Job Queue]
-            Q_REC[Recommendation Queue]
-            SCHED[Recommendation Scheduler]
-        end
-    end
-
-    subgraph "AI/NLP Layer (port 8321)"
-        LLAMA[LlamaStack<br/>NLP Inference]
-    end
-
-    subgraph "Data Layer"
-        subgraph "PostgreSQL + pgvector (port 5432)"
-            T_USER[(users)]
-            T_CARD[(credit_cards)]
-            T_TXN[(transactions)]
-            T_ALERT[(alert_rules)]
-            T_NOTIF[(alert_notifications)]
-            T_CACHE[(cached_recommendations)]
-            T_EMB[(merchant_embeddings)]
-            T_SYN[(category_synonyms)]
-        end
-
-        ML_MODEL[("ML Models<br/>/tmp/ml_models<br/>model_knn.pkl")]
-    end
-
-    subgraph "Notification Channels"
-        SMTP[SMTP4Dev<br/>Email Server<br/>port 3002]
-        SMS_GW[SMS Gateway]
-        PUSH_GW[Push Notifications]
-        WEBHOOK[Webhooks]
-    end
-
-    subgraph "External"
-        EXT_TXN[Transaction Source<br/>Credit Card Network]
-    end
-
-    %% User interactions
-    USER -->|HTTPS| NGINX
-    MOBILE -->|GPS Location| UI
-    NGINX --> UI
-    NGINX -->|/api/*| API
-
-    %% Authentication flow
-    UI <-->|OAuth2/PKCE| KC
-    API <-->|Token Validation| KC
-
-    %% API route to service mapping
-    R_USER --> S_USER
-    R_TXN --> S_TXN
-    R_ALERT --> S_ALERT
-    R_SETTING --> S_USER
-    R_WS --> S_ALERT
-
-    %% Service interactions
-    S_ALERT -->|Parse NL Rules| S_AGENT
-    S_AGENT -->|LLM Inference| LLAMA
-    S_ALERT -->|Get Recommendations| S_ML
-    S_ALERT -->|Fallback| S_LLM
-    S_ML -->|Load Model| ML_MODEL
-    S_ALERT -->|Categorize| S_EMBED
-    S_EMBED -->|Vector Search| T_EMB
-
-    %% Background processing
-    S_TXN -->|Trigger| Q_ALERT
-    Q_ALERT -->|Evaluate Rules| S_ALERT
-    S_ALERT -->|Send Alerts| S_NOTIF
-    SCHED -->|Schedule| Q_REC
-    Q_REC -->|Generate| S_ML
-
-    %% Location tracking
-    S_LOC -->|GPS Data| T_USER
-    S_ALERT -->|Location Check| S_LOC
-
-    %% Database interactions
-    S_USER <--> T_USER
-    S_USER <--> T_CARD
-    S_TXN <--> T_TXN
-    S_ALERT <--> T_ALERT
-    S_NOTIF <--> T_NOTIF
-    S_ML <--> T_CACHE
-    S_EMBED <--> T_EMB
-    S_EMBED <--> T_SYN
-
-    %% Transaction ingestion
-    EXT_TXN -->|POST /transactions| R_TXN
-
-    %% Notification delivery
-    S_NOTIF -->|Email| SMTP
-    S_NOTIF -->|SMS| SMS_GW
-    S_NOTIF -->|Push| PUSH_GW
-    S_NOTIF -->|HTTP| WEBHOOK
-
-    style UI fill:#e1f5ff
-    style API fill:#fff4e6
-    style KC fill:#f3e5f5
-    style LLAMA fill:#e8f5e9
-    style ML_MODEL fill:#fff3e0
-    style SMTP fill:#fce4ec
+  %% Notifications
+  API --> NOTIF[Notification Service]
+  NOTIF --> EMAIL[Email]
+  NOTIF --> SMS[SMS]
 ```
 
 #### Detailed Component Flow
