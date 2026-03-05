@@ -265,116 +265,21 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph "NLP Pipeline - Alert Rule Parsing"
-        NL_INPUT[Natural Language Input<br/>'Alert if spending > $500']
+NL[Natural language rule] --> PARSE[Parse and validate]
+PARSE --> LLAMA[LlamaStack]
+PARSE --> SQL[SQL query]
 
-        subgraph "LangGraph Agent Workflow"
-            A1[Alert Parser Agent]
-            A2[Timestamp Substitutor]
-            A3[SQL Generator]
-            A4[Rule Validator]
-            A5[Similarity Checker]
-        end
+FE[Build user features] --> KNN[KNN find similar users]
+KNN --> MLOUT[Alert recommendations]
 
-        LLAMA_NLP[LlamaStack NLP Engine]
-        SQL_OUT[Structured SQL Query]
-    end
+DATA[Transactions and labels] --> TRAIN[Train or retrain KNN]
+TRAIN --> KNN
 
-    subgraph "ML Recommendation Pipeline - Collaborative Filtering"
-        direction TB
+CATIN[Merchant category] --> EMB[Embed and vector search]
+EMB --> CATOUT[Normalized category]
 
-        subgraph "Feature Engineering"
-            FE1[Extract User Features<br/>- Transaction stats<br/>- Spending patterns<br/>- Credit utilization]
-            FE2[Build Feature Vector<br/>amount_mean, amount_std,<br/>merchant_diversity, etc.]
-        end
-
-        subgraph "KNN Model"
-            KNN1[Load model_knn.pkl]
-            KNN2[Find K=5 Similar Users<br/>Cosine Similarity]
-            KNN3[Calculate Alert Probabilities<br/>Per Alert Type]
-            KNN4[Threshold Filtering<br/>probability >= 40%]
-        end
-
-        subgraph "Recommendation Generation"
-            RG1[Template Mapping<br/>Alert Type → Description]
-            RG2[Generate Reasoning<br/>'X% of similar users...']
-            RG3[Priority Assignment<br/>High/Medium/Low]
-        end
-
-        ML_OUT[Top 3 Recommendations<br/>with Reasoning]
-    end
-
-    subgraph "ML Model Training Pipeline"
-        TRAIN_DATA[(Sample Data<br/>152K transactions<br/>50 users)]
-        TRAIN1[Feature Engineering]
-        TRAIN2[Generate Alert Labels<br/>Heuristic-based]
-        TRAIN3[Train KNN Model<br/>k=5, cosine]
-        TRAIN4[Save Model<br/>/tmp/ml_models/]
-        RETRAIN[Scheduled Retraining<br/>Background Job]
-    end
-
-    subgraph "Embedding Pipeline - Category Matching"
-        CAT_INPUT[Merchant Category<br/>'Coffee Shop']
-        EMB1[Generate Embedding<br/>sentence-transformers]
-        EMB2[Vector Search<br/>pgvector similarity]
-        EMB3[Match to Standard<br/>Category + Synonyms]
-        CAT_OUT[Normalized Category<br/>'Dining']
-    end
-
-    subgraph "Transaction Analysis"
-        TXN_IN[New Transaction]
-        ANALYZE1[Behavioral Analysis<br/>- Spending spike detection<br/>- Pattern deviation]
-        ANALYZE2[Location Analysis<br/>- GPS comparison<br/>- Unusual location flag]
-        ANALYZE3[Anomaly Score<br/>Calculation]
-        TXN_OUT[Anomaly Indicators]
-    end
-
-    %% NLP Flow
-    NL_INPUT --> A1
-    A1 --> LLAMA_NLP
-    LLAMA_NLP --> A2
-    A2 --> A3
-    A3 --> A4
-    A4 --> A5
-    A5 --> SQL_OUT
-
-    %% ML Recommendation Flow
-    FE1 --> FE2
-    FE2 --> KNN1
-    KNN1 --> KNN2
-    KNN2 --> KNN3
-    KNN3 --> KNN4
-    KNN4 --> RG1
-    RG1 --> RG2
-    RG2 --> RG3
-    RG3 --> ML_OUT
-
-    %% Training Flow
-    TRAIN_DATA --> TRAIN1
-    TRAIN1 --> TRAIN2
-    TRAIN2 --> TRAIN3
-    TRAIN3 --> TRAIN4
-    RETRAIN -.->|Periodic| TRAIN1
-
-    %% Embedding Flow
-    CAT_INPUT --> EMB1
-    EMB1 --> EMB2
-    EMB2 --> EMB3
-    EMB3 --> CAT_OUT
-
-    %% Transaction Analysis Flow
-    TXN_IN --> ANALYZE1
-    TXN_IN --> ANALYZE2
-    ANALYZE1 --> ANALYZE3
-    ANALYZE2 --> ANALYZE3
-    ANALYZE3 --> TXN_OUT
-
-    style NL_INPUT fill:#e3f2fd
-    style SQL_OUT fill:#c8e6c9
-    style ML_OUT fill:#fff9c4
-    style LLAMA_NLP fill:#f3e5f5
-    style KNN2 fill:#ffe0b2
-    style TRAIN4 fill:#ffccbc
+TXNIN[New transaction] --> CHECK[Behavior and location checks]
+CHECK --> ANOM[Anomaly indicators]
 ```
 
 ### Project structure
