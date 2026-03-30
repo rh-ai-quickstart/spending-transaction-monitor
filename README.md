@@ -1,6 +1,7 @@
-# Spending Transaction Monitor
+# Deliver personalized spending alerts with AI anomaly detection
 
-An **AI-driven application** that enables users to define **natural language alert rules** for their credit card transactions. The system provides rule-based anomaly detection and location-based security monitoring, ingesting real-time data, evaluating transactions against user-defined rules, applying AI/ML analysis for anomaly detection, and sending alerts through preferred channels such as email or SMS.
+Detect fraud and unusual spending in real time with AI-powered alerts and natural language rules, improving security and customer trust.
+
 
 ## Table of Contents
 
@@ -63,6 +64,8 @@ An **AI-driven application** that enables users to define **natural language ale
 ---
 
 ## Detailed Description
+
+An **AI-driven application** that enables users to define **natural language alert rules** for their credit card transactions. The system provides rule-based anomaly detection and location-based security monitoring, ingesting real-time data, evaluating transactions against user-defined rules, applying AI/ML analysis for anomaly detection, and sending alerts through preferred channels such as email or SMS.
 
 ### Who is this for?
 
@@ -890,9 +893,7 @@ Now that you have the system running, you can dive deeper into specific componen
 
 ## Tags
 
-- **Title:** AI-Powered Transaction Monitoring with Natural Language Alert Rules
-- **Description:** Framework for AI-driven credit card transaction monitoring with NLP rule parsing, behavioral analysis, and location-based anomaly detection.
-- **Industry:** Financial Services, Banking
+- **Industry:** Banking and securities
 - **Product:** OpenShift AI
 - **Use case:** Transaction monitoring, Anomaly detection, Personalized alerts
 - **Contributor org:** Red Hat
