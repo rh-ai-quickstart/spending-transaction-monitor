@@ -1,0 +1,41 @@
+{{- if .Values.modelRegistry.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: spending-monitor-model-registry-client
+  namespace: {{ .Values.modelRegistry.namespace }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: model-registry
+      app.kubernetes.io/name: model-registry
+      component: model-registry
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace | quote }}
+      ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spending-monitor-pipeline-model-registry-user
+  namespace: {{ .Values.modelRegistry.namespace }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: registry-user-model-registry
+subjects:
+  - kind: ServiceAccount
+    name: pipeline-runner-dspa
+    namespace: {{ .Release.Namespace }}
+{{- end }}

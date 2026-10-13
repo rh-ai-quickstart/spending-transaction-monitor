@@ -29,14 +29,17 @@ serviceAccount:
 
 dspa:
   deploy: true
+  name: "dspa"
   database:
     deploy: true
+    name: "mlpipeline"
     storage: 10Gi
+    username: "mlpipeline"
+    password: "mlpipeline123"
     storageClass: ""
   objectStorage:
     deploy: true
-    storage: 20Gi
-    storageClass: ""
+    bucket: "mlpipeline"
 
 dsPipelines:
   url: "https://ds-pipeline-dspa:8888"
@@ -52,20 +55,50 @@ database:
   migrationTimeout: 60
 
 # ==============================
-# MinIO Configuration (for model storage)
+# S3-compatible storage configuration. The S4 endpoint and credentials come
+# from the aws-compatible-storage dependency below.
 # ==============================
 
-minio:
-  deploy: true
-  endpoint: "http://minio-service:9000"
+s3:
+  # Empty values follow the aws-compatible-storage name, ports, and Secret.
+  # Set these only when reusing an S4 service with different settings.
+  endpoint: ""
+  # Set when the reused S4 UI is not on the S3 endpoint host and service port.
+  uiEndpoint: ""
+  region: ""
   bucketName: "models"
-  accessKey: "minio"
-  secretKey: "minio123"
-  deployment:
-    image: quay.io/minio/minio:latest
-    replicas: 1
-    storage: 20Gi
-    storageClass: ""
+  credentialsSecret: ""
+
+# The parent Job creates buckets even when an existing standalone S4 release
+# is reused with aws-compatible-storage.enabled=false.
+awsCompatibleStorageBuckets:
+  create: true
+
+aws-compatible-storage:
+  enabled: true
+  fullnameOverride: s4
+  image:
+    repository: quay.io/rh-aiservices-bu/s4
+    tag: "0.3.2"
+    pullPolicy: IfNotPresent
+  s3:
+    accessKeyId: s4admin # Demo value; override for shared or production clusters.
+    secretAccessKey: s4secret # Demo value; override for shared or production clusters.
+    region: us-east-1
+  auth:
+    enabled: true
+    username: admin
+    password: changeme # Demo value; override for shared or production clusters.
+  route:
+    enabled: true # S4 Web UI only
+    s3Api:
+      enabled: false
+  storage:
+    data:
+      size: 10Gi
+
+jobImages:
+  python: registry.redhat.io/ubi9/python-311:latest
 
 # ==============================
 # Model Registry Configuration
@@ -73,7 +106,9 @@ minio:
 
 modelRegistry:
   enabled: true
-  url: "http://model-registry.rhoai-model-registries.svc.cluster.local:8080"
+  namespace: "rhoai-model-registries"
+  url: "https://model-registry.rhoai-model-registries.svc.cluster.local:8443"
+  caBundle: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 
 # model-registry subchart values
 model-registry:
@@ -108,6 +143,14 @@ serving:
   runtime:
     create: true
     createViaPipeline: false
+  inferenceService:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 # ==============================
 # Sample Data Configuration
@@ -136,7 +179,7 @@ pipelines:
     threshold: 0.4
     deployModel: true
     registerModel: true
-    deployFromRegistry: true
+    deployFromRegistry: false
     modelVersionToDeploy: ""
 
 # ==============================

@@ -18,7 +18,7 @@ def add_pipeline(pipeline_name: str, deploy_model: bool = True, register_model: 
     
     pipeline_params = {
         "pipeline_name": pipeline_name,
-        "minio_endpoint": os.environ.get("MINIO_ENDPOINT", ""),
+        "s3_endpoint_url": os.environ.get("S3_ENDPOINT_URL", ""),
         "deploy_model": str(deploy_model).lower(),
         "register_model": str(register_model).lower(),
         "model_registry_url": os.environ.get("MODEL_REGISTRY_URL", ""),

@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY alert-recommender-pipeline/src/alert_recommender_pipeline/ /app/alert_recommender_pipeline/
 
-# Copy sample data for fallback (if MinIO data not available)
+# Copy sample data for fallback (if S3 data is not available)
 COPY data/ /app/data/
 
 # Set Python path

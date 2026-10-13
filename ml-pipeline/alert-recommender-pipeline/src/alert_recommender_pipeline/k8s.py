@@ -1,6 +1,7 @@
 """Kubernetes utilities for Alert Recommender Pipeline."""
 
 import base64
+import os
 import re
 from typing import Optional
 
@@ -50,6 +51,12 @@ def config_to_k8s_secret(pipeline_config, namespace: Optional[str] = None) -> cl
         for k, v in config_data.items()
         if not isinstance(v, (list, dict, bool)) or isinstance(v, bool)
     }
+
+    for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
+        value = os.getenv(key, "")
+        if not value:
+            raise ValueError(f"Required S3 credential {key} is not configured")
+        encoded_data[key] = base64.b64encode(value.encode()).decode()
     
     model_registry_enabled = getattr(pipeline_config, 'model_registry_enabled', 
                                      getattr(pipeline_config, 'register_model', False))
@@ -59,6 +66,9 @@ def config_to_k8s_secret(pipeline_config, namespace: Optional[str] = None) -> cl
     
     encoded_data['MODEL_REGISTRY_ENABLED'] = base64.b64encode(
         str(model_registry_enabled).lower().encode()
+    ).decode()
+    encoded_data['MODEL_REGISTRY_CA_BUNDLE'] = base64.b64encode(
+        os.getenv('MODEL_REGISTRY_CA_BUNDLE', '').encode()
     ).decode()
     encoded_data['DEPLOY_MODEL'] = base64.b64encode(
         str(deploy_model).lower().encode()
@@ -97,7 +107,7 @@ def apply_config_as_secret(pipeline_config, namespace: Optional[str] = None, rep
         return secret.metadata.name
     except client.exceptions.ApiException as e:
         if e.status == 409 and replace:
-            api.replace_namespaced_secret(
+            api.patch_namespaced_secret(
                 name=secret.metadata.name,
                 namespace=secret.metadata.namespace,
                 body=secret

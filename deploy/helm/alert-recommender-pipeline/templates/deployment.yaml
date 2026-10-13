@@ -102,7 +102,7 @@ spec:
               
               if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
                 echo "WARNING: Database not reachable after $MAX_ATTEMPTS attempts"
-                echo "Continuing anyway - pipeline will fall back to MinIO"
+                echo "Continuing anyway - pipeline will fall back to S3 storage"
                 exit 0
               fi
               
@@ -125,10 +125,10 @@ spec:
               done
               
               echo "WARNING: Database tables not found after $MAX_ATTEMPTS attempts"
-              echo "Migration may not have run. Pipeline will fall back to MinIO data."
+              echo "Migration may not have run. Pipeline will fall back to S3 data."
               exit 0
         {{- end }}
-        {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady .Values.minio.deploy }}
+        {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady (index (index .Values "aws-compatible-storage") "enabled") .Values.awsCompatibleStorageBuckets.create }}
         - name: wait-for-services
           image: "image-registry.openshift-image-registry.svc:5000/openshift/tools:latest"
           command:
@@ -150,15 +150,15 @@ spec:
               echo "Skipping Data Science Pipeline wait (dspa.deploy=false, dsPipelines.waitForReady=false)"
               {{- end }}
               
-              # Wait for MinIO if deployed
-              {{- if .Values.minio.deploy }}
-              url="{{ .Values.minio.endpoint }}/minio/health/live"
-              echo "Waiting for MinIO at $url..."
+              # Wait for S4 if deployed
+              {{- if or (index (index .Values "aws-compatible-storage") "enabled") .Values.awsCompatibleStorageBuckets.create }}
+              url="{{ include "s4.uiEndpoint" . }}"
+              echo "Waiting for S4 at $url..."
               until curl -ksf "$url"; do
-                echo "Still waiting for MinIO..."
+                echo "Still waiting for S4..."
                 sleep 5
               done
-              echo "MinIO is ready"
+              echo "S4 is ready"
               {{- end }}
         {{- end }}
       containers:
@@ -173,7 +173,7 @@ spec:
             - name: DS_PIPELINE_URL
               value: "{{ include "alert-recommender-pipeline.dsPipelinesUrl" . }}"
             # Database configuration (from spending-monitor-secret)
-            # Pipeline will try database first, then fall back to MinIO
+            # Pipeline will try the database first, then fall back to S3 storage
             - name: POSTGRES_DB_HOST
               valueFrom:
                 secretKeyRef:
@@ -204,24 +204,28 @@ spec:
                   name: spending-monitor-secret
                   key: POSTGRES_PASSWORD
                   optional: true
-            # MinIO configuration (fallback data source)
-            - name: MINIO_ENDPOINT
-              value: "{{ .Values.minio.endpoint }}"
-            - name: MINIO_ACCESS_KEY
+            # S4-backed S3 configuration
+            - name: S3_ENDPOINT_URL
+              value: {{ include "s4.endpoint" . | quote }}
+            - name: S3_REGION
+              value: {{ include "s4.region" . | quote }}
+            - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "alert-recommender-pipeline.fullname" . }}-minio
-                  key: access-key
-            - name: MINIO_SECRET_KEY
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "alert-recommender-pipeline.fullname" . }}-minio
-                  key: secret-key
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
             - name: BUCKET_NAME
-              value: "{{ .Values.minio.bucketName }}"
+              value: "{{ .Values.s3.bucketName }}"
             {{- if .Values.modelRegistry.enabled }}
             - name: MODEL_REGISTRY_URL
               value: "{{ .Values.modelRegistry.url }}"
+            - name: MODEL_REGISTRY_CA_BUNDLE
+              value: "{{ .Values.modelRegistry.caBundle }}"
             - name: MODEL_REGISTRY_ENABLED
               value: "true"
             {{- end }}

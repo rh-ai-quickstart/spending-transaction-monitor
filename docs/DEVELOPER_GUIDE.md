@@ -407,7 +407,7 @@ A Kubeflow pipeline for training and deploying KNN-based collaborative filtering
 
 - OpenShift cluster with OpenShift AI (Data Science Pipelines)
 - KServe or OpenDataHub Model Serving
-- MinIO or S3-compatible storage
+- S4 (deployed by the alert-recommender-pipeline Helm dependency)
 - (Optional) OpenDataHub Model Registry
 
 **Quick Start with Helm:**
@@ -418,38 +418,44 @@ helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
   --create-namespace
 
-# Install with custom MinIO configuration
+# Install with custom S4 storage settings
 helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
-  --set minio.endpoint="http://my-minio:9000" \
-  --set minio.accessKey="myaccesskey" \
-  --set minio.secretKey="mysecretkey"
+  --set s3.bucketName="models" \
+  --set aws-compatible-storage.storage.data.size="10Gi"
 
-# Install with Model Registry enabled
+# Reuse an existing standalone S4 release in this namespace
 helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
-  --set modelRegistry.enabled=true \
-  --set modelRegistry.url="http://model-registry:8080"
+  --set aws-compatible-storage.enabled=false
 ```
+
+The parent bucket Job creates `models` and `mlpipeline` for both nested and standalone S4. When using the full Spending Helm release, run `make deploy-with-ml-dspa`, or `make S4_DEPLOY=false deploy-with-ml-dspa` if `s4` is already owned by a standalone release. Set `ML_PIPELINE_IMAGE_REPOSITORY` and `ML_PIPELINE_IMAGE_TAG` when deploying a pipeline image outside the default Quay location.
 
 **Key Configuration Options:**
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `pipeline.name` | Model name | `alert-recommender` |
-| `pipeline.version` | Model version | `1.0.0` |
-| `pipeline.nNeighbors` | KNN neighbors | `5` |
-| `pipeline.deployModel` | Deploy after training | `true` |
-| `pipeline.registerModel` | Register with Model Registry | `false` |
-| `minio.endpoint` | MinIO endpoint URL | `http://minio-service:9000` |
-| `modelRegistry.enabled` | Enable Model Registry | `false` |
+| `pipelines.alert_recommender.name` | Model name | `alert-recommender` |
+| `pipelines.alert_recommender.version` | Model version | `1.0.0` |
+| `pipelines.alert_recommender.nNeighbors` | KNN neighbors | `5` |
+| `pipelines.alert_recommender.deployModel` | Deploy after training | `true` |
+| `pipelines.alert_recommender.registerModel` | Register with Model Registry | `true` |
+| `pipelines.alert_recommender.deployFromRegistry` | Use a registered model version during deployment | `false` |
+| `s3.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
+| `s3.bucketName` | Model artifact and fallback data bucket | `models` |
+| `dspa.objectStorage.bucket` | DSPA artifact bucket | `mlpipeline` |
+| `modelRegistry.url` | Service CA verified Model Registry proxy | `https://model-registry.rhoai-model-registries.svc.cluster.local:8443` |
+| `modelRegistry.enabled` | Enable Model Registry | `true` |
 
 **Data Source Priority:**
 
 The pipeline automatically tries data sources in order:
 1. **PostgreSQL Database** (preferred) - Uses `spending-monitor-secret`
-2. **MinIO** - Falls back to S3-compatible storage
+2. **S4 S3 storage** - Falls back to the `models` bucket on S4
 3. **Local Files** - Last resort fallback to bundled sample data
+
+The chart also creates the DSPA `mlpipeline` bucket in the S4 service. Its UI Route is enabled; its S3 API Route is disabled. The default S4 credentials and UI password are demos and need overrides on shared clusters. Existing MinIO objects are not copied by Helm, so migrate any existing `models` bucket contents before using previously saved model artifacts.
 
 **API Endpoints:**
 
@@ -465,8 +471,14 @@ The pipeline automatically tries data sources in order:
 
 **Example: Trigger Training Pipeline:**
 
+Forward the `spending-monitor` release's pipeline Service in a separate terminal:
+
 ```bash
-curl -X POST http://alert-recommender-pipeline/train \
+oc -n spending-transaction-monitor port-forward service/spending-monitor-alert-recommender-pipeline 8000:8080
+```
+
+```bash
+curl -X POST http://localhost:8000/train \
   -H "Content-Type: application/json" \
   -d '{
     "name": "alert-recommender",

@@ -280,6 +280,9 @@ KNN --> MLOUT[Alert recommendations]
 
 DATA[Transactions and labels] --> TRAIN[Train or retrain KNN]
 TRAIN --> KNN
+TRAIN --> S4["aws-compatible-storage (S4)<br/>models bucket"]
+S4 --> KSERVE[KServe model serving]
+DSPA[OpenShift AI Pipelines] --> S4
 
 CATIN[Merchant category] --> EMB[Embed and vector search]
 EMB --> CATOUT[Normalized category]
@@ -642,6 +645,17 @@ pnpm type-check        # Run TypeScript checks
 ```bash
 make deploy
 ```
+
+For the optional OpenShift AI training and serving path, run `make deploy-with-ml-dspa`. Its Helm chart installs the shared [aws-compatible-storage chart](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage) in `spending-transaction-monitor`. That chart packages the [upstream S4 runtime](https://github.com/rh-aiservices-bu/s4) with a 10Gi data PVC, an in-cluster S3 API at `http://s4:7480`, and an S4 UI Route. A regular parent Job creates the `models` and `mlpipeline` buckets. The S3 API Route stays disabled.
+
+If a standalone Helm release already owns `s4` and `s4-credentials` in the namespace, reuse it:
+
+```bash
+make S4_DEPLOY=false deploy-with-ml-dspa
+```
+
+The bucket Job still runs when reusing S4. Match `ML_PIPELINE_IMAGE_REPOSITORY` and `ML_PIPELINE_IMAGE_TAG` to a published pipeline image if they differ from the default `quay.io/rh-ai-quickstart/alert-recommender-pipeline:latest`. Release CI publishes that image alongside the UI, API, and DB images. For a local build, use `make push-ml-pipeline` with the same image settings before deploying. The chart’s S4 credentials and UI password are demo values; supply cluster-specific values for shared deployments. See the [pipeline guide](ml-pipeline/alert-recommender-pipeline/README.md) for storage and Model Registry settings.
+For a reused S4 with different settings, set `alert-recommender-pipeline.s3.endpoint`, `s3.uiEndpoint`, `s3.region`, and `s3.credentialsSecret` through Helm values. The endpoint also determines the DSPA storage host, port, and scheme.
 
 **Using Quay.io instead of the OpenShift internal registry:**
 

@@ -6,6 +6,9 @@ REGISTRY_URL ?= quay.io
 REPOSITORY ?= rh-ai-quickstart
 NAMESPACE ?= spending-transaction-monitor
 IMAGE_TAG ?= latest
+HELM_EXTRA_ARGS ?=
+# Set false when a standalone s4 Helm release already owns the S4 resources.
+S4_DEPLOY ?= true
 CLUSTER_DOMAIN ?= $(shell oc whoami --show-server 2>/dev/null | sed -E 's|https://api\.([^:]+).*|apps.\1|')
 
 # OpenShift internal registry nuance:
@@ -45,7 +48,11 @@ KEYCLOAK_WEB_ORIGINS_DYNAMIC := $(APP_URL_DYNAMIC)
 UI_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:$(IMAGE_TAG)
 API_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-api:$(IMAGE_TAG)
 DB_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-db:$(IMAGE_TAG)
-ML_PIPELINE_IMAGE = $(REGISTRY_URL)/$(REPOSITORY)/alert-recommender-pipeline:$(IMAGE_TAG)
+ML_PIPELINE_IMAGE_REPOSITORY ?= $(REGISTRY_URL)/$(REPOSITORY)/alert-recommender-pipeline
+ML_PIPELINE_IMAGE_TAG ?= $(IMAGE_TAG)
+ML_PIPELINE_IMAGE = $(ML_PIPELINE_IMAGE_REPOSITORY):$(ML_PIPELINE_IMAGE_TAG)
+ML_PIPELINE_HELM_ARGS = --set-string alert-recommender-pipeline.image.repository=$(ML_PIPELINE_IMAGE_REPOSITORY) \
+	--set-string alert-recommender-pipeline.image.tag=$(ML_PIPELINE_IMAGE_TAG)
 
 # Local development image names (tagged as 'local')
 UI_IMAGE_LOCAL = $(REGISTRY_URL)/$(REPOSITORY)/$(PROJECT_NAME)-ui:local
@@ -106,7 +113,9 @@ $$(if [ -n "$$LLAMASTACK_MODEL" ]; then echo "--set secrets.LLAMASTACK_MODEL=$$L
 $$(if [ -n "$$LLM_PROVIDER" ]; then echo "--set secrets.LLM_PROVIDER=$$LLM_PROVIDER"; fi) \
 $$(if [ -n "$$USE_ML_RECOMMENDATIONS" ]; then echo "--set secrets.USE_ML_RECOMMENDATIONS=$$USE_ML_RECOMMENDATIONS"; fi) \
 $$(if [ -n "$$USE_ML_INFERENCE_SERVICE" ]; then echo "--set secrets.USE_ML_INFERENCE_SERVICE=$$USE_ML_INFERENCE_SERVICE"; fi) \
-$$(if [ -n "$$ML_INFERENCE_ENDPOINT" ]; then echo "--set secrets.ML_INFERENCE_ENDPOINT=$$ML_INFERENCE_ENDPOINT"; fi)
+$$(if [ -n "$$ML_INFERENCE_ENDPOINT" ]; then echo "--set secrets.ML_INFERENCE_ENDPOINT=$$ML_INFERENCE_ENDPOINT"; fi) \
+$$(if [ -n "$$MODEL_REGISTRY_PASSWORD" ]; then echo "--set-string alert-recommender-pipeline.model-registry.postgres.password=$$MODEL_REGISTRY_PASSWORD"; echo "--set-string alert-recommender-pipeline.model-registry.pgvector.secret.password=$$MODEL_REGISTRY_PASSWORD"; fi) \
+$$(if [ -n "$$DSPA_DB_PASSWORD" ]; then echo "--set-string alert-recommender-pipeline.dspa.database.password=$$DSPA_DB_PASSWORD"; fi)
 endef
 
 define HELM_LLAMASTACK_PARAMS
@@ -544,7 +553,10 @@ deploy: create-project helm-dep-update check-keycloak-vars
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
+		$(ML_PIPELINE_HELM_ARGS) \
 		--set routes.sharedHost="$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)" \
+		--set alert-recommender-pipeline.aws-compatible-storage.enabled=$(S4_DEPLOY) \
+		$(HELM_EXTRA_ARGS) \
 		$(HELM_SECRET_PARAMS) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
@@ -576,9 +588,12 @@ deploy-dev: create-project helm-dep-update check-keycloak-vars
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
+		$(ML_PIPELINE_HELM_ARGS) \
 		--set database.persistence.enabled=false \
 		--set api.replicas=1 \
 		--set ui.replicas=1 \
+		--set alert-recommender-pipeline.aws-compatible-storage.enabled=$(S4_DEPLOY) \
+		$(HELM_EXTRA_ARGS) \
 		$(HELM_SECRET_PARAMS) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
@@ -600,7 +615,7 @@ deploy-with-ml-dspa: create-project helm-dep-update check-keycloak-vars
 	@echo "  - Spending Monitor (API, UI, Database)"
 	@echo "  - Alert Recommender ML Pipeline service"
 	@echo "  - Data Science Pipelines Application (DSPA)"
-	@echo "  - MinIO for model storage"
+	@echo "  - S4-backed S3 storage for model artifacts"
 	@echo "  - Model Registry (in rhoai-model-registries namespace)"
 	@echo ""
 	@set -a; source $(ENV_FILE_PROD); set +a; \
@@ -617,10 +632,12 @@ deploy-with-ml-dspa: create-project helm-dep-update check-keycloak-vars
 		--set global.imageRegistry=$(REGISTRY_URL) \
 		--set global.imageRepository=$(REPOSITORY) \
 		--set global.imageTag=$(IMAGE_TAG) \
+		$(ML_PIPELINE_HELM_ARGS) \
 		--set routes.sharedHost="$(PROJECT_NAME)-$(NAMESPACE).$(CLUSTER_DOMAIN)" \
 		--set alert-recommender-pipeline.enabled=true \
 		--set alert-recommender-pipeline.dspa.deploy=true \
-		--set alert-recommender-pipeline.minio.deploy=true \
+		--set alert-recommender-pipeline.aws-compatible-storage.enabled=$(S4_DEPLOY) \
+		$(HELM_EXTRA_ARGS) \
 		$(HELM_SECRET_PARAMS) \
 		$(HELM_LLAMASTACK_PARAMS) \
 		$(HELM_LLM_SERVICE_PARAMS)
@@ -682,7 +699,14 @@ helm-dep-update:
 	@helm dependency update ./deploy/helm/keycloak
 	@echo "📦 Updating alert-recommender-pipeline chart..."
 	@if [ -d "./deploy/helm/alert-recommender-pipeline" ]; then \
-		helm dependency update ./deploy/helm/alert-recommender-pipeline 2>/dev/null || true; \
+		if [ -f ./deploy/helm/alert-recommender-pipeline/charts/aws-compatible-storage-0.1.0.tgz ] && \
+		   [ -f ./deploy/helm/alert-recommender-pipeline/charts/model-registry-0.2.3.tgz ]; then \
+			echo "Using pinned S4 and Model Registry packages"; \
+			deps="$$(helm dependency list ./deploy/helm/alert-recommender-pipeline)" || exit 1; \
+			printf '%s\n' "$$deps" | awk 'NR > 1 && NF { count++; if ($$NF != "ok") { print "Invalid chart dependency: " $$0; bad=1 } } END { if (count != 2) { print "Expected two pinned chart dependencies"; bad=1 } exit bad }'; \
+		else \
+			helm dependency build ./deploy/helm/alert-recommender-pipeline --skip-refresh; \
+		fi; \
 	fi
 	@echo "📦 Updating spending-monitor chart dependencies (keycloak, alert-recommender-pipeline)..."
 	@helm dependency update ./deploy/helm/spending-monitor
@@ -693,6 +717,8 @@ helm-dep-build:
 	@echo "Building Helm chart dependencies..."
 	@echo "📦 Building keycloak chart dependencies (pgvector)..."
 	@helm dependency build ./deploy/helm/keycloak
+	@echo "📦 Building alert-recommender-pipeline dependencies (S4 and Model Registry)..."
+	@helm dependency build ./deploy/helm/alert-recommender-pipeline --skip-refresh
 	@echo "📦 Building spending-monitor chart dependencies (keycloak)..."
 	@helm dependency build ./deploy/helm/spending-monitor
 	@echo "✅ Helm dependencies built successfully"

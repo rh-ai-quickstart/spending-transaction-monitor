@@ -27,16 +27,6 @@ rules:
     resources: ["pods", "services"]
     verbs: ["get", "list", "watch"]
   
-  # Deployments for MinIO management
-  - apiGroups: ["apps"]
-    resources: ["deployments"]
-    verbs: ["get", "list", "watch", "create", "update", "delete"]
-  
-  # PVCs for MinIO storage
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
-    verbs: ["get", "list", "watch", "create", "delete"]
-  
   {{- with .Values.rbac.rules }}
   {{- toYaml . | nindent 2 }}
   {{- end }}

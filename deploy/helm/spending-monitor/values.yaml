@@ -335,11 +335,11 @@ alert-recommender-pipeline:
     name: "dspa"
     database:
       deploy: true
+      name: "mlpipeline"
       storage: 10Gi
     objectStorage:
       deploy: true
       bucket: "mlpipeline"
-      storage: 20Gi
   
   # External Data Science Pipelines configuration (when dspa.deploy is false)
   dsPipelines:
@@ -354,14 +354,16 @@ alert-recommender-pipeline:
     deployModel: true
     registerModel: false
   
-  # MinIO for model storage
-  minio:
-    deploy: true
+  # S4-backed S3 storage for model artifacts and DSPA.
+  aws-compatible-storage:
+    enabled: true
+  s3:
+    # Inherit the S4 service, port, region, and Secret from the child chart.
+    endpoint: ""
+    uiEndpoint: ""
+    region: ""
     bucketName: "models"
-    accessKey: "minio"
-    secretKey: "minio123"
-    deployment:
-      storage: 20Gi
+    credentialsSecret: ""
   
   # KServe model serving
   serving:

@@ -237,5 +237,9 @@ packages/api/test_start.txt
 # Helm dependencies
 deploy/helm/*/charts/
 deploy/helm/*/Chart.lock
+!deploy/helm/alert-recommender-pipeline/charts/
+!deploy/helm/alert-recommender-pipeline/charts/aws-compatible-storage-0.1.0.tgz
+!deploy/helm/alert-recommender-pipeline/charts/model-registry-0.2.3.tgz
+!deploy/helm/alert-recommender-pipeline/Chart.lock
 
 PR_DESCRIPTION.md

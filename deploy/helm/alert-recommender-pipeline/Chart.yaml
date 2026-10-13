@@ -20,13 +20,19 @@ keywords:
   - recommendations
   - openshift-ai
   - data-science-pipelines
+  - s4
+  - aws-compatible-storage
 
 maintainers:
   - name: AI Team
     email: ai-team@example.com
 
 dependencies:
+  - name: aws-compatible-storage
+    version: "0.1.0"
+    repository: "https://rh-ai-quickstart.github.io/ai-architecture-charts"
+    condition: aws-compatible-storage.enabled
   - name: model-registry
-    version: ">=0.1.0"
+    version: "0.2.3"
     repository: "https://rh-ai-quickstart.github.io/ai-architecture-charts"
     condition: modelRegistry.enabled

@@ -12,19 +12,8 @@ metadata:
     {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
 type: Opaque
 stringData:
-  username: "mlpipeline"
-  password: "mlpipeline123"
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Values.dspa.name }}-minio-secret
-  labels:
-    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
-type: Opaque
-stringData:
-  accesskey: "minio"
-  secretkey: "minio123"
+  username: {{ .Values.dspa.database.username | quote }}
+  password: {{ .Values.dspa.database.password | quote }}
 ---
 apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
 kind: DataSciencePipelinesApplication
@@ -38,11 +27,11 @@ spec:
   database:
     mariaDB:
       deploy: true
-      pipelineDBName: {{ .Values.dspa.database.name }}
+      pipelineDBName: {{ .Values.dspa.database.name | default "mlpipeline" | quote }}
       passwordSecret:
         name: {{ .Values.dspa.name }}-db-secret
         key: password
-      username: mlpipeline
+      username: {{ .Values.dspa.database.username }}
       pvcSize: {{ .Values.dspa.database.storage }}
       {{- if .Values.dspa.database.storageClass }}
       storageClassName: {{ .Values.dspa.database.storageClass }}
@@ -50,17 +39,14 @@ spec:
   {{- end }}
   {{- if .Values.dspa.objectStorage.deploy }}
   objectStorage:
-    minio:
-      deploy: true
-      image: "quay.io/minio/minio:latest"
+    externalStorage:
+      host: {{ include "s4.fqdn" . }}
+      port: {{ include "s4.apiPort" . | quote }}
+      scheme: {{ include "s4.endpointScheme" . }}
       bucket: {{ .Values.dspa.objectStorage.bucket }}
       s3CredentialsSecret:
-        accessKey: accesskey
-        secretKey: secretkey
-        secretName: {{ .Values.dspa.name }}-minio-secret
-      pvcSize: {{ .Values.dspa.objectStorage.storage }}
-      {{- if .Values.dspa.objectStorage.storageClass }}
-      storageClassName: {{ .Values.dspa.objectStorage.storageClass }}
-      {{- end }}
+        accessKey: AWS_ACCESS_KEY_ID
+        secretKey: AWS_SECRET_ACCESS_KEY
+        secretName: {{ include "s4.secretName" . }}
   {{- end }}
 {{- end }}
