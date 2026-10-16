@@ -38,13 +38,17 @@ Create a default fully qualified app name.
 
 {{- define "s4.secretName" -}}
 {{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
 {{- $s3 := index $storage "s3" | default dict -}}
-{{- .Values.s3.credentialsSecret | default (index $s3 "existingSecret") | default (printf "%s-credentials" (include "s4.fullname" .)) -}}
+{{- index $client "credentialsSecret" | default (index $s3 "existingSecret") | default (printf "%s-credentials" (include "s4.fullname" .)) -}}
 {{- end }}
 
 {{- define "s4.apiPort" -}}
-{{- if .Values.s3.endpoint -}}
-{{- $parsed := urlParse .Values.s3.endpoint -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- $endpoint := index $client "endpoint" -}}
+{{- if $endpoint -}}
+{{- $parsed := urlParse $endpoint -}}
 {{- $port := regexFind ":[0-9]+$" $parsed.host -}}
 {{- if $port -}}
 {{- trimPrefix ":" $port -}}
@@ -68,17 +72,23 @@ Create a default fully qualified app name.
 
 {{- define "s4.region" -}}
 {{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
 {{- $s3 := index $storage "s3" | default dict -}}
-{{- .Values.s3.region | default (index $s3 "region") | default "us-east-1" -}}
+{{- index $client "region" | default (index $s3 "region") | default "us-east-1" -}}
 {{- end }}
 
 {{- define "s4.endpoint" -}}
-{{- .Values.s3.endpoint | default (printf "http://%s:%s" (include "s4.fullname" .) (include "s4.apiPort" .)) -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- index $client "endpoint" | default (printf "http://%s:%s" (include "s4.fullname" .) (include "s4.apiPort" .)) -}}
 {{- end }}
 
 {{- define "s4.fqdn" -}}
-{{- if .Values.s3.endpoint -}}
-{{- $parsed := urlParse .Values.s3.endpoint -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- $endpoint := index $client "endpoint" -}}
+{{- if $endpoint -}}
+{{- $parsed := urlParse $endpoint -}}
 {{- regexReplaceAll ":[0-9]+$" $parsed.host "" -}}
 {{- else -}}
 {{- printf "%s.%s.svc.cluster.local" (include "s4.fullname" .) .Release.Namespace -}}
@@ -86,8 +96,11 @@ Create a default fully qualified app name.
 {{- end }}
 
 {{- define "s4.endpointScheme" -}}
-{{- if .Values.s3.endpoint -}}
-{{- $parsed := urlParse .Values.s3.endpoint -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- $endpoint := index $client "endpoint" -}}
+{{- if $endpoint -}}
+{{- $parsed := urlParse $endpoint -}}
 {{- $parsed.scheme -}}
 {{- else -}}
 http
@@ -95,7 +108,15 @@ http
 {{- end }}
 
 {{- define "s4.uiEndpoint" -}}
-{{- .Values.s3.uiEndpoint | default (printf "http://%s:%s/api" (include "s4.fqdn" .) (include "s4.uiPort" .)) -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- index $client "uiEndpoint" | default (printf "http://%s:%s/api" (include "s4.fqdn" .) (include "s4.uiPort" .)) -}}
+{{- end }}
+
+{{- define "s4.bucketName" -}}
+{{- $storage := index .Values "aws-compatible-storage" | default dict -}}
+{{- $client := index $storage "client" | default dict -}}
+{{- index $client "bucketName" | default "models" -}}
 {{- end }}
 
 {{/*
@@ -207,7 +228,7 @@ Prepare pipeline data for API call
     "threshold" $config.threshold
     "s3_endpoint_url" (include "s4.endpoint" $root)
     "s3_region" (include "s4.region" $root)
-    "bucket_name" $root.Values.s3.bucketName
+    "bucket_name" (include "s4.bucketName" $root)
     "namespace" $root.Release.Namespace
     "deploy_model" $config.deployModel
     "register_model" $config.registerModel

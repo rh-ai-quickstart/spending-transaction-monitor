@@ -97,7 +97,7 @@ helm install alert-recommender deploy/helm/alert-recommender-pipeline \
 # Install with custom S4 storage values
 helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
-  --set s3.bucketName="models" \
+  --set aws-compatible-storage.client.bucketName="models" \
   --set aws-compatible-storage.storage.data.size="10Gi" \
   --set modelRegistry.enabled=true
 
@@ -121,7 +121,7 @@ The chart now automatically deploys a `DataSciencePipelinesApplication` (DSPA) w
 
 The [aws-compatible-storage (S4) chart](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage) uses service `s4`, S3 API `http://s4:7480`, and a 10Gi data PVC. The chart enables the S4 UI Route and disables the S3 API Route. DSPA uses `s4.<namespace>.svc.cluster.local:7480` with the `s4-credentials` Secret. The parent chart creates both buckets with a regular boto3 Job, including when a standalone S4 release is reused. The default S4 credentials and UI password are demo values; override them for shared deployments.
 
-When reusing S4 with another service name or port, set `s3.endpoint` and `s3.credentialsSecret`; the endpoint also supplies DSPA's host, port, and scheme. Set `s3.uiEndpoint` if the S4 UI health endpoint is on another host or port, and `s3.region` if it differs from `us-east-1`. The DSPA MariaDB name defaults to `mlpipeline`.
+When reusing S4 with another service name or port, set `aws-compatible-storage.client.endpoint` and `aws-compatible-storage.client.credentialsSecret`; the endpoint also supplies DSPA's host, port, and scheme. Set `aws-compatible-storage.client.uiEndpoint` if the S4 UI health endpoint is on another host or port, and `aws-compatible-storage.client.region` if it differs from the S4 chart's region. The DSPA MariaDB name defaults to `mlpipeline`.
 
 The standalone notebooks use the same S4 service. Configure `S3_ENDPOINT_URL`, `S3_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` in the Workbench from the `s4-credentials` Secret before running notebooks 1 and 2. Notebook 3 reads that Secret and creates KServe's bucket-specific storage configuration and ServiceAccount. For a differently named S4 release, set `S4_SERVICE_NAME` and `S4_CREDENTIALS_SECRET` in notebook 3's environment.
 
@@ -144,8 +144,8 @@ Key configuration options in `values.yaml`:
 | `pipelines.alert_recommender.registerModel` | Register with Model Registry | `true` |
 | `pipelines.alert_recommender.deployFromRegistry` | Deploy model from registry instead of pipeline artifact | `false` |
 | `pipelines.alert_recommender.modelVersionToDeploy` | Specific version to deploy from registry (empty = latest) | `""` |
-| `s3.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
-| `s3.bucketName` | Model artifact and fallback data bucket | `models` |
+| `aws-compatible-storage.client.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
+| `aws-compatible-storage.client.bucketName` | Model artifact and fallback data bucket | `models` |
 | `dspa.objectStorage.bucket` | DSPA artifact bucket | `mlpipeline` |
 | `modelRegistry.enabled` | Enable Model Registry | `true` |
 | `modelRegistry.url` | Service CA verified Model Registry proxy | `https://model-registry.rhoai-model-registries.svc.cluster.local:8443` |

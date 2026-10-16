@@ -1,3 +1,6 @@
+{{- $s4 := index .Values "aws-compatible-storage" | default dict -}}
+{{- $bucketBootstrap := index $s4 "bucketBootstrap" | default dict -}}
+{{- $createBuckets := index $bucketBootstrap "create" | default false -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -128,7 +131,7 @@ spec:
               echo "Migration may not have run. Pipeline will fall back to S3 data."
               exit 0
         {{- end }}
-        {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady (index (index .Values "aws-compatible-storage") "enabled") .Values.awsCompatibleStorageBuckets.create }}
+        {{- if or .Values.dspa.deploy .Values.dsPipelines.waitForReady $s4.enabled $createBuckets }}
         - name: wait-for-services
           image: "image-registry.openshift-image-registry.svc:5000/openshift/tools:latest"
           command:
@@ -151,7 +154,7 @@ spec:
               {{- end }}
               
               # Wait for S4 if deployed
-              {{- if or (index (index .Values "aws-compatible-storage") "enabled") .Values.awsCompatibleStorageBuckets.create }}
+              {{- if or $s4.enabled $createBuckets }}
               url="{{ include "s4.uiEndpoint" . }}"
               echo "Waiting for S4 at $url..."
               until curl -ksf "$url"; do
@@ -220,7 +223,7 @@ spec:
                   name: {{ include "s4.secretName" . }}
                   key: AWS_SECRET_ACCESS_KEY
             - name: BUCKET_NAME
-              value: "{{ .Values.s3.bucketName }}"
+              value: {{ include "s4.bucketName" . | quote }}
             {{- if .Values.modelRegistry.enabled }}
             - name: MODEL_REGISTRY_URL
               value: "{{ .Values.modelRegistry.url }}"

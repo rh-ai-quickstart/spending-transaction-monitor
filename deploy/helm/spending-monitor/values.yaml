@@ -357,13 +357,15 @@ alert-recommender-pipeline:
   # S4-backed S3 storage for model artifacts and DSPA.
   aws-compatible-storage:
     enabled: true
-  s3:
-    # Inherit the S4 service, port, region, and Secret from the child chart.
-    endpoint: ""
-    uiEndpoint: ""
-    region: ""
-    bucketName: "models"
-    credentialsSecret: ""
+    # Keep application client and parent-chart bootstrap settings with S4.
+    client:
+      endpoint: ""
+      uiEndpoint: ""
+      region: ""
+      bucketName: "models"
+      credentialsSecret: ""
+    bucketBootstrap:
+      create: true
   
   # KServe model serving
   serving:

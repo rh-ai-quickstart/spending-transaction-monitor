@@ -421,7 +421,7 @@ helm install alert-recommender deploy/helm/alert-recommender-pipeline \
 # Install with custom S4 storage settings
 helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
-  --set s3.bucketName="models" \
+  --set aws-compatible-storage.client.bucketName="models" \
   --set aws-compatible-storage.storage.data.size="10Gi"
 
 # Reuse an existing standalone S4 release in this namespace
@@ -442,8 +442,8 @@ The parent bucket Job creates `models` and `mlpipeline` for both nested and stan
 | `pipelines.alert_recommender.deployModel` | Deploy after training | `true` |
 | `pipelines.alert_recommender.registerModel` | Register with Model Registry | `true` |
 | `pipelines.alert_recommender.deployFromRegistry` | Use a registered model version during deployment | `false` |
-| `s3.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
-| `s3.bucketName` | Model artifact and fallback data bucket | `models` |
+| `aws-compatible-storage.client.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
+| `aws-compatible-storage.client.bucketName` | Model artifact and fallback data bucket | `models` |
 | `dspa.objectStorage.bucket` | DSPA artifact bucket | `mlpipeline` |
 | `modelRegistry.url` | Service CA verified Model Registry proxy | `https://model-registry.rhoai-model-registries.svc.cluster.local:8443` |
 | `modelRegistry.enabled` | Enable Model Registry | `true` |

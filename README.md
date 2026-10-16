@@ -655,7 +655,7 @@ make S4_DEPLOY=false deploy-with-ml-dspa
 ```
 
 The bucket Job still runs when reusing S4. Match `ML_PIPELINE_IMAGE_REPOSITORY` and `ML_PIPELINE_IMAGE_TAG` to a published pipeline image if they differ from the default `quay.io/rh-ai-quickstart/alert-recommender-pipeline:latest`. Release CI publishes that image alongside the UI, API, and DB images. For a local build, use `make push-ml-pipeline` with the same image settings before deploying. The chart’s S4 credentials and UI password are demo values; supply cluster-specific values for shared deployments. See the [pipeline guide](ml-pipeline/alert-recommender-pipeline/README.md) for storage and Model Registry settings.
-For a reused S4 with different settings, set `alert-recommender-pipeline.s3.endpoint`, `s3.uiEndpoint`, `s3.region`, and `s3.credentialsSecret` through Helm values. The endpoint also determines the DSPA storage host, port, and scheme.
+For a reused S4 with different settings, set `alert-recommender-pipeline.aws-compatible-storage.client.endpoint`, `alert-recommender-pipeline.aws-compatible-storage.client.uiEndpoint`, `alert-recommender-pipeline.aws-compatible-storage.client.region`, and `alert-recommender-pipeline.aws-compatible-storage.client.credentialsSecret` through Helm values. The endpoint also determines the DSPA storage host, port, and scheme.
 
 **Using Quay.io instead of the OpenShift internal registry:**
 

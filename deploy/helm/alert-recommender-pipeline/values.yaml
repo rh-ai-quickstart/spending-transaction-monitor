@@ -54,29 +54,21 @@ database:
   waitForMigration: true
   migrationTimeout: 60
 
-# ==============================
-# S3-compatible storage configuration. The S4 endpoint and credentials come
-# from the aws-compatible-storage dependency below.
-# ==============================
-
-s3:
-  # Empty values follow the aws-compatible-storage name, ports, and Secret.
-  # Set these only when reusing an S4 service with different settings.
-  endpoint: ""
-  # Set when the reused S4 UI is not on the S3 endpoint host and service port.
-  uiEndpoint: ""
-  region: ""
-  bucketName: "models"
-  credentialsSecret: ""
-
-# The parent Job creates buckets even when an existing standalone S4 release
-# is reused with aws-compatible-storage.enabled=false.
-awsCompatibleStorageBuckets:
-  create: true
-
+# S4-backed S3 storage for model artifacts and DSPA.
 aws-compatible-storage:
   enabled: true
   fullnameOverride: s4
+  # Parent-chart client and bootstrap settings are grouped with the dependency.
+  client:
+    # Empty values inherit the service name, ports, region, and Secret below.
+    endpoint: ""
+    uiEndpoint: ""
+    region: ""
+    bucketName: "models"
+    credentialsSecret: ""
+  # The parent Job creates buckets even when reusing a standalone S4 release.
+  bucketBootstrap:
+    create: true
   image:
     repository: quay.io/rh-aiservices-bu/s4
     tag: "0.3.2"

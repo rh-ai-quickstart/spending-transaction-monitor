@@ -1,4 +1,6 @@
-{{- if .Values.awsCompatibleStorageBuckets.create }}
+{{- $s4 := index .Values "aws-compatible-storage" | default dict -}}
+{{- $bucketBootstrap := index $s4 "bucketBootstrap" | default dict -}}
+{{- if (index $bucketBootstrap "create") }}
 {{- $suffix := printf "-s4-buckets-r%d" .Release.Revision -}}
 apiVersion: batch/v1
 kind: Job
@@ -43,7 +45,7 @@ spec:
             - name: S3_REGION
               value: {{ include "s4.region" . | quote }}
             - name: S3_BUCKETS
-              value: {{ list .Values.s3.bucketName .Values.dspa.objectStorage.bucket | join "," | quote }}
+              value: {{ list (include "s4.bucketName" .) .Values.dspa.objectStorage.bucket | join "," | quote }}
           command:
             - /bin/sh
             - -c

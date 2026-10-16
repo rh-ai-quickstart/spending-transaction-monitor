@@ -62,7 +62,7 @@ spec:
             - name: S3_REGION
               value: {{ include "s4.region" $root | quote }}
             - name: BUCKET_NAME
-              value: {{ $root.Values.s3.bucketName | quote }}
+              value: {{ include "s4.bucketName" $root | quote }}
             - name: DATA_VERSION
               value: {{ $pipelineConfig.dataVersion | quote }}
           command:
