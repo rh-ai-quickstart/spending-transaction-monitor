@@ -3,7 +3,7 @@
 
 {{/* Create jobs for enabled pipelines */}}
 {{- range $pipelineKey, $pipelineConfig := $enabledPipelines }}
-{{- $jobName := include "alert-recommender-pipeline.pipelineJobName" (dict "pipelineKey" $pipelineKey) -}}
+{{- $jobName := include "alert-recommender-pipeline.pipelineJobName" (dict "root" $root "pipelineKey" $pipelineKey) -}}
 {{- $pipelineDict := dict "root" $root "pipelineKey" $pipelineKey "pipelineConfig" $pipelineConfig "pipelineName" $pipelineKey -}}
 {{- $pipelineData := include "alert-recommender-pipeline.preparePipelineData" $pipelineDict -}}
 ---
@@ -42,25 +42,27 @@ spec:
                 sleep 10
               done
               echo "Pipeline service is ready"
-        {{- if and $root.Values.minio.deploy $root.Values.sampleData.generate }}
+        {{- if $root.Values.sampleData.generate }}
         - name: wait-for-training-data
           image: {{ $root.Values.image.repository }}:{{ $root.Values.image.tag | default "latest" }}
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
           env:
-            - name: MINIO_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "alert-recommender-pipeline.fullname" $root }}-minio
-                  key: access-key
-            - name: MINIO_SECRET_KEY
+                  name: {{ include "s4.secretName" $root }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "alert-recommender-pipeline.fullname" $root }}-minio
-                  key: secret-key
-            - name: MINIO_ENDPOINT
-              value: "http://minio-service:9000"
+                  name: {{ include "s4.secretName" $root }}
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: S3_ENDPOINT_URL
+              value: {{ include "s4.endpoint" $root | quote }}
+            - name: S3_REGION
+              value: {{ include "s4.region" $root | quote }}
             - name: BUCKET_NAME
-              value: {{ $root.Values.minio.bucketName | quote }}
+              value: {{ include "s4.bucketName" $root | quote }}
             - name: DATA_VERSION
               value: {{ $pipelineConfig.dataVersion | quote }}
           command:
@@ -72,19 +74,20 @@ spec:
               import boto3
               from botocore.client import Config
               
-              minio_endpoint = os.environ['MINIO_ENDPOINT']
-              access_key = os.environ['MINIO_ACCESS_KEY']
-              secret_key = os.environ['MINIO_SECRET_KEY']
+              s3_endpoint_url = os.environ['S3_ENDPOINT_URL']
+              access_key = os.environ['AWS_ACCESS_KEY_ID']
+              secret_key = os.environ['AWS_SECRET_ACCESS_KEY']
               bucket_name = os.environ['BUCKET_NAME']
               data_version = os.environ['DATA_VERSION']
+              region = os.environ['S3_REGION']
               
               s3_client = boto3.client(
                   's3',
-                  endpoint_url=minio_endpoint,
+                  endpoint_url=s3_endpoint_url,
                   aws_access_key_id=access_key,
                   aws_secret_access_key=secret_key,
-                  config=Config(signature_version='s3v4'),
-                  region_name='us-east-1'
+                  config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+                  region_name=region
               )
               
               users_key = f'data/v{data_version}/users.csv'

@@ -29,14 +29,17 @@ serviceAccount:
 
 dspa:
   deploy: true
+  name: "dspa"
   database:
     deploy: true
+    name: "mlpipeline"
     storage: 10Gi
+    username: "mlpipeline"
+    password: "mlpipeline123"
     storageClass: ""
   objectStorage:
     deploy: true
-    storage: 20Gi
-    storageClass: ""
+    bucket: "mlpipeline"
 
 dsPipelines:
   url: "https://ds-pipeline-dspa:8888"
@@ -51,21 +54,43 @@ database:
   waitForMigration: true
   migrationTimeout: 60
 
-# ==============================
-# MinIO Configuration (for model storage)
-# ==============================
+# S4-backed S3 storage for model artifacts and DSPA.
+aws-compatible-storage:
+  enabled: true
+  fullnameOverride: s4
+  # Parent-chart client and bootstrap settings are grouped with the dependency.
+  client:
+    # Empty values inherit the service name, ports, region, and Secret below.
+    endpoint: ""
+    uiEndpoint: ""
+    region: ""
+    bucketName: "models"
+    credentialsSecret: ""
+  # The parent Job creates buckets even when reusing a standalone S4 release.
+  bucketBootstrap:
+    create: true
+  image:
+    repository: quay.io/rh-aiservices-bu/s4
+    tag: "0.3.2"
+    pullPolicy: IfNotPresent
+  s3:
+    accessKeyId: s4admin # Demo value; override for shared or production clusters.
+    secretAccessKey: s4secret # Demo value; override for shared or production clusters.
+    region: us-east-1
+  auth:
+    enabled: true
+    username: admin
+    password: changeme # Demo value; override for shared or production clusters.
+  route:
+    enabled: true # S4 Web UI only
+    s3Api:
+      enabled: false
+  storage:
+    data:
+      size: 10Gi
 
-minio:
-  deploy: true
-  endpoint: "http://minio-service:9000"
-  bucketName: "models"
-  accessKey: "minio"
-  secretKey: "minio123"
-  deployment:
-    image: quay.io/minio/minio:latest
-    replicas: 1
-    storage: 20Gi
-    storageClass: ""
+jobImages:
+  python: registry.redhat.io/ubi9/python-311:latest
 
 # ==============================
 # Model Registry Configuration
@@ -73,7 +98,9 @@ minio:
 
 modelRegistry:
   enabled: true
-  url: "http://model-registry.rhoai-model-registries.svc.cluster.local:8080"
+  namespace: "rhoai-model-registries"
+  url: "https://model-registry.rhoai-model-registries.svc.cluster.local:8443"
+  caBundle: "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
 
 # model-registry subchart values
 model-registry:
@@ -108,6 +135,14 @@ serving:
   runtime:
     create: true
     createViaPipeline: false
+  inferenceService:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 # ==============================
 # Sample Data Configuration
@@ -136,7 +171,7 @@ pipelines:
     threshold: 0.4
     deployModel: true
     registerModel: true
-    deployFromRegistry: true
+    deployFromRegistry: false
     modelVersionToDeploy: ""
 
 # ==============================

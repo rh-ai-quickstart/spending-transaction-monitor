@@ -1,0 +1,100 @@
+{{- $s4 := index .Values "aws-compatible-storage" | default dict -}}
+{{- $bucketBootstrap := index $s4 "bucketBootstrap" | default dict -}}
+{{- if (index $bucketBootstrap "create") }}
+{{- $suffix := printf "-s4-buckets-r%d" .Release.Revision -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s%s" ((include "alert-recommender-pipeline.fullname" .) | trunc (int (sub 63 (len $suffix))) | trimSuffix "-") $suffix }}
+  labels:
+    {{- include "alert-recommender-pipeline.labels" . | nindent 4 }}
+    app.kubernetes.io/component: s3-bootstrap
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "alert-recommender-pipeline.labels" . | nindent 8 }}
+        app.kubernetes.io/component: s3-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-buckets
+          image: {{ .Values.jobImages.python | quote }}
+          imagePullPolicy: IfNotPresent
+          workingDir: /tmp
+          env:
+            - name: HOME
+              value: /tmp
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "s4.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: S3_ENDPOINT_URL
+              value: {{ include "s4.endpoint" . | quote }}
+            - name: S4_UI_ENDPOINT_URL
+              value: {{ include "s4.uiEndpoint" . | quote }}
+            - name: S3_REGION
+              value: {{ include "s4.region" . | quote }}
+            - name: S3_BUCKETS
+              value: {{ list (include "s4.bucketName" .) .Values.dspa.objectStorage.bucket | join "," | quote }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              python -m pip install --no-cache-dir -q boto3
+              python - <<'PY'
+              import os
+              import time
+              from urllib.request import urlopen
+
+              import boto3
+              from botocore.config import Config
+
+              for attempt in range(60):
+                  try:
+                      with urlopen(os.environ["S4_UI_ENDPOINT_URL"], timeout=3) as response:
+                          if 200 <= response.status < 300:
+                              break
+                  except OSError:
+                      pass
+                  time.sleep(5)
+              else:
+                  raise RuntimeError("S4 UI readiness endpoint did not become healthy")
+
+              client = boto3.client(
+                  "s3",
+                  endpoint_url=os.environ["S3_ENDPOINT_URL"],
+                  region_name=os.environ["S3_REGION"],
+                  config=Config(s3={"addressing_style": "path"}),
+              )
+              for attempt in range(60):
+                  try:
+                      existing = {
+                          bucket["Name"]
+                          for bucket in client.list_buckets().get("Buckets", [])
+                      }
+                      break
+                  except Exception:
+                      if attempt == 59:
+                          raise
+                      time.sleep(5)
+
+              for name in filter(None, os.environ["S3_BUCKETS"].split(",")):
+                  if name not in existing:
+                      client.create_bucket(Bucket=name)
+                      existing.add(name)
+                      print(f"Created bucket {name}")
+                  else:
+                      print(f"Bucket {name} already exists")
+              PY
+{{- end }}

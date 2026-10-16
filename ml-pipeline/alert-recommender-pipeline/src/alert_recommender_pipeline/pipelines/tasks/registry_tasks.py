@@ -17,6 +17,22 @@ def register_model(input_artifact: Input[Artifact]):
     
     model_registry_url = os.getenv('MODEL_REGISTRY_URL', '')
     model_registry_enabled = os.getenv('MODEL_REGISTRY_ENABLED', 'false').lower() == 'true'
+    request_options = {'timeout': (5, 30)}
+    ca_bundle = os.getenv('MODEL_REGISTRY_CA_BUNDLE')
+    if ca_bundle:
+        request_options['verify'] = ca_bundle
+    api_headers = {}
+    token_path = os.getenv(
+        'MODEL_REGISTRY_TOKEN_FILE',
+        '/var/run/secrets/kubernetes.io/serviceaccount/token'
+    )
+    try:
+        with open(token_path, 'r') as token_file:
+            service_account_token = token_file.read().strip()
+        if service_account_token:
+            api_headers['Authorization'] = f'Bearer {service_account_token}'
+    except OSError:
+        print("Model Registry service-account token is unavailable")
     
     if not model_registry_enabled or not model_registry_url:
         print("Model registry not enabled or URL not configured. Skipping registration.")
@@ -42,7 +58,9 @@ def register_model(input_artifact: Input[Artifact]):
         print(f"Searching for existing registered model: {model_name}")
         response = requests.get(
             f"{api_base}/registered_model",
-            params={"name": model_name}
+            params={"name": model_name},
+            headers=api_headers,
+            **request_options
         )
         
         registered_model_id = None
@@ -58,7 +76,8 @@ def register_model(input_artifact: Input[Artifact]):
                     patch_response = requests.patch(
                         f"{api_base}/registered_models/{registered_model_id}",
                         json={"state": "LIVE"},
-                        headers={"Content-Type": "application/json"}
+                        headers={**api_headers, "Content-Type": "application/json"},
+                        **request_options
                     )
                     if patch_response.ok:
                         print(f"Successfully updated model state to LIVE")
@@ -90,7 +109,8 @@ def register_model(input_artifact: Input[Artifact]):
             create_response = requests.post(
                 f"{api_base}/registered_models",
                 json=create_payload,
-                headers={"Content-Type": "application/json"}
+                headers={**api_headers, "Content-Type": "application/json"},
+                **request_options
             )
             
             if not create_response.ok:
@@ -105,11 +125,13 @@ def register_model(input_artifact: Input[Artifact]):
             print(f"Created new model: {registered_model_id}")
         
         namespace = os.getenv('NAMESPACE', 'spending-transaction-monitor')
-        minio_endpoint = os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000')
+        s3_endpoint_url = os.getenv('S3_ENDPOINT_URL', f'http://s4.{namespace}.svc.cluster.local:7480')
         
         print(f"Checking for existing version: {model_version}")
         versions_response = requests.get(
-            f"{api_base}/registered_models/{registered_model_id}/versions"
+            f"{api_base}/registered_models/{registered_model_id}/versions",
+            headers=api_headers,
+            **request_options
         )
         
         version_id = None
@@ -128,7 +150,7 @@ def register_model(input_artifact: Input[Artifact]):
                 "customProperties": {
                     "storage_uri": {"metadataType": "MetadataStringValue", "string_value": f"s3://{s3_bucket}/{s3_model_path}"},
                     "model_format": {"metadataType": "MetadataStringValue", "string_value": "joblib"},
-                    "minio_endpoint": {"metadataType": "MetadataStringValue", "string_value": minio_endpoint}
+                    "s3_endpoint_url": {"metadataType": "MetadataStringValue", "string_value": s3_endpoint_url}
                 }
             }
             print(f"Creating model version with payload: {json.dumps(version_payload, indent=2)}")
@@ -136,7 +158,8 @@ def register_model(input_artifact: Input[Artifact]):
             version_response = requests.post(
                 f"{api_base}/registered_models/{registered_model_id}/versions",
                 json=version_payload,
-                headers={"Content-Type": "application/json"}
+                headers={**api_headers, "Content-Type": "application/json"},
+                **request_options
             )
             
             if not version_response.ok:
@@ -154,7 +177,9 @@ def register_model(input_artifact: Input[Artifact]):
         print(f"Checking for existing artifact: {artifact_name}")
         
         artifacts_response = requests.get(
-            f"{api_base}/model_versions/{version_id}/artifacts"
+            f"{api_base}/model_versions/{version_id}/artifacts",
+            headers=api_headers,
+            **request_options
         )
         
         artifact_id = None
@@ -179,7 +204,8 @@ def register_model(input_artifact: Input[Artifact]):
             artifact_response = requests.post(
                 f"{api_base}/model_versions/{version_id}/artifacts",
                 json=artifact_payload,
-                headers={"Content-Type": "application/json"}
+                headers={**api_headers, "Content-Type": "application/json"},
+                **request_options
             )
             
             if not artifact_response.ok:

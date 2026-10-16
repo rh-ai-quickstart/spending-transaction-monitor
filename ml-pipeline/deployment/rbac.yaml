@@ -5,29 +5,25 @@ metadata:
   name: ml-deployment-manager
   namespace: spending-transaction-monitor
 rules:
-  # Permissions for managing deployments (MinIO)
+  # Read-only access to verify the Helm-managed S4 deployment.
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    verbs: ["get", "list", "watch"]
 
-  # Permissions for managing services
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Permissions for managing secrets (storage-config)
+  # Read S4 credentials and manage the KServe storage-config Secret.
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+  # Notebook 3 creates or updates the KServe ServiceAccount that references
+  # the storage-config Secret.
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "create", "update", "patch"]
+
   # Permissions for managing ConfigMaps
   - apiGroups: [""]
     resources: ["configmaps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
-  # Permissions for managing PVCs (MinIO storage)
-  - apiGroups: [""]
-    resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   # Permissions for managing ServingRuntimes and InferenceServices

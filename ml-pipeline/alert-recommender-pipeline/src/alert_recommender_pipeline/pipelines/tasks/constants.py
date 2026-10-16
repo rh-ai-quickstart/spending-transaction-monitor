@@ -36,12 +36,10 @@ DEFAULT_DB_HOST = 'spending-monitor-db'
 DEFAULT_DB_PORT = '5432'
 DEFAULT_DB_NAME = 'spending-monitor'
 DEFAULT_DB_USER = 'user'
-DEFAULT_MINIO_ACCESS_KEY = 'minio'
-DEFAULT_MINIO_SECRET_KEY = 'minio123'
 DEFAULT_BUCKET_NAME = 'models'
 
-def get_default_minio_endpoint(namespace: str = DEFAULT_NAMESPACE) -> str:
-    return f'http://minio-service.{namespace}.svc.cluster.local:9000'
+def get_default_s3_endpoint_url(namespace: str = DEFAULT_NAMESPACE) -> str:
+    return f'http://s4.{namespace}.svc.cluster.local:7480'
 
 DEFAULT_MODEL_NAME = 'alert-recommender'
 DEFAULT_MODEL_VERSION = '1.0.0'

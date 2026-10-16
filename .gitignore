@@ -237,5 +237,6 @@ packages/api/test_start.txt
 # Helm dependencies
 deploy/helm/*/charts/
 deploy/helm/*/Chart.lock
+!deploy/helm/alert-recommender-pipeline/Chart.lock
 
 PR_DESCRIPTION.md

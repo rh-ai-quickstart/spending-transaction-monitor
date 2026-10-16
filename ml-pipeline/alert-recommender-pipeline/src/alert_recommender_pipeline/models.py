@@ -7,7 +7,7 @@ class BasePipelineModel(BaseModel):
     """Base model for pipeline configurations."""
     name: str
     version: str
-    source: str = "MINIO"  # Data source type (MINIO, S3, etc.)
+    source: str = "S3"  # Data source type (S3-compatible object storage, etc.)
     
     def pipeline_name(self) -> str:
         """Generate a Kubernetes-compliant pipeline name."""
@@ -20,22 +20,19 @@ class PipelineConfig(BasePipelineModel):
     """Configuration for the alert recommender ML pipeline."""
     name: str = "alert-recommender"
     version: str = "1.0.0"
-    source: str = "MINIO"
+    source: str = "S3"
     data_version: str = "1"
     n_neighbors: int = 5
     metric: str = "cosine"
     threshold: float = 0.4
-    minio_endpoint: str = ""
-    minio_access_key: str = ""
-    minio_secret_key: str = ""
+    s3_endpoint_url: str = ""
     bucket_name: str = "models"
-    region: str = "us-east-1"
+    s3_region: str = "us-east-1"
     namespace: str = "spending-transaction-monitor"
     serving_runtime: str = "mlserver-sklearn"
     model_registry_enabled: bool = False
     model_registry_url: str = ""
     deploy_model: bool = True
-    cleanup_on_failure: bool = False
     create_serving_runtime: bool = True
 
 

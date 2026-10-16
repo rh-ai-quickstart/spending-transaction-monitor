@@ -9,11 +9,11 @@ from .constants import BASE_IMAGE
 @dsl.component(base_image=BASE_IMAGE)
 def prepare_data(output_data: Output[Dataset]):
     """
-    Prepare training data by loading from PostgreSQL database, MinIO, or local storage.
+    Prepare training data by loading from PostgreSQL database, S4-backed S3 storage, or local storage.
     
     This task automatically tries data sources in order:
     1. PostgreSQL database (using spending-monitor-db service)
-    2. MinIO (S3-compatible storage)
+    2. S4-backed S3 storage (S3-compatible storage)
     3. Local filesystem (fallback)
     
     The database is preferred as it contains live application data.
@@ -134,25 +134,28 @@ def prepare_data(output_data: Output[Dataset]):
         conn.close()
         return users_df, transactions_df, use_real_alerts
     
-    def load_from_minio():
-        """Load users and transactions from MinIO S3-compatible storage. This is a backup data source in case the database is not available."""
+    def load_from_s3():
+        """Load users and transactions from S4-backed S3 storage as a database fallback."""
         namespace = os.getenv('NAMESPACE', 'spending-transaction-monitor')
         bucket_name = os.getenv('BUCKET_NAME', 'models')
-        minio_endpoint = os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000')
-        minio_access_key = os.getenv('MINIO_ACCESS_KEY', 'minio')
-        minio_secret_key = os.getenv('MINIO_SECRET_KEY', 'minio123')
-        
-        print(f"Attempting MinIO connection:")
-        print(f"  Endpoint: {minio_endpoint}")
+        s3_endpoint_url = os.getenv('S3_ENDPOINT_URL', f'http://s4.{namespace}.svc.cluster.local:7480')
+        s3_region = os.getenv('S3_REGION', 'us-east-1')
+        aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+        if not aws_access_key_id or not aws_secret_access_key:
+            raise RuntimeError('S4 credentials are missing from the pipeline task environment')
+
+        print(f"Attempting S4-backed S3 storage connection:")
+        print(f"  Endpoint: {s3_endpoint_url}")
         print(f"  Bucket: {bucket_name}")
         
         s3_client = boto3.client(
             's3',
-            endpoint_url=minio_endpoint,
-            aws_access_key_id=minio_access_key,
-            aws_secret_access_key=minio_secret_key,
-            config=Config(signature_version='s3v4'),
-            region_name='us-east-1'
+            endpoint_url=s3_endpoint_url,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+            region_name=s3_region
         )
         
         data_key_prefix = f'data/v{data_version}'
@@ -161,13 +164,13 @@ def prepare_data(output_data: Output[Dataset]):
         users_local_path = os.path.join(output_data.path, 'users.csv')
         s3_client.download_file(bucket_name, users_key, users_local_path)
         users_df = pd.read_csv(users_local_path)
-        print(f"Loaded {len(users_df)} users from MinIO")
+        print(f"Loaded {len(users_df)} users from S4-backed S3 storage")
         
         transactions_key = f'{data_key_prefix}/transactions.csv'
         transactions_local_path = os.path.join(output_data.path, 'transactions.csv')
         s3_client.download_file(bucket_name, transactions_key, transactions_local_path)
         transactions_df = pd.read_csv(transactions_local_path)
-        print(f"Loaded {len(transactions_df)} transactions from MinIO")
+        print(f"Loaded {len(transactions_df)} transactions from S4-backed S3 storage")
         
         use_real_alerts = False
         try:
@@ -175,10 +178,10 @@ def prepare_data(output_data: Output[Dataset]):
             alerts_local_path = os.path.join(output_data.path, 'user_alerts.csv')
             s3_client.download_file(bucket_name, alerts_key, alerts_local_path)
             user_alerts_df = pd.read_csv(alerts_local_path)
-            print(f"Loaded {len(user_alerts_df)} alert preferences from MinIO")
+            print(f"Loaded {len(user_alerts_df)} alert preferences from S4-backed S3 storage")
             use_real_alerts = True
         except Exception as e:
-            print(f"No alert preferences found in MinIO: {e}")
+            print(f"No alert preferences found in S4-backed S3 storage: {e}")
         
         return users_df, transactions_df, use_real_alerts
     
@@ -204,7 +207,7 @@ def prepare_data(output_data: Output[Dataset]):
         
         return users_df, transactions_df, False
     
-    # Try data sources in order: Database -> MinIO -> Local
+    # Try data sources in order: Database -> S4-backed S3 storage -> Local
     try:
         print("\n=== Trying database as data source ===")
         users_df, transactions_df, use_real_alerts = load_from_database()
@@ -212,11 +215,11 @@ def prepare_data(output_data: Output[Dataset]):
     except Exception as e:
         print(f"Database load failed: {e}")
         try:
-            print("\n=== Falling back to MinIO ===")
-            users_df, transactions_df, use_real_alerts = load_from_minio()
-            data_source_used = 'minio'
+            print("\n=== Falling back to S4-backed S3 storage ===")
+            users_df, transactions_df, use_real_alerts = load_from_s3()
+            data_source_used = 's3'
         except Exception as e2:
-            print(f"MinIO load failed: {e2}")
+            print(f"S4-backed S3 storage load failed: {e2}")
             print("\n=== Falling back to local storage ===")
             users_df, transactions_df, use_real_alerts = load_from_local()
             data_source_used = 'local'

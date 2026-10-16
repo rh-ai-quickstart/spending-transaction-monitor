@@ -43,10 +43,9 @@ class PipelineRequest(BaseModel):
     postgres_db: str = "spending-monitor"
     postgres_user: str = ""
     postgres_password: str = ""
-    minio_endpoint: str = ""
-    minio_access_key: str = "minio"
-    minio_secret_key: str = "minio123"
+    s3_endpoint_url: str = ""
     bucket_name: str = "models"
+    s3_region: str = "us-east-1"
     namespace: str = "spending-transaction-monitor"
     serving_runtime: str = "alert-recommender-runtime"
     create_serving_runtime: bool = False
@@ -70,7 +69,6 @@ class CleanupRequest(BaseModel):
     
     name: str = "alert-recommender"
     namespace: str = "spending-transaction-monitor"
-    cleanup_minio: bool = False
 
 
 @app.get("/ping")
@@ -116,6 +114,12 @@ async def train_pipeline(payload: PipelineRequest = Body(...)):
             payload.postgres_user = os.getenv('POSTGRES_USER', '')
         if not payload.postgres_password:
             payload.postgres_password = os.getenv('POSTGRES_PASSWORD', '')
+        if not payload.s3_endpoint_url:
+            namespace = payload.namespace or os.getenv('NAMESPACE', 'spending-transaction-monitor')
+            payload.s3_endpoint_url = os.getenv(
+                'S3_ENDPOINT_URL',
+                f'http://s4.{namespace}.svc.cluster.local:7480'
+            )
         
         logger.info(f"Database config: host={payload.postgres_db_host}, db={payload.postgres_db}, user={payload.postgres_user}, password_set={bool(payload.postgres_password)}")
         
@@ -216,17 +220,9 @@ async def cleanup_deployment(payload: CleanupRequest = Body(...)):
     - ServingRuntime
     - Secrets
     - RBAC resources
-    - MinIO resources (optional)
+    - S3 storage is managed by the Helm release and is left in place
     """
     try:
-        from .models import PipelineConfig
-        
-        cleanup_config = PipelineConfig(
-            name=payload.name,
-            namespace=payload.namespace,
-            cleanup_on_failure=payload.cleanup_minio
-        )
-        
         k8s_name = k8s.normalize_name(f"{payload.name}-cleanup")
         
         pipeline_id = await asyncio.to_thread(

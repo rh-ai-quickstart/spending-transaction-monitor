@@ -9,7 +9,7 @@ from .constants import BASE_IMAGE
 @dsl.component(base_image=BASE_IMAGE)
 def save_model(input_model: Input[Model], output_artifact: Output[Artifact]):
     """
-    Save the trained model to MinIO and prepare for deployment.
+    Save the trained model to S4-backed S3 storage and prepare for deployment.
     """
     import os
     import json
@@ -101,9 +101,12 @@ class AlertRecommenderModel(MLModel):
     
     namespace = os.getenv('NAMESPACE', 'spending-transaction-monitor')
     bucket_name = os.getenv('BUCKET_NAME', 'models')
-    minio_endpoint = os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000')
-    minio_access_key = os.getenv('MINIO_ACCESS_KEY', 'minio')
-    minio_secret_key = os.getenv('MINIO_SECRET_KEY', 'minio123')
+    s3_endpoint_url = os.getenv('S3_ENDPOINT_URL', f'http://s4.{namespace}.svc.cluster.local:7480')
+    s3_region = os.getenv('S3_REGION', 'us-east-1')
+    aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+    if not aws_access_key_id or not aws_secret_access_key:
+        raise RuntimeError('S4 credentials are missing from the pipeline task environment')
     threshold = float(os.getenv('THRESHOLD', '0.4'))
     
     model_version = datetime.now().strftime("%y-%m-%d-%H%M%S")
@@ -114,11 +117,11 @@ class AlertRecommenderModel(MLModel):
     
     s3_client = boto3.client(
         's3',
-        endpoint_url=minio_endpoint,
-        aws_access_key_id=minio_access_key,
-        aws_secret_access_key=minio_secret_key,
-        config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        endpoint_url=s3_endpoint_url,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}),
+        region_name=s3_region
     )
     
     try:
@@ -186,7 +189,7 @@ class AlertRecommenderModel(MLModel):
         'model_name': model_name,
         's3_bucket': bucket_name,
         's3_model_path': s3_model_path,
-        'minio_endpoint': minio_endpoint
+        's3_endpoint_url': s3_endpoint_url
     }
     
     with open(os.path.join(output_artifact.path, 'vars.json'), 'w') as f:

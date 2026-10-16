@@ -24,6 +24,7 @@ def deploy_model(input_artifact: Input[Artifact]):
     import json
     import time
     import requests
+    from urllib.parse import urlparse
     from kubernetes import client, config
     from kubernetes.client.rest import ApiException
     
@@ -33,16 +34,22 @@ def deploy_model(input_artifact: Input[Artifact]):
         return {
             'namespace': namespace,
             'deploy_enabled': os.getenv('DEPLOY_MODEL', 'true').lower() == 'true',
-            'minio_access_key': os.getenv('MINIO_ACCESS_KEY', 'minio'),
-            'minio_secret_key': os.getenv('MINIO_SECRET_KEY', 'minio123'),
+            'aws_access_key_id': os.getenv('AWS_ACCESS_KEY_ID'),
+            'aws_secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY'),
             'serving_runtime': os.getenv('SERVING_RUNTIME', 'alert-recommender-runtime'),
             'create_serving_runtime': os.getenv('CREATE_SERVING_RUNTIME', 'false').lower() == 'true',
             'runtime_image': os.getenv('SERVING_RUNTIME_IMAGE', 'docker.io/seldonio/mlserver:1.7.0-sklearn'),
             'deploy_from_registry': os.getenv('DEPLOY_FROM_REGISTRY', 'false').lower() == 'true',
             'model_registry_url': os.getenv('MODEL_REGISTRY_URL', ''),
+            'model_registry_ca_bundle': os.getenv('MODEL_REGISTRY_CA_BUNDLE', ''),
+            'model_registry_token_file': os.getenv(
+                'MODEL_REGISTRY_TOKEN_FILE',
+                '/var/run/secrets/kubernetes.io/serviceaccount/token',
+            ),
             'model_name_override': os.getenv('MODEL_NAME', 'alert-recommender'),
             'model_version_override': os.getenv('MODEL_VERSION_TO_DEPLOY', ''),
-            'default_minio_endpoint': os.getenv('MINIO_ENDPOINT', f'http://minio-service.{namespace}.svc.cluster.local:9000'),
+            'default_s3_endpoint_url': os.getenv('S3_ENDPOINT_URL', f'http://s4.{namespace}.svc.cluster.local:7480'),
+            's3_region': os.getenv('S3_REGION', 'us-east-1'),
         }
     
     def load_model_info_from_registry(cfg):
@@ -55,10 +62,27 @@ def deploy_model(input_artifact: Input[Artifact]):
         print(f"  Registry URL: {cfg['model_registry_url']}")
         print(f"  Model Name: {model_name}")
         print(f"  Version: {version_override or 'latest'}")
+
+        request_options = {'timeout': (5, 30)}
+        if cfg['model_registry_ca_bundle']:
+            request_options['verify'] = cfg['model_registry_ca_bundle']
+        try:
+            with open(cfg['model_registry_token_file'], 'r') as token_file:
+                token = token_file.read().strip()
+        except OSError as exc:
+            raise RuntimeError('Model Registry service-account token is unavailable') from exc
+        if not token:
+            raise RuntimeError('Model Registry service-account token is empty')
+        headers = {'Authorization': f'Bearer {token}'}
         
         # Get registered model
         print(f"Searching for registered model: {model_name}")
-        response = requests.get(f"{api_base}/registered_model", params={"name": model_name})
+        response = requests.get(
+            f"{api_base}/registered_model",
+            params={"name": model_name},
+            headers=headers,
+            **request_options,
+        )
         
         if response.status_code == 404:
             raise RuntimeError(f"Model '{model_name}' not found in registry")
@@ -71,7 +95,11 @@ def deploy_model(input_artifact: Input[Artifact]):
         print(f"Found registered model: {registered_model_id}")
         
         # Get model versions
-        versions_response = requests.get(f"{api_base}/registered_models/{registered_model_id}/versions")
+        versions_response = requests.get(
+            f"{api_base}/registered_models/{registered_model_id}/versions",
+            headers=headers,
+            **request_options,
+        )
         if not versions_response.ok:
             print(f"Failed to get versions: {versions_response.status_code}")
             versions_response.raise_for_status()
@@ -89,7 +117,9 @@ def deploy_model(input_artifact: Input[Artifact]):
         print(f"Using version: {model_version} (id: {version_id})")
         
         # Extract storage info
-        storage_uri, minio_endpoint = extract_storage_info(api_base, target_version, version_id)
+        storage_uri, s3_endpoint_url = extract_storage_info(
+            api_base, target_version, version_id, headers, request_options
+        )
         
         if not storage_uri:
             raise RuntimeError("Could not find storage URI in model registry")
@@ -97,20 +127,20 @@ def deploy_model(input_artifact: Input[Artifact]):
         # Parse storage URI (format: s3://bucket/path/)
         bucket, model_path = parse_s3_uri(storage_uri)
         
-        # Use MinIO endpoint from registry or default
-        if not minio_endpoint:
-            minio_endpoint = cfg['default_minio_endpoint']
+        # Use S4-backed S3 storage endpoint from registry or default
+        if not s3_endpoint_url:
+            s3_endpoint_url = cfg['default_s3_endpoint_url']
         
         print(f"Resolved deployment info from registry:")
         print(f"  Bucket: {bucket}, Path: {model_path}")
-        print(f"  MinIO Endpoint: {minio_endpoint}")
+        print(f"  S4-backed S3 storage Endpoint: {s3_endpoint_url}")
         
         return {
             'model_name': model_name,
             'model_version': model_version,
             'bucket': bucket,
             'model_path': model_path,
-            'minio_endpoint': minio_endpoint,
+            's3_endpoint_url': s3_endpoint_url,
         }
     
     def find_model_version(versions, version_override):
@@ -123,22 +153,26 @@ def deploy_model(input_artifact: Input[Artifact]):
         # Return latest version
         return sorted(versions, key=lambda x: x.get('createTimeSinceEpoch', '0'), reverse=True)[0]
     
-    def extract_storage_info(api_base, target_version, version_id):
-        """Extract storage URI and MinIO endpoint from version metadata."""
+    def extract_storage_info(api_base, target_version, version_id, headers, request_options):
+        """Extract storage URI and S4-backed S3 storage endpoint from version metadata."""
         custom_props = target_version.get('customProperties', {})
         storage_uri = custom_props.get('storage_uri', {}).get('string_value', '')
-        minio_endpoint = custom_props.get('minio_endpoint', {}).get('string_value', '')
+        s3_endpoint_url = custom_props.get('s3_endpoint_url', {}).get('string_value', '')
         
         if not storage_uri:
             # Try to get from model artifact
-            artifacts_response = requests.get(f"{api_base}/model_versions/{version_id}/artifacts")
+            artifacts_response = requests.get(
+                f"{api_base}/model_versions/{version_id}/artifacts",
+                headers=headers,
+                **request_options,
+            )
             if artifacts_response.ok:
                 artifacts = artifacts_response.json().get('items', [])
                 print(f"Found {len(artifacts)} artifacts")
                 if artifacts:
                     storage_uri = artifacts[0].get('uri', '')
         
-        return storage_uri, minio_endpoint
+        return storage_uri, s3_endpoint_url
     
     def parse_s3_uri(storage_uri):
         """Parse S3 URI into bucket and path."""
@@ -150,7 +184,7 @@ def deploy_model(input_artifact: Input[Artifact]):
         model_path = uri_parts[1] if len(uri_parts) > 1 else ''
         return bucket, model_path
     
-    def load_model_info_from_artifact(artifact_path):
+    def load_model_info_from_artifact(artifact_path, cfg):
         """Load model deployment info from pipeline artifact."""
         vars_path = os.path.join(artifact_path, 'vars.json')
         with open(vars_path, 'r') as f:
@@ -160,7 +194,7 @@ def deploy_model(input_artifact: Input[Artifact]):
             'model_version': vars_data['model_version'],
             'bucket': vars_data['s3_bucket'],
             'model_path': vars_data['s3_model_path'],
-            'minio_endpoint': vars_data['minio_endpoint'],
+            's3_endpoint_url': vars_data.get('s3_endpoint_url', cfg['default_s3_endpoint_url']),
         }
     
     def init_kubernetes_client():
@@ -186,18 +220,23 @@ def deploy_model(input_artifact: Input[Artifact]):
                 raise
     
     def create_storage_secret(core_v1, cfg, model_info):
-        """Create the storage-config secret for MinIO access."""
+        """Create the storage-config secret for S4-backed S3 storage access."""
         print("\nCreating storage-config secret...")
         
-        minio_host = model_info['minio_endpoint'].replace('http://', '').replace('https://', '')
+        parsed_endpoint = urlparse(model_info['s3_endpoint_url'])
+        if parsed_endpoint.scheme not in ('http', 'https') or not parsed_endpoint.netloc:
+            raise ValueError('S3 endpoint must be an absolute HTTP(S) URL')
+        s3_host = parsed_endpoint.netloc
+        use_https = '1' if parsed_endpoint.scheme == 'https' else '0'
+        verify_ssl = use_https
         
         storage_config_json = json.dumps({
             "type": "s3",
-            "access_key_id": cfg['minio_access_key'],
-            "secret_access_key": cfg['minio_secret_key'],
-            "endpoint_url": model_info['minio_endpoint'],
-            "region": "us-east-1",
-            "verify_ssl": "false"
+            "access_key_id": cfg['aws_access_key_id'],
+            "secret_access_key": cfg['aws_secret_access_key'],
+            "endpoint_url": model_info['s3_endpoint_url'],
+            "region": cfg['s3_region'],
+            "verify_ssl": "true" if verify_ssl == '1' else "false"
         })
         
         secret = client.V1Secret(
@@ -207,27 +246,27 @@ def deploy_model(input_artifact: Input[Artifact]):
                 name="storage-config",
                 namespace=cfg['namespace'],
                 annotations={
-                    "serving.kserve.io/s3-endpoint": minio_host,
-                    "serving.kserve.io/s3-usehttps": "0",
-                    "serving.kserve.io/s3-verifyssl": "0",
-                    "serving.kserve.io/s3-region": "us-east-1"
+                    "serving.kserve.io/s3-endpoint": s3_host,
+                    "serving.kserve.io/s3-usehttps": use_https,
+                    "serving.kserve.io/s3-verifyssl": verify_ssl,
+                    "serving.kserve.io/s3-region": cfg['s3_region']
                 }
             ),
             type="Opaque",
             string_data={
                 model_info['bucket']: storage_config_json,
-                "AWS_ACCESS_KEY_ID": cfg['minio_access_key'],
-                "AWS_SECRET_ACCESS_KEY": cfg['minio_secret_key'],
-                "AWS_DEFAULT_REGION": "us-east-1",
-                "S3_ENDPOINT": model_info['minio_endpoint'],
-                "S3_USE_HTTPS": "0",
-                "S3_VERIFY_SSL": "0"
+                "AWS_ACCESS_KEY_ID": cfg['aws_access_key_id'],
+                "AWS_SECRET_ACCESS_KEY": cfg['aws_secret_access_key'],
+                "AWS_DEFAULT_REGION": cfg['s3_region'],
+                "S3_ENDPOINT": model_info['s3_endpoint_url'],
+                "S3_USE_HTTPS": use_https,
+                "S3_VERIFY_SSL": verify_ssl
             }
         )
         
         create_or_update_resource(
             lambda: core_v1.create_namespaced_secret(cfg['namespace'], secret),
-            lambda: core_v1.replace_namespaced_secret("storage-config", cfg['namespace'], secret),
+            lambda: core_v1.patch_namespaced_secret("storage-config", cfg['namespace'], secret),
             "Storage config secret"
         )
     
@@ -337,7 +376,7 @@ def deploy_model(input_artifact: Input[Artifact]):
                         "storageUri": f"s3://{model_info['bucket']}/{model_info['model_path']}",
                         "storage": {
                             "key": model_info['bucket'],
-                            "parameters": {"endpoint": model_info['minio_endpoint'], "region": "us-east-1"}
+                            "parameters": {"endpoint": model_info['s3_endpoint_url'], "region": cfg['s3_region']}
                         }
                     },
                     "serviceAccountName": sa_name
@@ -402,14 +441,19 @@ def deploy_model(input_artifact: Input[Artifact]):
     if not cfg['deploy_enabled']:
         print("Model deployment not enabled. Skipping.")
         return
+
+    if not cfg['aws_access_key_id'] or not cfg['aws_secret_access_key']:
+        raise RuntimeError('S4 credentials are missing from the pipeline task environment')
     
-    if cfg['deploy_from_registry'] and cfg['model_registry_url']:
+    if cfg['deploy_from_registry']:
+        if not cfg['model_registry_url']:
+            raise RuntimeError('Model Registry URL is required for deploy_from_registry')
         try:
             model_info = load_model_info_from_registry(cfg)
         except requests.RequestException as e:
             raise RuntimeError(f"Failed to fetch from Model Registry: {e}")
     else:
-        model_info = load_model_info_from_artifact(input_artifact.path)
+        model_info = load_model_info_from_artifact(input_artifact.path, cfg)
     
     print(f"\nDeployment configuration:")
     print(f"  Model: {model_info['model_name']}")
@@ -424,4 +468,5 @@ def deploy_model(input_artifact: Input[Artifact]):
     sa_name = create_service_account(core_v1, cfg, model_info['model_name'])
     create_serving_runtime(custom_api, cfg)
     create_inference_service(custom_api, cfg, model_info, sa_name)
-    wait_for_inference_service(custom_api, cfg, model_info['model_name'])
+    if not wait_for_inference_service(custom_api, cfg, model_info['model_name']):
+        raise RuntimeError(f"InferenceService {model_info['model_name']} did not become Ready")

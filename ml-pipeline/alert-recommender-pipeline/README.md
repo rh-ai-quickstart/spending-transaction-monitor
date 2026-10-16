@@ -6,9 +6,9 @@ A Kubeflow pipeline for training and deploying KNN-based collaborative filtering
 
 This pipeline converts the existing Jupyter notebooks into a production-ready Kubeflow pipeline that:
 
-1. **Prepares Data** - Loads user and transaction data from PostgreSQL database or MinIO
+1. **Prepares Data** - Loads user and transaction data from PostgreSQL database or S4-backed S3 storage
 2. **Trains Model** - Trains a KNN collaborative filtering model
-3. **Saves Model** - Saves the model to MinIO and creates MLServer-compatible artifacts
+3. **Saves Model** - Saves the model to the S4 `models` bucket and creates MLServer-compatible artifacts
 4. **Registers Model** (optional) - Registers the model with OpenDataHub Model Registry
 5. **Deploys Model** - Deploys the model as a KServe InferenceService
 
@@ -71,10 +71,9 @@ deploy/helm/alert-recommender-pipeline/
     ├── service.yaml
     ├── serviceaccount.yaml
     ├── rbac.yaml
-    ├── secret.yaml
     ├── pipeline-job.yaml
     ├── serving-runtime.yaml
-    └── minio.yaml
+    └── s4-bucket-bootstrap-job.yaml
 ```
 
 ## Prerequisites
@@ -82,7 +81,7 @@ deploy/helm/alert-recommender-pipeline/
 - OpenShift cluster with:
   - OpenShift AI (Data Science Pipelines)
   - KServe or OpenDataHub Model Serving
-- MinIO or S3-compatible storage
+- S4-backed S3 storage (installed by the chart dependency)
 - (Optional) OpenDataHub Model Registry
 
 ## Installation
@@ -91,30 +90,44 @@ deploy/helm/alert-recommender-pipeline/
 
 ```bash
 # Install with default values (includes DSPA setup)
-helm install alert-recommender ../../deploy/helm/alert-recommender-pipeline \
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
   --create-namespace
 
-# Install with custom values
-helm install alert-recommender ../../deploy/helm/alert-recommender-pipeline \
+# Install with custom S4 storage values
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
-  --set minio.endpoint="http://my-minio:9000" \
-  --set minio.accessKey="myaccesskey" \
-  --set minio.secretKey="mysecretkey" \
+  --set aws-compatible-storage.client.bucketName="models" \
+  --set aws-compatible-storage.storage.data.size="10Gi" \
   --set modelRegistry.enabled=true
 
 # Install without DSPA (if already exists)
-helm install alert-recommender ../../deploy/helm/alert-recommender-pipeline \
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
   --namespace spending-transaction-monitor \
   --set dspa.deploy=false
+
+# Reuse an existing standalone S4 release in the same namespace
+helm install alert-recommender deploy/helm/alert-recommender-pipeline \
+  --namespace spending-transaction-monitor \
+  --set aws-compatible-storage.enabled=false
 ```
 
-### Data Science Pipelines
+### Data Science Pipelines and S4
 
 The chart now automatically deploys a `DataSciencePipelinesApplication` (DSPA) which is required for Kubeflow Pipelines. This includes:
 - MariaDB for pipeline metadata
-- MinIO for pipeline artifacts
+- S4-backed S3 storage for the `mlpipeline` artifact bucket and `models` bucket
 - Pipeline API server, persistence agent, and scheduler
+
+The [aws-compatible-storage (S4) chart](https://github.com/rh-ai-quickstart/ai-architecture-charts/tree/main/aws-compatible-storage) uses service `s4`, S3 API `http://s4:7480`, and a 10Gi data PVC. The chart enables the S4 UI Route and disables the S3 API Route. DSPA uses `s4.<namespace>.svc.cluster.local:7480` with the `s4-credentials` Secret. The parent chart creates both buckets with a regular boto3 Job, including when a standalone S4 release is reused. The default S4 credentials and UI password are demo values; override them for shared deployments.
+
+When reusing S4 with another service name or port, set `aws-compatible-storage.client.endpoint` and `aws-compatible-storage.client.credentialsSecret`; the endpoint also supplies DSPA's host, port, and scheme. Set `aws-compatible-storage.client.uiEndpoint` if the S4 UI health endpoint is on another host or port, and `aws-compatible-storage.client.region` if it differs from the S4 chart's region. The DSPA MariaDB name defaults to `mlpipeline`.
+
+The standalone notebooks use the same S4 service. Configure `S3_ENDPOINT_URL`, `S3_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` in the Workbench from the `s4-credentials` Secret before running notebooks 1 and 2. Notebook 3 reads that Secret and creates KServe's bucket-specific storage configuration and ServiceAccount. For a differently named S4 release, set `S4_SERVICE_NAME` and `S4_CREDENTIALS_SECRET` in notebook 3's environment.
+
+Before running notebook 3, a namespace admin should apply `ml-pipeline/deployment/rbac.yaml`. Its RoleBinding targets a Workbench ServiceAccount named `alert-recommendation`; set the binding's subject to the actual Workbench ServiceAccount when that name differs. The Role grants the Secret and ServiceAccount access notebook 3 needs.
+
+Helm does not copy existing MinIO objects. Copy any existing data in the `models` bucket to S4 before deploying models saved in the old store.
 
 To use an existing DSPA, set `dspa.deploy=false` and configure `dsPipelines.url`.
 
@@ -124,24 +137,25 @@ Key configuration options in `values.yaml`:
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `pipeline.name` | Model name | `alert-recommender` |
-| `pipeline.version` | Model version | `1.0.0` |
-| `pipeline.nNeighbors` | KNN neighbors | `5` |
-| `pipeline.deployModel` | Deploy after training | `true` |
-| `pipeline.registerModel` | Register with Model Registry | `false` |
-| `pipeline.deployFromRegistry` | Deploy model from registry instead of pipeline artifact | `false` |
-| `pipeline.modelVersionToDeploy` | Specific version to deploy from registry (empty = latest) | `""` |
-| `minio.endpoint` | MinIO endpoint URL | `http://minio-service:9000` |
-| `minio.deploy` | Deploy MinIO | `false` |
-| `modelRegistry.enabled` | Enable Model Registry | `false` |
-| `modelRegistry.url` | Model Registry URL | `http://model-registry:8080` |
+| `pipelines.alert_recommender.name` | Model name | `alert-recommender` |
+| `pipelines.alert_recommender.version` | Model version | `1.0.0` |
+| `pipelines.alert_recommender.nNeighbors` | KNN neighbors | `5` |
+| `pipelines.alert_recommender.deployModel` | Deploy after training | `true` |
+| `pipelines.alert_recommender.registerModel` | Register with Model Registry | `true` |
+| `pipelines.alert_recommender.deployFromRegistry` | Deploy model from registry instead of pipeline artifact | `false` |
+| `pipelines.alert_recommender.modelVersionToDeploy` | Specific version to deploy from registry (empty = latest) | `""` |
+| `aws-compatible-storage.client.endpoint` | Optional S4 S3 API override; otherwise derived from S4 name and port | `http://s4:7480` (derived) |
+| `aws-compatible-storage.client.bucketName` | Model artifact and fallback data bucket | `models` |
+| `dspa.objectStorage.bucket` | DSPA artifact bucket | `mlpipeline` |
+| `modelRegistry.enabled` | Enable Model Registry | `true` |
+| `modelRegistry.url` | Service CA verified Model Registry proxy | `https://model-registry.rhoai-model-registries.svc.cluster.local:8443` |
 
 ### Data Source Priority
 
 The pipeline automatically tries data sources in the following order:
 
 1. **PostgreSQL Database** (preferred) - Uses the `spending-monitor-secret` from the main application
-2. **MinIO** - Falls back to S3-compatible storage if database is unavailable
+2. **S4 S3 storage** - Falls back to the `models` bucket if the database is unavailable
 3. **Local Files** - Last resort fallback to bundled sample data
 
 No additional configuration is needed - the pipeline automatically reads database credentials from `spending-monitor-secret` when deployed in the same namespace as the spending-monitor application.
@@ -189,8 +203,14 @@ The pipeline service exposes the following REST endpoints:
 
 ### Example: Create Training Pipeline
 
+For the `spending-monitor` Helm release, forward the pipeline Service in a separate terminal:
+
 ```bash
-curl -X POST http://alert-recommender-pipeline/train \
+oc -n spending-transaction-monitor port-forward service/spending-monitor-alert-recommender-pipeline 8000:8080
+```
+
+```bash
+curl -X POST http://localhost:8000/train \
   -H "Content-Type: application/json" \
   -d '{
     "name": "alert-recommender",
@@ -204,7 +224,7 @@ curl -X POST http://alert-recommender-pipeline/train \
 ### Example: Check Pipeline Status
 
 ```bash
-curl http://alert-recommender-pipeline/status?pipeline_name=alert-recommender-v1-0-0
+curl 'http://localhost:8000/status?pipeline_name=alert-recommender-v1-0-0'
 ```
 
 ## Model Serving
@@ -233,12 +253,12 @@ curl -X POST http://<inference-url>/v2/models/alert-recommender/infer \
 ### Building the Container Image
 
 ```bash
-# Build the image
-podman build -t alert-recommender-pipeline:latest -f Containerfile .
-
-# Push to registry
-podman push alert-recommender-pipeline:latest quay.io/your-org/alert-recommender-pipeline:latest
+# From the repository root, build and publish the image selected by Make
+make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> build-ml-pipeline
+make REGISTRY_URL=quay.io REPOSITORY=<your-quay-org> IMAGE_TAG=<tag> push-ml-pipeline
 ```
+
+Release CI also publishes `quay.io/rh-ai-quickstart/alert-recommender-pipeline:<release-tag>` and `:latest`. `make deploy-with-ml-dspa` passes the selected pipeline repository and tag to Helm; use `ML_PIPELINE_IMAGE_REPOSITORY` and `ML_PIPELINE_IMAGE_TAG` when they differ from the UI/API image location.
 
 ### Local Development
 
@@ -265,7 +285,7 @@ pytest tests/ -v --cov=alert_recommender_pipeline
 ### 1. Prepare Data (`prepare_data`)
 - Automatically tries data sources in priority order:
   1. **Database**: Queries PostgreSQL directly for users, transactions, and alert rules (preferred)
-  2. **MinIO**: Downloads CSV files from S3-compatible storage
+  2. **S4 S3 storage**: Downloads CSV files from the `models` bucket
   3. **Local**: Falls back to local filesystem if other sources unavailable
 - Uses `spending-monitor-secret` for database credentials (no extra config needed)
 - Outputs: User and transaction CSV files, metadata JSON with data source used
@@ -279,8 +299,8 @@ pytest tests/ -v --cov=alert_recommender_pipeline
 ### 3. Save Model (`save_model`)
 - Creates KNNRecommender wrapper for MLServer
 - Wraps in sklearn Pipeline
-- Uploads to MinIO
-- Outputs: Model artifacts in MinIO
+- Uploads to the S4 `models` bucket
+- Outputs: Model artifacts in S4
 
 ### 4. Register Model (`register_model`) - Optional
 - Registers model with OpenDataHub Model Registry
@@ -299,7 +319,7 @@ pytest tests/ -v --cov=alert_recommender_pipeline
 - Removes InferenceService
 - Removes ServingRuntime
 - Removes secrets and RBAC resources
-- Optionally removes MinIO resources
+- Leaves Helm-managed S4 and stored model objects in place
 
 ## Model Registry Integration
 
@@ -308,7 +328,7 @@ When enabled, the pipeline registers models with the OpenDataHub Model Registry:
 ```yaml
 modelRegistry:
   enabled: true
-  url: "http://model-registry:8080"
+  url: "https://model-registry.rhoai-model-registries.svc.cluster.local:8443"
 ```
 
 This creates:
@@ -318,30 +338,32 @@ This creates:
 
 ### Deploy from Model Registry
 
-You can deploy a model directly from the Model Registry instead of from the pipeline's saved artifact. This is useful for:
+The training pipeline can use a model version from the Model Registry for its deploy step instead of the artifact saved by that run. This is useful for:
 - Deploying a specific version of a model that was trained earlier
-- Separating the training and deployment processes
 - Rolling back to a previous model version
 
 #### Configuration
 
-Enable in `values.yaml`:
+Enable in `values.yaml` for a pipeline that has a registered model version:
 
 ```yaml
-pipeline:
-  deployModel: true
-  deployFromRegistry: true
-  modelVersionToDeploy: ""  # Empty = latest version, or specify version like "25-01-29-143052"
+pipelines:
+  alert_recommender:
+    deployModel: true
+    deployFromRegistry: true
+    modelVersionToDeploy: ""  # Empty = latest version
 
 modelRegistry:
   enabled: true
-  url: "http://model-registry.rhoai-model-registries.svc.cluster.local:8080"
+  url: "https://model-registry.rhoai-model-registries.svc.cluster.local:8443"
 ```
+
+The deploy task reads its mounted service account token and the OpenShift service CA bundle to authenticate to this proxy. The default `deployFromRegistry=false` uses the model artifact saved by the current run.
 
 #### API Request
 
 ```bash
-curl -X POST http://alert-recommender-pipeline/train \
+curl -X POST http://localhost:8000/train \
   -H "Content-Type: application/json" \
   -d '{
     "name": "alert-recommender",
@@ -349,7 +371,7 @@ curl -X POST http://alert-recommender-pipeline/train \
     "deploy_model": true,
     "deploy_from_registry": true,
     "model_version_to_deploy": "",
-    "model_registry_url": "http://model-registry:8080"
+    "model_registry_url": "https://model-registry.rhoai-model-registries.svc.cluster.local:8443"
   }'
 ```
 
@@ -363,19 +385,19 @@ When `deploy_from_registry` is enabled, the deploy step:
 4. Extracts the storage URI from the model's custom properties
 5. Configures the InferenceService to use that storage URI
 
-This allows you to deploy any previously registered model version without re-running the training pipeline.
+The current pipeline still runs its prepare, train, and save steps; the deploy step can select an earlier registered version.
 
-#### Example: Deploy-Only Pipeline Configuration
+#### Example: Select a Registered Version After Training
 
 ```yaml
 pipelines:
-  deploy-from-registry:
+  alert_recommender:
     enabled: true
     name: "alert-recommender"
     version: "1.0.0"
     deployModel: true
     deployFromRegistry: true
-    modelVersionToDeploy: ""  # Deploy latest version
+    modelVersionToDeploy: ""  # Deploy latest version after this training run
 ```
 
 ## Troubleshooting
@@ -399,7 +421,7 @@ pipelines:
    ```bash
    kubectl get servingruntimes
    ```
-3. Verify MinIO connectivity and model artifacts
+3. Verify S4 readiness, credentials, bucket access, and model artifacts
 
 ### Data Loading Issues
 
@@ -412,10 +434,10 @@ pipelines:
 3. Ensure the database has users and transactions data
 4. Check pipeline logs for connection errors
 
-**For MinIO Data Source:**
-1. Verify MinIO endpoint and credentials
+**For S4 S3 Data Source:**
+1. Verify the `s4` service endpoint and `s4-credentials` Secret
 2. Check bucket and data paths
-3. Ensure data files exist in MinIO or local fallback
+3. Ensure data files exist in the S4 `models` bucket or local fallback
 
 ## License
 

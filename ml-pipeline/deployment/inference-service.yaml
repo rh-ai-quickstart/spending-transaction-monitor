@@ -5,6 +5,8 @@ metadata:
   namespace: {{ namespace }}
   annotations:
     serving.kserve.io/deploymentMode: RawDeployment
+    serving.kserve.io/storageSecretName: storage-config
+    model-version: "{{ model_version }}"
     openshift.io/display-name: "Alert Recommendation Model"
   labels:
     app: alert-recommender
@@ -13,18 +15,19 @@ spec:
   predictor:
     minReplicas: 1
     maxReplicas: 3
+    serviceAccountName: alert-recommender-sa
     model:
       modelFormat:
         name: sklearn
         version: "1"
       runtime: mlserver-sklearn
+      storageUri: "s3://{{ bucket }}/{{ model_path }}"
       storage:
-        key: minio-secret
-        path: {{ model_path }}
+        key: {{ bucket }}
         parameters:
-          endpoint: http://minio-service.{{ namespace }}.svc.cluster.local:9000
+          endpoint: "{{ s3_endpoint_url }}"
           bucket: {{ bucket }}
-          region: us-east-1
+          region: "{{ s3_region }}"
       resources:
         requests:
           cpu: 500m

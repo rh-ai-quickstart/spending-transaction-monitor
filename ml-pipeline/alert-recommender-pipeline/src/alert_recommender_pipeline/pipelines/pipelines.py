@@ -13,7 +13,7 @@ from .tasks import (
 
 def alert_recommender_pipeline(
     pipeline_name: str,
-    minio_endpoint: str,
+    s3_endpoint_url: str,
     deploy_model: str = "true",
     register_model: str = "false",
     model_registry_url: str = ""
@@ -41,13 +41,15 @@ def alert_recommender_pipeline(
             'POSTGRES_DB': 'POSTGRES_DB',
             'POSTGRES_USER': 'POSTGRES_USER',
             'POSTGRES_PASSWORD': 'POSTGRES_PASSWORD',
-            'MINIO_ENDPOINT': 'MINIO_ENDPOINT',
-            'MINIO_ACCESS_KEY': 'MINIO_ACCESS_KEY',
-            'MINIO_SECRET_KEY': 'MINIO_SECRET_KEY',
+            'S3_ENDPOINT_URL': 'S3_ENDPOINT_URL',
+            'S3_REGION': 'S3_REGION',
+            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
             'BUCKET_NAME': 'BUCKET_NAME',
             'NAMESPACE': 'NAMESPACE',
             'MODEL_REGISTRY_ENABLED': 'MODEL_REGISTRY_ENABLED',
             'MODEL_REGISTRY_URL': 'MODEL_REGISTRY_URL',
+            'MODEL_REGISTRY_CA_BUNDLE': 'MODEL_REGISTRY_CA_BUNDLE',
             'DEPLOY_FROM_REGISTRY': 'DEPLOY_FROM_REGISTRY',
             'MODEL_VERSION_TO_DEPLOY': 'MODEL_VERSION_TO_DEPLOY',
             'DEPLOY_MODEL': 'DEPLOY_MODEL',
@@ -102,13 +104,13 @@ def alert_recommender_pipeline(
     return _pipeline
 
 
-def training_only_pipeline(pipeline_name: str, minio_endpoint: str):
+def training_only_pipeline(pipeline_name: str, s3_endpoint_url: str):
     """
     Create a training-only pipeline (no deployment).
     
     Args:
         pipeline_name: Name of the pipeline (used for secrets)
-        minio_endpoint: MinIO endpoint URL
+        s3_endpoint_url: S4-backed S3 storage endpoint URL
     
     Returns:
         A Kubeflow pipeline function
@@ -133,9 +135,10 @@ def training_only_pipeline(pipeline_name: str, minio_endpoint: str):
             'POSTGRES_DB': 'POSTGRES_DB',
             'POSTGRES_USER': 'POSTGRES_USER',
             'POSTGRES_PASSWORD': 'POSTGRES_PASSWORD',
-            'MINIO_ENDPOINT': 'MINIO_ENDPOINT',
-            'MINIO_ACCESS_KEY': 'MINIO_ACCESS_KEY',
-            'MINIO_SECRET_KEY': 'MINIO_SECRET_KEY',
+            'S3_ENDPOINT_URL': 'S3_ENDPOINT_URL',
+            'S3_REGION': 'S3_REGION',
+            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
             'BUCKET_NAME': 'BUCKET_NAME',
             'NAMESPACE': 'NAMESPACE',
         }
