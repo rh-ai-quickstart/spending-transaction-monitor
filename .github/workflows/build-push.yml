@@ -36,6 +36,10 @@ jobs:
     # Skip running on forked repositories
     if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     outputs:
       new_release_tag: ${{ steps.get-tag.outputs.tag }}
 
@@ -43,13 +47,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.TOKEN }}
         fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
 
     - name: Install semantic-release dependencies
       run: |
@@ -63,7 +66,7 @@ jobs:
     - name: Run semantic-release
       id: semantic
       env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: semantic-release
 
     - name: Get latest tag
