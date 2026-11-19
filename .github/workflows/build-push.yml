@@ -1,129 +1,31 @@
-name: CI/CD Pipeline
+name: Release token dry run
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-env:
-  REGISTRY: quay.io
-  REPOSITORY: rh-ai-quickstart
-  PROJECT_NAME: spending-monitor
+    branches: [release-token-check]
 
 jobs:
-  verify-ml-pipeline-image:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build pipeline image without publishing
-      uses: docker/build-push-action@v5
-      with:
-        context: ./ml-pipeline
-        file: ./ml-pipeline/alert-recommender-pipeline/Containerfile
-        platforms: linux/amd64
-        push: false
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
   semantic-release:
-    # Skip running on forked repositories
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    outputs:
-      new_release_tag: ${{ steps.get-tag.outputs.tag }}
+    permissions:
+      contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.TOKEN }}
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
 
-    - name: Install semantic-release dependencies
-      run: |
-        npm install -g semantic-release @semantic-release/changelog @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/github
+      - name: Install semantic-release dependencies
+        run: |
+          npm install -g semantic-release @semantic-release/changelog @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/github
 
-    - name: Get tag before release
-      id: previous-tag
-      run: |
-        echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> "$GITHUB_OUTPUT"
-
-    - name: Run semantic-release
-      id: semantic
-      env:
-        GITHUB_TOKEN: ${{ secrets.TOKEN }}
-      run: semantic-release
-
-    - name: Get latest tag
-      id: get-tag
-      run: |
-        TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-        if [ -n "$TAG" ] && [ "$TAG" != "${{ steps.previous-tag.outputs.tag }}" ]; then
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-        fi
-
-  build-and-push:
-    needs: semantic-release
-    # This job only runs if a new release tag was created by semantic-release
-    if: github.event_name == 'push' && needs.semantic-release.outputs.new_release_tag != ''
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: spending-monitor-ui
-            context: .
-            containerfile: ./packages/ui/Containerfile
-            platforms: linux/amd64,linux/arm64
-          - image: spending-monitor-api
-            context: .
-            containerfile: ./packages/api/Containerfile
-            platforms: linux/amd64,linux/arm64
-          - image: spending-monitor-db
-            context: .
-            containerfile: ./packages/db/Containerfile
-            platforms: linux/amd64,linux/arm64
-          - image: alert-recommender-pipeline
-            context: ./ml-pipeline
-            containerfile: ./ml-pipeline/alert-recommender-pipeline/Containerfile
-            platforms: linux/amd64
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Login to Quay.io
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.QUAY_USERNAME }}
-        password: ${{ secrets.QUAY_PASSWORD }}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ${{ matrix.context }}
-        file: ${{ matrix.containerfile }}
-        platforms: ${{ matrix.platforms }}
-        push: true
-        tags: |
-          ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ matrix.image }}:${{ needs.semantic-release.outputs.new_release_tag }}
-          ${{ env.REGISTRY }}/${{ env.REPOSITORY }}/${{ matrix.image }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          TORCH_VARIANT=cuda
+      - name: Check the built-in release token
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: semantic-release --dry-run --branches release-token-check
