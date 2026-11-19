@@ -26,6 +26,4 @@ jobs:
           npm install -g semantic-release @semantic-release/changelog @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/github
 
       - name: Check the built-in release token
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release --dry-run --branches release-token-check
